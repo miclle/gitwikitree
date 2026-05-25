@@ -1,0 +1,395 @@
+@import './base.css';
+
+body {
+  min-width: 1024px;
+  overflow: hidden;
+  background:
+    linear-gradient(120deg, rgba(253, 246, 232, 0.74), rgba(232, 244, 242, 0.82)), #f7f3ea;
+  user-select: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+  color: #22231f;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px;
+  border-right: 1px solid rgba(55, 66, 58, 0.14);
+  background: rgba(255, 252, 245, 0.86);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand svg {
+  color: #1d6f5a;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 760;
+}
+
+.brand span,
+.eyebrow,
+.repo-meta,
+.change-count {
+  color: #68706a;
+}
+
+.brand span,
+.repo-meta,
+.repo-status,
+.eyebrow,
+.change-count {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.primary-action,
+.action-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 8px;
+  color: #fffaf0;
+  background: #286b58;
+  font-weight: 700;
+}
+
+.repo-list {
+  display: grid;
+  gap: 10px;
+}
+
+.repo-item {
+  display: grid;
+  gap: 7px;
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid rgba(71, 84, 77, 0.1);
+  border-radius: 8px;
+  text-align: left;
+  color: #2a2d28;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.repo-item.active {
+  border-color: rgba(40, 107, 88, 0.34);
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(51, 55, 49, 0.08);
+}
+
+.repo-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 740;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-meta,
+.repo-status,
+.branch-pill,
+.toolbar-actions,
+.path-row,
+.panel-heading,
+.action-row,
+.activity-panel li {
+  display: flex;
+  align-items: center;
+}
+
+.repo-meta {
+  gap: 6px;
+}
+
+.repo-status {
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #8a3d2b;
+  background: #f8e7df;
+  font-weight: 700;
+}
+
+.repo-status.clean {
+  color: #286b58;
+  background: #e0f0ea;
+}
+
+.workspace {
+  min-width: 0;
+  padding: 22px 26px 26px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  height: 54px;
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, 58vw);
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(72, 82, 74, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.search-field input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #252823;
+  background: transparent;
+}
+
+.toolbar-actions {
+  gap: 8px;
+}
+
+.toolbar-actions button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(72, 82, 74, 0.16);
+  border-radius: 8px;
+  color: #343832;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.25fr);
+  grid-template-rows: minmax(420px, 1fr) 180px;
+  gap: 16px;
+  height: calc(100vh - 102px);
+  min-height: 620px;
+}
+
+.file-panel,
+.detail-panel,
+.activity-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid rgba(67, 75, 67, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 50px rgba(61, 55, 43, 0.08);
+}
+
+.activity-panel {
+  grid-column: 1 / -1;
+}
+
+.panel-heading {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.panel-heading.compact {
+  justify-content: flex-start;
+}
+
+.panel-heading h2 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 19px;
+  line-height: 25px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-pill {
+  flex-shrink: 0;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #255f50;
+  background: #e0f0ea;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.path-row {
+  gap: 4px;
+  height: 34px;
+  margin-bottom: 12px;
+  color: #737870;
+  font-size: 13px;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(62, 70, 63, 0.1);
+  border-radius: 8px;
+  color: #2e332e;
+  background: #fbfaf6;
+}
+
+.file-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row strong {
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.file-row .modified {
+  color: #9a4f23;
+}
+
+.file-row .added {
+  color: #21724f;
+}
+
+.file-row .clean {
+  color: #6f766f;
+}
+
+.diff-preview {
+  display: grid;
+  gap: 8px;
+  min-height: 248px;
+  padding: 16px;
+  border: 1px solid rgba(61, 67, 61, 0.14);
+  border-radius: 8px;
+  background: #292c28;
+  color: #f2f0e8;
+  font-family: SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.diff-line {
+  overflow: hidden;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-line.added {
+  color: #c9f1d9;
+  background: rgba(45, 126, 85, 0.2);
+}
+
+.diff-line.removed {
+  color: #ffd0c2;
+  background: rgba(151, 72, 44, 0.2);
+}
+
+.diff-line.neutral {
+  color: #d7d5cb;
+}
+
+.action-row {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.action-row button {
+  min-width: 128px;
+  padding: 0 14px;
+}
+
+.activity-panel ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+}
+
+.activity-panel li {
+  gap: 9px;
+  min-height: 52px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #343832;
+  background: #fbfaf6;
+}
+
+.activity-panel li svg {
+  flex-shrink: 0;
+  color: #286b58;
+}
+
+@media (max-width: 1080px) {
+  body {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .app-shell,
+  .content-grid,
+  .activity-panel ol {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid rgba(55, 66, 58, 0.14);
+  }
+
+  .content-grid {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto;
+  }
+
+  .activity-panel {
+    grid-column: auto;
+  }
+}
