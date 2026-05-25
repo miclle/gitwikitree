@@ -41,7 +41,7 @@ function App(): React.JSX.Element {
         <div className="brand">
           <FolderGit2 size={28} strokeWidth={2.2} />
           <div>
-            <h1>GitWikiTree</h1>
+            <h1>Git Wikitree</h1>
             <span>Git file workspace</span>
           </div>
         </div>

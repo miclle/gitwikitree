@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: gitwikitree
+appId: com.miclle.gitwikitree
+productName: Git Wikitree
 directories:
   buildResources: build
 files:
@@ -33,7 +33,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: miclle
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}

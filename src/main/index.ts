@@ -3,6 +3,10 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+const appName = 'Git Wikitree'
+
+app.setName(appName)
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -10,7 +14,7 @@ function createWindow(): void {
     height: 670,
     minWidth: 1024,
     minHeight: 720,
-    title: 'GitWikiTree',
+    title: appName,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),

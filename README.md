@@ -1,6 +1,6 @@
-# GitWikiTree
+# Git Wikitree
 
-GitWikiTree is a desktop Git file workspace initialized with Electron, electron-vite, React, and TypeScript.
+Git Wikitree is a desktop Git file workspace initialized with Electron, electron-vite, React, and TypeScript.
 
 ## Stack
 
