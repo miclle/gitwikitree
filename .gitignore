@@ -1,6 +1,59 @@
-node_modules
-dist
-out
-.DS_Store
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+release/
+dist-electron/
+*.asar
+*.blockmap
+
+# Electron builder generated files
+dev-app-update.yml
+builder-debug.yml
+builder-effective-config.yaml
+
+# Logs
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Caches
 .eslintcache
-*.log*
+.vite/
+.cache/
+.parcel-cache/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Editor metadata
+.idea/
+*.swp
+*.swo

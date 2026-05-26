@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import {
   BookOpen,
+  Bot,
   ChevronDown,
   ChevronRight,
-  Clipboard,
   Code2,
+  Copy,
   File,
   FileCode2,
   FileImage,
@@ -12,8 +13,13 @@ import {
   Folder,
   FolderOpen,
   GitBranch,
+  Github,
+  Lock,
   Loader2,
-  Plus
+  Menu,
+  Plus,
+  Search,
+  Terminal
 } from 'lucide-react'
 
 type TreeNode = {
@@ -26,7 +32,12 @@ type TreeNode = {
 type Repository = {
   name: string
   path: string
+  rootPath: string
   branch: string
+  activeRef: string
+  source: 'working-tree' | 'git-ref' | 'worktree'
+  editable: boolean
+  refs: Array<{ name: string; type: 'local' | 'remote'; current: boolean }>
   tree: TreeNode[]
 }
 
@@ -43,6 +54,7 @@ type FilePreview = {
   name: string
   extension: string
   previewType: 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+  editable: boolean
   content?: string
   dataUrl?: string
   size: number
@@ -67,13 +79,79 @@ function renderInlineMarkdown(value: string): string {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
 }
 
+function splitTableRow(row: string): string[] {
+  const trimmed = row.trim().replace(/^\|/, '').replace(/\|$/, '')
+  const cells: string[] = []
+  let current = ''
+  let escaped = false
+
+  for (const character of trimmed) {
+    if (escaped) {
+      current += character
+      escaped = false
+      continue
+    }
+
+    if (character === '\\') {
+      escaped = true
+      continue
+    }
+
+    if (character === '|') {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+
+    current += character
+  }
+
+  cells.push(current.trim())
+  return cells
+}
+
+function getTableAlignments(
+  row: string
+): Array<'left' | 'center' | 'right' | undefined> | undefined {
+  const cells = splitTableRow(row)
+
+  if (cells.length === 0 || !cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))) {
+    return undefined
+  }
+
+  return cells.map((cell) => {
+    const compact = cell.replace(/\s+/g, '')
+    if (compact.startsWith(':') && compact.endsWith(':')) return 'center'
+    if (compact.endsWith(':')) return 'right'
+    if (compact.startsWith(':')) return 'left'
+    return undefined
+  })
+}
+
+function isTableStart(currentLine: string, nextLine?: string): boolean {
+  return Boolean(
+    currentLine.includes('|') && nextLine?.includes('|') && getTableAlignments(nextLine)
+  )
+}
+
+function renderTableCell(
+  tag: 'td' | 'th',
+  content: string,
+  alignment: 'left' | 'center' | 'right' | undefined
+): string {
+  const alignAttribute = alignment ? ` style="text-align: ${alignment}"` : ''
+  return `<${tag}${alignAttribute}>${renderInlineMarkdown(content)}</${tag}>`
+}
+
 function markdownToHtml(markdown: string): string {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
   const html: string[] = []
   let inCode = false
   let inList = false
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+
     if (line.startsWith('```')) {
       if (inList) {
         html.push('</ul>')
@@ -86,6 +164,38 @@ function markdownToHtml(markdown: string): string {
 
     if (inCode) {
       html.push(`${escapeHtml(line)}\n`)
+      continue
+    }
+
+    if (isTableStart(line, lines[index + 1])) {
+      if (inList) {
+        html.push('</ul>')
+        inList = false
+      }
+
+      const headers = splitTableRow(line)
+      const alignments = getTableAlignments(lines[index + 1]) ?? []
+      const bodyRows: string[] = []
+      index += 2
+
+      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
+        const cells = splitTableRow(lines[index])
+        bodyRows.push(
+          `<tr>${headers
+            .map((_, cellIndex) =>
+              renderTableCell('td', cells[cellIndex] ?? '', alignments[cellIndex])
+            )
+            .join('')}</tr>`
+        )
+        index += 1
+      }
+
+      index -= 1
+      html.push(
+        `<table><thead><tr>${headers
+          .map((header, cellIndex) => renderTableCell('th', header, alignments[cellIndex]))
+          .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table>`
+      )
       continue
     }
 
@@ -123,26 +233,26 @@ function markdownToHtml(markdown: string): string {
   return html.join('\n')
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
 function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): React.JSX.Element {
   if (node.type === 'directory') {
-    return expanded ? <FolderOpen size={18} /> : <Folder size={18} />
+    return expanded ? (
+      <FolderOpen className="folder-icon" size={18} />
+    ) : (
+      <Folder className="folder-icon" size={18} />
+    )
   }
 
   const lowerName = node.name.toLowerCase()
-  if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) return <BookOpen size={18} />
+  if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
+    return <BookOpen className="file-icon" size={18} />
+  }
   if (lowerName.endsWith('.svg') || /\.(png|jpe?g|gif|webp|ico)$/.test(lowerName)) {
-    return <FileImage size={18} />
+    return <FileImage className="file-icon" size={18} />
   }
   if (/\.(html?|tsx?|jsx?|css|json|ya?ml|xml|sh|swift|go|rs|py)$/.test(lowerName)) {
-    return <FileCode2 size={18} />
+    return <FileCode2 className="file-icon" size={18} />
   }
-  return <File size={18} />
+  return <File className="file-icon" size={18} />
 }
 
 function App(): React.JSX.Element {
@@ -153,29 +263,35 @@ function App(): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const [copied, setCopied] = useState(false)
-  const [sidebarWidth, setSidebarWidth] = useState(340)
+  const [sidebarWidth, setSidebarWidth] = useState(360)
   const [isResizing, setIsResizing] = useState(false)
 
-  const selectedLabel = selectedPath || repository?.name || 'No repository selected'
   const fullSelectedPath = repository
-    ? selectedPath
-      ? `${repository.path}/${selectedPath}`
-      : repository.path
+    ? repository.source === 'git-ref'
+      ? `${repository.path}@${repository.activeRef}${selectedPath ? `:${selectedPath}` : ''}`
+      : selectedPath
+        ? `${repository.path}/${selectedPath}`
+        : repository.path
     : ''
 
   const loadPreview = useCallback(
-    async (path: string, repo = repository): Promise<void> => {
-      if (!repo) return
+    async (path: string, repo = repository): Promise<Preview | undefined> => {
+      if (!repo) return undefined
 
       setPreviewLoading(true)
       setError(undefined)
 
       try {
-        const nextPreview = await window.api.previewPath(repo.path, path)
+        const nextPreview = await window.api.previewPath(repo.path, path, {
+          ref: repo.activeRef,
+          source: repo.source,
+          rootPath: repo.rootPath
+        })
         setPreview(nextPreview)
+        return nextPreview
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
+        return undefined
       } finally {
         setPreviewLoading(false)
       }
@@ -240,7 +356,7 @@ function App(): React.JSX.Element {
     if (!isResizing) return
 
     const handleMouseMove = (event: MouseEvent): void => {
-      setSidebarWidth(Math.min(Math.max(event.clientX, 240), 560))
+      setSidebarWidth(Math.min(Math.max(event.clientX, 280), 520))
     }
     const handleMouseUp = (): void => setIsResizing(false)
 
@@ -273,19 +389,72 @@ function App(): React.JSX.Element {
   const copyPath = useCallback(async (): Promise<void> => {
     if (!fullSelectedPath) return
     await navigator.clipboard.writeText(fullSelectedPath)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1200)
   }, [fullSelectedPath])
 
-  const previewTitle = useMemo(() => {
-    if (!preview) return 'Preview'
-    if (preview.kind === 'directory' && preview.readme) return preview.readme.path
-    if (preview.kind === 'directory') return preview.path || repository?.name || 'Repository'
-    return preview.path
-  }, [preview, repository])
+  const switchRef = useCallback(
+    async (ref: string): Promise<void> => {
+      if (!repository || ref === repository.activeRef) return
+
+      setLoading(true)
+      setError(undefined)
+
+      try {
+        const nextRepository = await window.api.loadRef(
+          repository.rootPath,
+          ref,
+          repository.rootPath
+        )
+        setRepository(nextRepository)
+        setSelectedPath('')
+        setExpandedPaths(defaultExpanded)
+        await loadPreview('', nextRepository)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [loadPreview, repository]
+  )
+
+  const breadcrumbParts = selectedPath ? selectedPath.split('/').filter(Boolean) : []
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
+      {repository && (
+        <header className="github-topbar">
+          <div className="topbar-left">
+            <button className="topbar-icon-button" type="button" aria-label="Menu">
+              <Menu size={20} />
+            </button>
+            <Github className="github-mark" size={34} />
+            <div className="topbar-repo">
+              <span>miclle</span>
+              <span className="repo-slash">/</span>
+              <strong>{repository.name}</strong>
+              <Lock size={14} />
+            </div>
+          </div>
+          <div className="topbar-right">
+            <div className="topbar-search">
+              <Search size={18} />
+              <span>
+                Type <kbd>/</kbd> to search
+              </span>
+            </div>
+            <button className="topbar-icon-button" type="button" aria-label="Terminal">
+              <Terminal size={18} />
+            </button>
+            <button className="topbar-icon-button" type="button" aria-label="Agents">
+              <Bot size={18} />
+            </button>
+            <button className="topbar-icon-button" type="button" aria-label="More">
+              <ChevronDown size={16} />
+            </button>
+          </div>
+        </header>
+      )}
+
       {error && <div className="error-banner">{error}</div>}
 
       {!repository ? (
@@ -308,26 +477,31 @@ function App(): React.JSX.Element {
           style={{ gridTemplateColumns: `${sidebarWidth}px 1px minmax(0, 1fr)` }}
         >
           <aside className="tree-panel" aria-label="Files">
-            <div className="panel-bar">
-              <div className="repo-title">
-                <strong>Files</strong>
-                <span>{repository.path}</span>
-              </div>
+            <div className="sidebar-controls">
+              <span className="branch-pill">
+                <GitBranch size={15} />
+                <select
+                  aria-label="Branch"
+                  disabled={loading}
+                  value={repository.activeRef}
+                  onChange={(event) => void switchRef(event.target.value)}
+                >
+                  {repository.refs.map((ref) => (
+                    <option key={`${ref.type}:${ref.name}`} value={ref.name}>
+                      {ref.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <button className="sidebar-control-button" type="button" aria-label="Add">
+                <Plus size={18} />
+              </button>
+              <button className="sidebar-control-button" type="button" aria-label="Search files">
+                <Search size={18} />
+              </button>
             </div>
 
             <div className="tree">
-              <button
-                className={selectedPath === '' ? 'tree-row selected' : 'tree-row'}
-                type="button"
-                onClick={() => {
-                  setSelectedPath('')
-                  void loadPreview('')
-                }}
-              >
-                <ChevronDown size={16} />
-                <FolderOpen size={18} />
-                <span>{repository.name}</span>
-              </button>
               {repository.tree.map((node) => (
                 <TreeRow
                   expandedPaths={expandedPaths}
@@ -350,31 +524,59 @@ function App(): React.JSX.Element {
           />
 
           <section className="preview-panel">
-            <div className="path-toolbar">
-              <div className="path-title">
-                <span>{selectedLabel}</span>
-                {preview?.kind === 'file' && <small>{formatBytes(preview.size)}</small>}
+            <div className="repo-pathbar">
+              <div className="breadcrumb">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPath('')
+                    void loadPreview('')
+                  }}
+                >
+                  {repository.name}
+                </button>
+                {breadcrumbParts.map((part, index) => {
+                  const path = breadcrumbParts.slice(0, index + 1).join('/')
+                  const isLast = index === breadcrumbParts.length - 1
+
+                  return (
+                    <span className={isLast ? 'breadcrumb-current' : undefined} key={path}>
+                      <span className="slash">/</span>
+                      {isLast ? (
+                        <strong>{part}</strong>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedPath(path)
+                            void loadPreview(path)
+                          }}
+                        >
+                          {part}
+                        </button>
+                      )}
+                    </span>
+                  )
+                })}
+                <button
+                  className="copy-path-button"
+                  type="button"
+                  aria-label="Copy path"
+                  onClick={copyPath}
+                >
+                  <Copy size={17} />
+                </button>
               </div>
-              <span className="branch-pill">
-                <GitBranch size={15} />
-                {repository.branch}
-              </span>
-              <button type="button" title="Copy path" aria-label="Copy path" onClick={copyPath}>
-                {copied ? 'Copied' : <Clipboard size={17} />}
-              </button>
             </div>
 
-            <div className="preview-body">
-              {previewLoading && (
-                <div className="loading-state">
-                  <Loader2 className="spin" size={26} />
-                </div>
-              )}
-              {!previewLoading && preview && (
-                <>
-                  <div className="content-header">
-                    <span>{previewTitle}</span>
+            <div className="blob-card">
+              <div className="preview-body">
+                {previewLoading && (
+                  <div className="loading-state">
+                    <Loader2 className="spin" size={26} />
                   </div>
+                )}
+                {!previewLoading && preview && (
                   <PreviewContent
                     preview={preview}
                     onSelectPath={(path) => {
@@ -382,8 +584,8 @@ function App(): React.JSX.Element {
                       void loadPreview(path)
                     }}
                   />
-                </>
-              )}
+                )}
+              </div>
             </div>
           </section>
         </section>
@@ -441,6 +643,49 @@ function TreeRow({
           />
         ))}
     </>
+  )
+}
+
+function highlightCodeLine(line: string): string {
+  const tokenPattern =
+    /('[^']*'|"[^"]*"|`[^`]*`)|\b(import|from|type|const|let|function|return|if|else|for|while|async|await|try|catch|finally|switch|case|break|continue|true|false|undefined|null)\b|\b(\d+(?:\.\d+)?)\b/g
+  let cursor = 0
+  let html = ''
+
+  for (const match of line.matchAll(tokenPattern)) {
+    const index = match.index ?? 0
+    html += escapeHtml(line.slice(cursor, index))
+
+    if (match[1]) {
+      html += `<span class="tok-string">${escapeHtml(match[1])}</span>`
+    } else if (match[2]) {
+      html += `<span class="tok-keyword">${escapeHtml(match[2])}</span>`
+    } else if (match[3]) {
+      html += `<span class="tok-number">${escapeHtml(match[3])}</span>`
+    }
+
+    cursor = index + match[0].length
+  }
+
+  return html + escapeHtml(line.slice(cursor))
+}
+
+function CodePreview({ content }: { content: string }): React.JSX.Element {
+  const lines = content.split('\n')
+
+  return (
+    <table className="code-table" aria-label="Source code">
+      <tbody>
+        {lines.map((line, index) => (
+          <tr key={`${index}-${line}`}>
+            <td className="line-number">{index + 1}</td>
+            <td className="line-code">
+              <span dangerouslySetInnerHTML={{ __html: highlightCodeLine(line) || ' ' }} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -508,11 +753,7 @@ function PreviewContent({
   }
 
   if (preview.content) {
-    return (
-      <pre className="code-preview">
-        <code>{preview.content}</code>
-      </pre>
-    )
+    return <CodePreview content={preview.content} />
   }
 
   return (

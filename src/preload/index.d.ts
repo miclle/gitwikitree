@@ -10,7 +10,12 @@ export type TreeNode = {
 export type RepositoryPayload = {
   name: string
   path: string
+  rootPath: string
   branch: string
+  activeRef: string
+  source: 'working-tree' | 'git-ref' | 'worktree'
+  editable: boolean
+  refs: Array<{ name: string; type: 'local' | 'remote'; current: boolean }>
   tree: TreeNode[]
 }
 
@@ -27,6 +32,7 @@ export type FilePreview = {
   name: string
   extension: string
   previewType: 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+  editable: boolean
   content?: string
   dataUrl?: string
   size: number
@@ -38,7 +44,18 @@ export type GitWikitreeAPI = {
   newWindow: () => Promise<void>
   pickRepository: () => Promise<RepositoryPayload | undefined>
   loadRepository: (repoPath: string) => Promise<RepositoryPayload>
-  previewPath: (repoPath: string, relativePath: string) => Promise<PreviewPayload>
+  loadRef: (repoPath: string, ref: string, rootPath?: string) => Promise<RepositoryPayload>
+  openWorktree: (repoPath: string, ref: string) => Promise<RepositoryPayload>
+  previewPath: (
+    repoPath: string,
+    relativePath: string,
+    options?: {
+      ref?: string
+      source?: 'working-tree' | 'git-ref' | 'worktree'
+      rootPath?: string
+    }
+  ) => Promise<PreviewPayload>
+  saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => () => void
   onOpenRepositoryRequest: (callback: () => void) => () => void
 }

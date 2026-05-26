@@ -9,6 +9,7 @@ import {
   type MenuItemConstructorOptions
 } from 'electron'
 import { execFile } from 'child_process'
+import { existsSync, statSync } from 'fs'
 import { promises as fs } from 'fs'
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { promisify } from 'util'
@@ -29,7 +30,12 @@ type TreeNode = {
 type RepositoryPayload = {
   name: string
   path: string
+  rootPath: string
   branch: string
+  activeRef: string
+  source: 'working-tree' | 'git-ref' | 'worktree'
+  editable: boolean
+  refs: Array<{ name: string; type: 'local' | 'remote'; current: boolean }>
   tree: TreeNode[]
 }
 
@@ -46,6 +52,7 @@ type PreviewPayload =
       name: string
       extension: string
       previewType: 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+      editable: boolean
       content?: string
       dataUrl?: string
       size: number
@@ -54,6 +61,21 @@ type PreviewPayload =
 app.setName(appName)
 
 const windows = new Set<BrowserWindow>()
+
+function getInitialRepositoryPath(): string | undefined {
+  const envPath = process.env['GITWIKITREE_OPEN_PATH']
+  if (envPath) return envPath
+
+  return process.argv.slice(1).find((argument) => {
+    if (!isAbsolute(argument) || !existsSync(argument)) return false
+
+    try {
+      return statSync(argument).isDirectory()
+    } catch {
+      return false
+    }
+  })
+}
 
 function toPosixPath(path: string): string {
   return path.split(sep).join('/')
@@ -76,6 +98,11 @@ async function assertRepositoryPath(repoPath: string): Promise<string> {
   return resolved
 }
 
+async function getRepositoryRoot(repoPath: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['-C', repoPath, 'rev-parse', '--show-toplevel'])
+  return stdout.trim()
+}
+
 async function getBranch(repoPath: string): Promise<string> {
   try {
     const { stdout } = await execFileAsync('git', ['-C', repoPath, 'branch', '--show-current'])
@@ -85,6 +112,43 @@ async function getBranch(repoPath: string): Promise<string> {
   }
 }
 
+async function getRefs(
+  repoPath: string,
+  currentBranch: string
+): Promise<RepositoryPayload['refs']> {
+  const { stdout } = await execFileAsync('git', [
+    '-C',
+    repoPath,
+    'for-each-ref',
+    '--format=%(refname:short)%09%(refname)',
+    'refs/heads',
+    'refs/remotes'
+  ])
+
+  const seen = new Set<string>()
+  return stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, fullName] = line.split('\t')
+      return {
+        name,
+        type: fullName?.startsWith('refs/remotes/') ? ('remote' as const) : ('local' as const),
+        current: name === currentBranch
+      }
+    })
+    .filter((ref) => {
+      if (!ref.name || ref.name.endsWith('/HEAD') || seen.has(ref.name)) return false
+      seen.add(ref.name)
+      return true
+    })
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'local' ? -1 : 1
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    })
+}
+
 async function getGitVisibleFiles(repoPath: string): Promise<string[]> {
   const { stdout } = await execFileAsync('git', [
     '-C',
@@ -92,6 +156,26 @@ async function getGitVisibleFiles(repoPath: string): Promise<string[]> {
     'ls-files',
     '-co',
     '--exclude-standard'
+  ])
+
+  return stdout
+    .split('\n')
+    .map((file) => file.trim())
+    .filter((file) => Boolean(file) && !file.startsWith('.worktrees/'))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+}
+
+async function getRefFiles(repoPath: string, ref: string): Promise<string[]> {
+  await assertValidRef(repoPath, ref)
+  const { stdout } = await execFileAsync('git', [
+    '-C',
+    repoPath,
+    '-c',
+    'core.quotepath=false',
+    'ls-tree',
+    '-r',
+    '--name-only',
+    ref
   ])
 
   return stdout
@@ -131,12 +215,36 @@ function insertPath(tree: TreeNode[], filePath: string): void {
   })
 }
 
-async function loadRepository(repoPath: string): Promise<RepositoryPayload> {
+async function assertValidRef(repoPath: string, ref: string): Promise<void> {
+  if (!ref || ref.includes('\0') || ref.startsWith('-')) {
+    throw new Error('Invalid git ref.')
+  }
+
+  await execFileAsync('git', ['-C', repoPath, 'rev-parse', '--verify', `${ref}^{commit}`])
+}
+
+async function loadRepository(
+  repoPath: string,
+  options: {
+    ref?: string
+    source?: 'working-tree' | 'git-ref' | 'worktree'
+    rootPath?: string
+  } = {}
+): Promise<RepositoryPayload> {
   const resolvedPath = await assertRepositoryPath(repoPath)
-  const [branch, files] = await Promise.all([
+  const rootPath = options.rootPath
+    ? resolve(options.rootPath)
+    : await getRepositoryRoot(resolvedPath)
+  const source = options.source ?? 'working-tree'
+  const [branch, refs] = await Promise.all([
     getBranch(resolvedPath),
-    getGitVisibleFiles(resolvedPath)
+    getRefs(resolvedPath, await getBranch(resolvedPath))
   ])
+  const activeRef = options.ref ?? branch
+  const files =
+    source === 'git-ref'
+      ? await getRefFiles(resolvedPath, activeRef)
+      : await getGitVisibleFiles(resolvedPath)
   const tree: TreeNode[] = []
 
   files.forEach((file) => insertPath(tree, file))
@@ -144,7 +252,12 @@ async function loadRepository(repoPath: string): Promise<RepositoryPayload> {
   return {
     name: basename(resolvedPath),
     path: resolvedPath,
+    rootPath,
     branch,
+    activeRef,
+    source,
+    editable: source !== 'git-ref',
+    refs: refs.map((ref) => ({ ...ref, current: ref.name === activeRef })),
     tree
   }
 }
@@ -254,18 +367,72 @@ function getPreviewType(
   return 'unsupported'
 }
 
-async function getPreview(repoPath: string, relativePath = ''): Promise<PreviewPayload> {
-  const repository = await loadRepository(repoPath)
+function assertSafeGitRelativePath(relativePath: string): void {
+  if (
+    relativePath.includes('\0') ||
+    relativePath.startsWith('/') ||
+    relativePath.split('/').includes('..')
+  ) {
+    throw new Error('Invalid file path.')
+  }
+}
+
+async function readRefFile(repoPath: string, ref: string, relativePath: string): Promise<Buffer> {
+  assertSafeGitRelativePath(relativePath)
+
+  await assertValidRef(repoPath, ref)
+  const { stdout } = await execFileAsync(
+    'git',
+    ['-C', repoPath, 'show', `${ref}:${relativePath}`],
+    {
+      encoding: 'buffer',
+      maxBuffer: 20 * 1024 * 1024
+    }
+  )
+
+  return Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout)
+}
+
+async function getRefFileSize(
+  repoPath: string,
+  ref: string,
+  relativePath: string
+): Promise<number> {
+  assertSafeGitRelativePath(relativePath)
+
+  const { stdout } = await execFileAsync('git', [
+    '-C',
+    repoPath,
+    'cat-file',
+    '-s',
+    `${ref}:${relativePath}`
+  ])
+  return Number(stdout.trim()) || 0
+}
+
+async function getPreview(
+  repoPath: string,
+  relativePath = '',
+  options: {
+    ref?: string
+    source?: 'working-tree' | 'git-ref' | 'worktree'
+    rootPath?: string
+  } = {}
+): Promise<PreviewPayload> {
+  const repository = await loadRepository(repoPath, options)
   const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined
   const target = safeJoin(repository.path, relativePath)
-  const stats = await fs.stat(target)
+  const isRefSource = repository.source === 'git-ref'
+  const stats = isRefSource ? undefined : await fs.stat(target)
 
-  if (stats.isDirectory()) {
+  if ((isRefSource && (!relativePath || node?.type === 'directory')) || stats?.isDirectory()) {
     const children = relativePath ? (node?.children ?? []) : repository.tree
     const readme = findReadme(children)
 
     if (readme) {
-      const content = await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
+      const content = isRefSource
+        ? (await readRefFile(repository.path, repository.activeRef, readme.path)).toString('utf8')
+        : await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
       return {
         kind: 'directory',
         path: toPosixPath(relativePath),
@@ -289,17 +456,23 @@ async function getPreview(repoPath: string, relativePath = ''): Promise<PreviewP
 
   const extension = extname(target).toLowerCase()
   const previewType = getPreviewType(extension)
+  const size = isRefSource
+    ? await getRefFileSize(repository.path, repository.activeRef, relativePath)
+    : (stats?.size ?? 0)
   const payload = {
     kind: 'file' as const,
     path: toPosixPath(relativePath),
     name: basename(target),
     extension,
     previewType,
-    size: stats.size
+    editable: repository.editable,
+    size
   }
 
   if (previewType === 'image') {
-    const buffer = await fs.readFile(target)
+    const buffer = isRefSource
+      ? await readRefFile(repository.path, repository.activeRef, relativePath)
+      : await fs.readFile(target)
     return {
       ...payload,
       dataUrl: `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
@@ -309,18 +482,96 @@ async function getPreview(repoPath: string, relativePath = ''): Promise<PreviewP
   if (previewType === 'svg') {
     return {
       ...payload,
-      content: await fs.readFile(target, 'utf8')
+      content: isRefSource
+        ? (await readRefFile(repository.path, repository.activeRef, relativePath)).toString('utf8')
+        : await fs.readFile(target, 'utf8')
     }
   }
 
-  if (previewType !== 'unsupported' && stats.size <= maxTextPreviewBytes) {
+  if (previewType !== 'unsupported' && size <= maxTextPreviewBytes) {
     return {
       ...payload,
-      content: await fs.readFile(target, 'utf8')
+      content: isRefSource
+        ? (await readRefFile(repository.path, repository.activeRef, relativePath)).toString('utf8')
+        : await fs.readFile(target, 'utf8')
     }
   }
 
   return payload
+}
+
+function slugifyRef(ref: string): string {
+  return ref
+    .replace(/^refs\/heads\//, '')
+    .replace(/^refs\/remotes\//, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+}
+
+async function openWorktree(repoPath: string, ref: string): Promise<RepositoryPayload> {
+  const rootPath = await assertRepositoryPath(repoPath)
+  const currentBranch = await getBranch(rootPath)
+
+  if (ref === currentBranch) {
+    return loadRepository(rootPath)
+  }
+
+  await assertValidRef(rootPath, ref)
+  const worktreesDir = join(rootPath, '.worktrees')
+  const worktreePath = join(worktreesDir, slugifyRef(ref) || 'branch')
+
+  try {
+    const stats = await fs.stat(worktreePath)
+    if (stats.isDirectory()) {
+      return loadRepository(worktreePath, { source: 'worktree', rootPath })
+    }
+  } catch {
+    await fs.mkdir(worktreesDir, { recursive: true })
+  }
+
+  const refs = await getRefs(rootPath, currentBranch)
+  const localBranches = new Set(
+    refs.filter((item) => item.type === 'local').map((item) => item.name)
+  )
+  const remotePrefix = ref.includes('/') ? ref.split('/')[0] : ''
+  const remoteTail = remotePrefix ? ref.slice(remotePrefix.length + 1) : ref
+
+  if (remoteTail === currentBranch) {
+    return loadRepository(rootPath)
+  }
+
+  if (localBranches.has(ref)) {
+    await execFileAsync('git', ['-C', rootPath, 'worktree', 'add', worktreePath, ref])
+  } else if (remotePrefix && !localBranches.has(remoteTail)) {
+    await execFileAsync('git', [
+      '-C',
+      rootPath,
+      'worktree',
+      'add',
+      '-b',
+      remoteTail,
+      worktreePath,
+      ref
+    ])
+  } else {
+    await execFileAsync('git', ['-C', rootPath, 'worktree', 'add', worktreePath, remoteTail])
+  }
+
+  return loadRepository(worktreePath, { source: 'worktree', rootPath })
+}
+
+async function saveFile(
+  repoPath: string,
+  relativePath: string,
+  content: string
+): Promise<PreviewPayload> {
+  const rootPath = await assertRepositoryPath(repoPath)
+  const target = safeJoin(rootPath, relativePath)
+
+  await fs.mkdir(resolve(target, '..'), { recursive: true })
+  await fs.writeFile(target, content, 'utf8')
+  return getPreview(rootPath, relativePath, { source: 'working-tree' })
 }
 
 function createWindow(repoPath?: string): void {
@@ -332,6 +583,7 @@ function createWindow(repoPath?: string): void {
     title: appName,
     show: false,
     autoHideMenuBar: true,
+    frame: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -401,6 +653,21 @@ function createAppMenu(): void {
       ]
     },
     {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
       label: 'View',
       submenu: [
         { role: 'reload' },
@@ -449,11 +716,41 @@ app.whenReady().then(() => {
     return loadRepository(repoPath)
   })
 
-  ipcMain.handle('repository:preview', async (_event, repoPath: string, relativePath = '') => {
-    return getPreview(repoPath, relativePath)
+  ipcMain.handle(
+    'repository:load-ref',
+    async (_event, repoPath: string, ref: string, rootPath?: string) => {
+      return loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
+    }
+  )
+
+  ipcMain.handle('repository:open-worktree', async (_event, repoPath: string, ref: string) => {
+    return openWorktree(repoPath, ref)
   })
 
-  createWindow()
+  ipcMain.handle(
+    'repository:preview',
+    async (
+      _event,
+      repoPath: string,
+      relativePath = '',
+      options?: {
+        ref?: string
+        source?: 'working-tree' | 'git-ref' | 'worktree'
+        rootPath?: string
+      }
+    ) => {
+      return getPreview(repoPath, relativePath, options)
+    }
+  )
+
+  ipcMain.handle(
+    'repository:save-file',
+    async (_event, repoPath: string, relativePath: string, content: string) => {
+      return saveFile(repoPath, relativePath, content)
+    }
+  )
+
+  createWindow(getInitialRepositoryPath())
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

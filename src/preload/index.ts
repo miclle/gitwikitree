@@ -6,8 +6,21 @@ const api = {
   newWindow: (): Promise<void> => ipcRenderer.invoke('window:new'),
   pickRepository: () => ipcRenderer.invoke('repository:pick'),
   loadRepository: (repoPath: string) => ipcRenderer.invoke('repository:load', repoPath),
-  previewPath: (repoPath: string, relativePath: string) =>
-    ipcRenderer.invoke('repository:preview', repoPath, relativePath),
+  loadRef: (repoPath: string, ref: string, rootPath?: string) =>
+    ipcRenderer.invoke('repository:load-ref', repoPath, ref, rootPath),
+  openWorktree: (repoPath: string, ref: string) =>
+    ipcRenderer.invoke('repository:open-worktree', repoPath, ref),
+  previewPath: (
+    repoPath: string,
+    relativePath: string,
+    options?: {
+      ref?: string
+      source?: 'working-tree' | 'git-ref' | 'worktree'
+      rootPath?: string
+    }
+  ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
+  saveFile: (repoPath: string, relativePath: string, content: string) =>
+    ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content),
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => {
     const listener = (_event: IpcRendererEvent, repoPath: string): void => callback(repoPath)
     ipcRenderer.on('repository:open-path', listener)
