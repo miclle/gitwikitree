@@ -1,38 +1,30 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent
+} from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { getOpenFileTabsForRecentFile } from '../../main/session-store'
 import { getMarkdownPreview } from './markdown-preview'
+import { getTreeIcon } from './tree-icons'
 import {
-  BookOpen,
-  Braces,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Code2,
   Copy,
-  Database,
   File,
-  FileArchive,
-  FileAudio,
-  FileCog,
-  FileImage,
-  FileLock,
-  FileSpreadsheet,
-  FileTerminal,
   FileText,
-  FileType,
-  FileVideo,
   Folder,
-  FolderOpen,
   GitBranch,
-  KeyRound,
   Loader2,
-  Package,
   Plus,
   Search,
   X
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 
 type TreeNode = {
   name: string
@@ -79,6 +71,12 @@ type OpenFileTab = {
   name: string
 }
 
+type TabPopoverState = {
+  tab: OpenFileTab
+  left: number
+  visible: boolean
+}
+
 type SessionState = {
   repositoryPath?: string
   rootPath?: string
@@ -91,45 +89,8 @@ type SessionState = {
 }
 
 const defaultExpanded = new Set([''])
-
-const fileBadgeByExtension = new Map<string, { label: string; kind: string }>([
-  ['ts', { label: 'TS', kind: 'typescript' }],
-  ['tsx', { label: 'TS', kind: 'typescript' }],
-  ['js', { label: 'JS', kind: 'javascript' }],
-  ['jsx', { label: 'JS', kind: 'javascript' }],
-  ['mjs', { label: 'JS', kind: 'javascript' }],
-  ['cjs', { label: 'JS', kind: 'javascript' }],
-  ['css', { label: '#', kind: 'css' }],
-  ['scss', { label: '#', kind: 'css' }],
-  ['sass', { label: '#', kind: 'css' }],
-  ['less', { label: '#', kind: 'css' }],
-  ['html', { label: '<>', kind: 'html' }],
-  ['htm', { label: '<>', kind: 'html' }],
-  ['vue', { label: 'V', kind: 'vue' }],
-  ['svelte', { label: 'S', kind: 'svelte' }],
-  ['py', { label: 'PY', kind: 'python' }],
-  ['go', { label: 'GO', kind: 'go' }],
-  ['rs', { label: 'RS', kind: 'rust' }],
-  ['swift', { label: 'SW', kind: 'swift' }],
-  ['java', { label: 'J', kind: 'java' }],
-  ['kt', { label: 'KT', kind: 'kotlin' }],
-  ['rb', { label: 'RB', kind: 'ruby' }],
-  ['php', { label: 'PHP', kind: 'php' }],
-  ['c', { label: 'C', kind: 'c' }],
-  ['h', { label: 'H', kind: 'c' }],
-  ['cc', { label: 'C++', kind: 'cpp' }],
-  ['cpp', { label: 'C++', kind: 'cpp' }],
-  ['hpp', { label: 'H++', kind: 'cpp' }],
-  ['cs', { label: 'C#', kind: 'csharp' }],
-  ['md', { label: 'M', kind: 'markdown' }],
-  ['markdown', { label: 'M', kind: 'markdown' }],
-  ['mdx', { label: 'M', kind: 'markdown' }],
-  ['json', { label: '{}', kind: 'json' }],
-  ['jsonc', { label: '{}', kind: 'json' }],
-  ['json5', { label: '{}', kind: 'json' }],
-  ['yaml', { label: '!', kind: 'yaml' }],
-  ['yml', { label: '!', kind: 'yaml' }]
-])
+const tabPopoverWidth = 280
+const tabPopoverInset = 8
 
 function getRepositoryLabel(repository: Repository): string {
   const parts = repository.rootPath.split(/[\\/]/).filter(Boolean)
@@ -157,12 +118,6 @@ function fileNameFromPath(path: string): string {
 function parentPaths(path: string): string[] {
   const parts = path.split('/').filter(Boolean)
   return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
-}
-
-function fileExtension(name: string): string {
-  const normalizedName = name.toLowerCase()
-  const parts = normalizedName.split('.')
-  return parts.length > 1 ? (parts.at(-1) ?? '') : ''
 }
 
 function escapeHtml(value: string): string {
@@ -335,103 +290,24 @@ function markdownToHtml(markdown: string): string {
 }
 
 function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): React.JSX.Element {
-  if (node.type === 'directory') {
-    return expanded ? (
-      <FolderOpen className="folder-icon" size={18} />
-    ) : (
-      <Folder className="folder-icon" size={18} />
-    )
+  const treeIcon = getTreeIcon(node, expanded)
+  if (treeIcon) {
+    return <img alt={treeIcon.alt} className="tree-icon" draggable={false} src={treeIcon.src} />
   }
 
-  const lowerName = node.name.toLowerCase()
-
-  const renderFileIcon = (Icon: LucideIcon, kind: string): React.JSX.Element => (
-    <Icon className={`file-icon ${kind}-file-icon`} size={18} />
+  return node.type === 'directory' ? (
+    <Folder className="tree-icon" size={16} />
+  ) : (
+    <File className="tree-icon" size={16} />
   )
-  const renderFileBadge = (label: string, kind: string): React.JSX.Element => (
-    <span aria-hidden="true" className={`file-icon file-badge ${kind}-file-badge`}>
-      {label}
-    </span>
-  )
-  const badge = fileBadgeByExtension.get(fileExtension(lowerName))
-
-  if (/^license(\..*)?$/.test(lowerName)) {
-    return renderFileIcon(KeyRound, 'license')
-  }
-
-  if (/^(changelog|authors|contributors|copying)(\..*)?$/.test(lowerName)) {
-    return renderFileIcon(BookOpen, 'document')
-  }
-
-  if (/^\.git(ignore|attributes|modules|config)$/.test(lowerName)) {
-    return renderFileIcon(GitBranch, 'git')
-  }
-
-  if (lowerName === '.editorconfig') {
-    return renderFileIcon(FileCog, 'editorconfig')
-  }
-
-  if (/^(package(-lock)?|pnpm-lock|yarn|bun)\.(json|yaml|lock|toml)$/.test(lowerName)) {
-    return renderFileIcon(Package, 'package')
-  }
-
-  if (/(\.lock|lockfile)$/.test(lowerName)) {
-    return renderFileIcon(FileLock, 'lock')
-  }
-
-  if (badge) {
-    return renderFileBadge(badge.label, badge.kind)
-  }
-
-  if (/\.(txt|rst|adoc)$/.test(lowerName)) {
-    return renderFileIcon(FileText, 'document')
-  }
-
-  if (/\.(svg|png|jpe?g|gif|webp|avif|ico|bmp|tiff?)$/.test(lowerName)) {
-    return renderFileIcon(FileImage, 'image')
-  }
-
-  if (/\.(mp3|wav|flac|aac|m4a|ogg)$/.test(lowerName)) {
-    return renderFileIcon(FileAudio, 'media')
-  }
-
-  if (/\.(mp4|mov|webm|mkv|avi)$/.test(lowerName)) {
-    return renderFileIcon(FileVideo, 'media')
-  }
-
-  if (/\.(zip|tar|gz|tgz|bz2|xz|7z|rar)$/.test(lowerName)) {
-    return renderFileIcon(FileArchive, 'archive')
-  }
-
-  if (/\.(csv|tsv|xlsx?|ods)$/.test(lowerName)) {
-    return renderFileIcon(FileSpreadsheet, 'data')
-  }
-
-  if (/\.(sqlite|sqlite3|db|sql)$/.test(lowerName)) {
-    return renderFileIcon(Database, 'data')
-  }
-
-  if (/\.(toml|ini|env|properties|editorconfig)$/.test(lowerName)) {
-    return renderFileIcon(FileCog, 'config')
-  }
-
-  if (/\.(sh|bash|zsh|fish|ps1|bat|cmd)$/.test(lowerName)) {
-    return renderFileIcon(FileTerminal, 'script')
-  }
-
-  if (/\.(xml)$/.test(lowerName)) {
-    return renderFileIcon(FileType, 'markup')
-  }
-
-  if (/\.(graphql|gql)$/.test(lowerName)) {
-    return renderFileIcon(Braces, 'code')
-  }
-
-  return renderFileIcon(File, 'default')
 }
 
 function App(): React.JSX.Element {
   const didRestoreSession = useRef(false)
+  const titlebarTabsRef = useRef<HTMLElement | null>(null)
+  const tabPopoverTimer = useRef<number | undefined>(undefined)
+  const tabPopoverHideTimer = useRef<number | undefined>(undefined)
+  const isTabPopoverVisible = useRef(false)
   const [repository, setRepository] = useState<Repository | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -443,6 +319,7 @@ function App(): React.JSX.Element {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
+  const [tabPopover, setTabPopover] = useState<TabPopoverState | undefined>()
   const [isResizing, setIsResizing] = useState(false)
 
   const fullSelectedPath = repository
@@ -738,6 +615,86 @@ function App(): React.JSX.Element {
     [activeFilePath, loadPreview, openFileTabs]
   )
 
+  const clearTabPopoverTimer = useCallback((): void => {
+    if (tabPopoverTimer.current === undefined) return
+    window.clearTimeout(tabPopoverTimer.current)
+    tabPopoverTimer.current = undefined
+  }, [])
+
+  const clearTabPopoverHideTimer = useCallback((): void => {
+    if (tabPopoverHideTimer.current === undefined) return
+    window.clearTimeout(tabPopoverHideTimer.current)
+    tabPopoverHideTimer.current = undefined
+  }, [])
+
+  const getTabPopoverLeft = useCallback((tabElement: HTMLElement): number => {
+    const tabsRect = titlebarTabsRef.current?.getBoundingClientRect()
+    const tabRect = tabElement.getBoundingClientRect()
+    const center = tabRect.left + tabRect.width / 2 - (tabsRect?.left ?? 0)
+
+    if (!tabsRect) return center
+
+    const popoverWidth = Math.min(tabPopoverWidth, window.innerWidth * 0.7)
+    const minLeft = popoverWidth / 2 + tabPopoverInset
+    const maxLeft = tabsRect.width - popoverWidth / 2 - tabPopoverInset
+
+    if (maxLeft < minLeft) return tabsRect.width / 2
+
+    return Math.min(Math.max(center, minLeft), maxLeft)
+  }, [])
+
+  const showTabPopover = useCallback(
+    (tab: OpenFileTab, tabElement: HTMLElement): void => {
+      clearTabPopoverTimer()
+      clearTabPopoverHideTimer()
+
+      const left = getTabPopoverLeft(tabElement)
+
+      if (isTabPopoverVisible.current) {
+        setTabPopover({ tab, left, visible: true })
+        return
+      }
+
+      setTabPopover({ tab, left, visible: false })
+      tabPopoverTimer.current = window.setTimeout(() => {
+        isTabPopoverVisible.current = true
+        tabPopoverTimer.current = undefined
+        setTabPopover({ tab, left, visible: true })
+      }, 360)
+    },
+    [clearTabPopoverHideTimer, clearTabPopoverTimer, getTabPopoverLeft]
+  )
+
+  const hideTabPopover = useCallback(
+    (delayed = false): void => {
+      clearTabPopoverTimer()
+      clearTabPopoverHideTimer()
+
+      const hide = (): void => {
+        tabPopoverHideTimer.current = undefined
+        isTabPopoverVisible.current = false
+        setTabPopover((current) => (current ? { ...current, visible: false } : undefined))
+      }
+
+      if (!delayed) {
+        hide()
+        return
+      }
+
+      tabPopoverHideTimer.current = window.setTimeout(hide, 120)
+    },
+    [clearTabPopoverHideTimer, clearTabPopoverTimer]
+  )
+
+  const handleTitlebarTabsPointerLeave = useCallback(
+    (event: ReactPointerEvent<HTMLElement>): void => {
+      const nextTarget = event.relatedTarget
+      if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
+      hideTabPopover(true)
+    },
+    [hideTabPopover]
+  )
+
   const copyPath = useCallback(async (): Promise<void> => {
     if (!fullSelectedPath) return
     await navigator.clipboard.writeText(fullSelectedPath)
@@ -773,6 +730,9 @@ function App(): React.JSX.Element {
 
   const breadcrumbParts = selectedPath ? selectedPath.split('/').filter(Boolean) : []
   const repositoryLabel = repository ? getRepositoryLabel(repository) : ''
+  const tabPopoverStyle: CSSProperties | undefined = tabPopover
+    ? ({ '--tab-popover-left': `${tabPopover.left}px` } as CSSProperties)
+    : undefined
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
@@ -823,7 +783,16 @@ function App(): React.JSX.Element {
                 <ChevronRight size={16} />
               </button>
             </div>
-            <nav className="titlebar-tabs" aria-label="Open tabs">
+            <nav
+              className="titlebar-tabs"
+              aria-label="Open tabs"
+              ref={titlebarTabsRef}
+              onPointerLeave={handleTitlebarTabsPointerLeave}
+              onBlur={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget)) return
+                hideTabPopover()
+              }}
+            >
               {openFileTabs.map((tab) => {
                 const active = tab.path === activeFilePath
 
@@ -834,7 +803,9 @@ function App(): React.JSX.Element {
                     tabIndex={0}
                     aria-selected={active}
                     key={tab.path}
-                    title={tab.path}
+                    aria-label={`${tab.name} ${tab.path}`}
+                    onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
+                    onFocus={(event) => showTabPopover(tab, event.currentTarget)}
                     onClick={() => void selectFileTab(tab)}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter' && event.key !== ' ') return
@@ -851,6 +822,7 @@ function App(): React.JSX.Element {
                       aria-label={`Close ${tab.name}`}
                       onClick={(event) => {
                         event.stopPropagation()
+                        hideTabPopover()
                         closeFileTab(tab.path)
                       }}
                     >
@@ -859,6 +831,18 @@ function App(): React.JSX.Element {
                   </div>
                 )
               })}
+              {tabPopover && (
+                <span
+                  className={
+                    tabPopover.visible ? 'titlebar-tab-popover visible' : 'titlebar-tab-popover'
+                  }
+                  style={tabPopoverStyle}
+                  aria-hidden="true"
+                >
+                  <span className="titlebar-tab-popover-name">{tabPopover.tab.name}</span>
+                  <span className="titlebar-tab-popover-path">{tabPopover.tab.path}</span>
+                </span>
+              )}
             </nav>
           </div>
         </header>
