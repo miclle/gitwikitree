@@ -736,118 +736,6 @@ function App(): React.JSX.Element {
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
-      {repository && (
-        <header className="app-titlebar">
-          <div className="titlebar-main">
-            <div className="titlebar-left">
-              <div className="titlebar-window-controls">
-                <button
-                  className="window-control close"
-                  type="button"
-                  aria-label="Close window"
-                  onClick={() => window.api.controlWindow('close')}
-                />
-                <button
-                  className="window-control minimize"
-                  type="button"
-                  aria-label="Minimize window"
-                  onClick={() => window.api.controlWindow('minimize')}
-                />
-                <button
-                  className="window-control zoom"
-                  type="button"
-                  aria-label="Toggle fullscreen"
-                  onClick={() => window.api.controlWindow('toggle-maximize')}
-                />
-              </div>
-              <div className="titlebar-repository" title={repositoryLabel}>
-                {repositoryLabel}
-              </div>
-              <button
-                className="titlebar-icon-button sidebar-toggle-button"
-                type="button"
-                aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
-                aria-pressed={isSidebarOpen}
-                onClick={() => setIsSidebarOpen((current) => !current)}
-              >
-                {isSidebarOpen ? (
-                  <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
-                ) : (
-                  <IconLayoutSidebarLeftExpand size={20} stroke={2} />
-                )}
-              </button>
-              <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
-                <ChevronLeft size={16} />
-              </button>
-              <button className="titlebar-icon-button" type="button" aria-label="Forward" disabled>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-            <nav
-              className="titlebar-tabs"
-              aria-label="Open tabs"
-              ref={titlebarTabsRef}
-              onPointerLeave={handleTitlebarTabsPointerLeave}
-              onBlur={(event) => {
-                if (event.currentTarget.contains(event.relatedTarget)) return
-                hideTabPopover()
-              }}
-            >
-              {openFileTabs.map((tab) => {
-                const active = tab.path === activeFilePath
-
-                return (
-                  <div
-                    className={active ? 'titlebar-tab active' : 'titlebar-tab'}
-                    role="tab"
-                    tabIndex={0}
-                    aria-selected={active}
-                    key={tab.path}
-                    aria-label={`${tab.name} ${tab.path}`}
-                    onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
-                    onFocus={(event) => showTabPopover(tab, event.currentTarget)}
-                    onClick={() => void selectFileTab(tab)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      void selectFileTab(tab)
-                    }}
-                  >
-                    <span className="titlebar-tab-corner" aria-hidden="true" />
-                    {iconForNode({ type: 'file', name: tab.name })}
-                    <span className="titlebar-tab-name">{tab.name}</span>
-                    <button
-                      className="titlebar-tab-close"
-                      type="button"
-                      aria-label={`Close ${tab.name}`}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        hideTabPopover()
-                        closeFileTab(tab.path)
-                      }}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                )
-              })}
-              {tabPopover && (
-                <span
-                  className={
-                    tabPopover.visible ? 'titlebar-tab-popover visible' : 'titlebar-tab-popover'
-                  }
-                  style={tabPopoverStyle}
-                  aria-hidden="true"
-                >
-                  <span className="titlebar-tab-popover-name">{tabPopover.tab.name}</span>
-                  <span className="titlebar-tab-popover-path">{tabPopover.tab.path}</span>
-                </span>
-              )}
-            </nav>
-          </div>
-        </header>
-      )}
-
       {error && <div className="error-banner">{error}</div>}
 
       {!repository ? (
@@ -876,6 +764,52 @@ function App(): React.JSX.Element {
           {isSidebarOpen && (
             <>
               <aside className="tree-panel" aria-label="Files">
+                <div className="sidebar-titlebar">
+                  <div className="titlebar-window-controls">
+                    <button
+                      className="window-control close"
+                      type="button"
+                      aria-label="Close window"
+                      onClick={() => window.api.controlWindow('close')}
+                    />
+                    <button
+                      className="window-control minimize"
+                      type="button"
+                      aria-label="Minimize window"
+                      onClick={() => window.api.controlWindow('minimize')}
+                    />
+                    <button
+                      className="window-control zoom"
+                      type="button"
+                      aria-label="Toggle fullscreen"
+                      onClick={() => window.api.controlWindow('toggle-maximize')}
+                    />
+                  </div>
+                  <div className="titlebar-repository" title={repositoryLabel}>
+                    {repositoryLabel}
+                  </div>
+                  <button
+                    className="titlebar-icon-button sidebar-toggle-button"
+                    type="button"
+                    aria-label="Hide files"
+                    aria-pressed={isSidebarOpen}
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
+                  </button>
+                  <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    className="titlebar-icon-button"
+                    type="button"
+                    aria-label="Forward"
+                    disabled
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
                 <div className="sidebar-controls">
                   <span className="branch-pill">
                     <GitBranch size={15} />
@@ -930,6 +864,112 @@ function App(): React.JSX.Element {
           )}
 
           <section className="preview-panel">
+            {!isSidebarOpen && (
+              <div className="main-titlebar">
+                <div className="titlebar-window-controls">
+                  <button
+                    className="window-control close"
+                    type="button"
+                    aria-label="Close window"
+                    onClick={() => window.api.controlWindow('close')}
+                  />
+                  <button
+                    className="window-control minimize"
+                    type="button"
+                    aria-label="Minimize window"
+                    onClick={() => window.api.controlWindow('minimize')}
+                  />
+                  <button
+                    className="window-control zoom"
+                    type="button"
+                    aria-label="Toggle fullscreen"
+                    onClick={() => window.api.controlWindow('toggle-maximize')}
+                  />
+                </div>
+                <div className="titlebar-repository" title={repositoryLabel}>
+                  {repositoryLabel}
+                </div>
+                <button
+                  className="titlebar-icon-button sidebar-toggle-button"
+                  type="button"
+                  aria-label="Show files"
+                  aria-pressed={isSidebarOpen}
+                  onClick={() => setIsSidebarOpen(true)}
+                >
+                  <IconLayoutSidebarLeftExpand size={20} stroke={2} />
+                </button>
+                <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  className="titlebar-icon-button"
+                  type="button"
+                  aria-label="Forward"
+                  disabled
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+            <nav
+              className="main-tabs"
+              aria-label="Open tabs"
+              ref={titlebarTabsRef}
+              onPointerLeave={handleTitlebarTabsPointerLeave}
+              onBlur={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget)) return
+                hideTabPopover()
+              }}
+            >
+              {openFileTabs.map((tab) => {
+                const active = tab.path === activeFilePath
+
+                return (
+                  <div
+                    className={active ? 'main-tab active' : 'main-tab'}
+                    role="tab"
+                    tabIndex={0}
+                    aria-selected={active}
+                    key={tab.path}
+                    aria-label={`${tab.name} ${tab.path}`}
+                    onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
+                    onFocus={(event) => showTabPopover(tab, event.currentTarget)}
+                    onClick={() => void selectFileTab(tab)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      void selectFileTab(tab)
+                    }}
+                  >
+                    <span className="main-tab-corner" aria-hidden="true" />
+                    {iconForNode({ type: 'file', name: tab.name })}
+                    <span className="main-tab-name">{tab.name}</span>
+                    <button
+                      className="main-tab-close"
+                      type="button"
+                      aria-label={`Close ${tab.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        hideTabPopover()
+                        closeFileTab(tab.path)
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )
+              })}
+              {tabPopover && (
+                <span
+                  className={tabPopover.visible ? 'main-tab-popover visible' : 'main-tab-popover'}
+                  style={tabPopoverStyle}
+                  aria-hidden="true"
+                >
+                  <span className="main-tab-popover-name">{tabPopover.tab.name}</span>
+                  <span className="main-tab-popover-path">{tabPopover.tab.path}</span>
+                </span>
+              )}
+            </nav>
             <div className="repo-pathbar">
               <div className="breadcrumb">
                 <button
