@@ -21,7 +21,7 @@
       <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#061014" flood-opacity="0.32"/>
     </filter>
     <filter id="nodeShadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#071219" flood-opacity="0.28"/>
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#071219" flood-opacity="0.24"/>
     </filter>
   </defs>
 
@@ -30,9 +30,9 @@
     d="M185 732c98 95 228 144 390 136 118-6 206-43 265-107"
     fill="none"
     stroke="#6df0be"
-    stroke-width="30"
+    stroke-width="28"
     stroke-linecap="round"
-    opacity="0.18"/>
+    opacity="0.14"/>
 
   <g filter="url(#softShadow)">
     <path
@@ -48,14 +48,14 @@
       d="M512 310c76-56 151-92 227-108 28-6 53 15 53 43v534c0-28-25-49-53-43-76 15-151 51-227 108V310Z"
       fill="#ffffff"
       opacity="0.10"/>
-    <path d="M512 292v560" stroke="#174238" stroke-width="20" stroke-linecap="round" opacity="0.30"/>
-    <path d="M315 357c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.22"/>
-    <path d="M315 470c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.16"/>
-    <path d="M709 357c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.22"/>
-    <path d="M709 470c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.16"/>
+    <path d="M512 292v560" stroke="#174238" stroke-width="20" stroke-linecap="round" opacity="0.24"/>
+    <path d="M315 357c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
+    <path d="M315 470c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
+    <path d="M709 357c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
+    <path d="M709 470c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
   </g>
 
-  <g fill="none" stroke="url(#branch)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+  <g fill="none" stroke="url(#branch)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round">
     <path d="M512 743V592"/>
     <path d="M512 592c0-92 0-170 0-249"/>
     <path d="M512 592c-91-35-151-86-195-152"/>
