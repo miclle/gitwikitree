@@ -204,6 +204,13 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.titlebar-tab > .tree-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  object-fit: contain;
+}
+
 .titlebar-tab:focus-visible {
   outline: 2px solid rgba(69, 132, 237, 0.55);
   outline-offset: -3px;

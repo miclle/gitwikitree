@@ -814,7 +814,7 @@ function App(): React.JSX.Element {
                     }}
                   >
                     <span className="titlebar-tab-corner" aria-hidden="true" />
-                    <FileText size={14} />
+                    {iconForNode({ type: 'file', name: tab.name })}
                     <span className="titlebar-tab-name">{tab.name}</span>
                     <button
                       className="titlebar-tab-close"
