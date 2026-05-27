@@ -1,25 +1,38 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { getOpenFileTabsForRecentFile } from '../../main/session-store'
+import { getMarkdownPreview } from './markdown-preview'
 import {
   BookOpen,
+  Braces,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Code2,
   Copy,
+  Database,
   File,
-  FileCode2,
+  FileArchive,
+  FileAudio,
+  FileCog,
   FileImage,
+  FileLock,
+  FileSpreadsheet,
+  FileTerminal,
   FileText,
+  FileType,
+  FileVideo,
   Folder,
   FolderOpen,
   GitBranch,
+  KeyRound,
   Loader2,
+  Package,
   Plus,
   Search,
   X
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 type TreeNode = {
   name: string
@@ -79,6 +92,45 @@ type SessionState = {
 
 const defaultExpanded = new Set([''])
 
+const fileBadgeByExtension = new Map<string, { label: string; kind: string }>([
+  ['ts', { label: 'TS', kind: 'typescript' }],
+  ['tsx', { label: 'TS', kind: 'typescript' }],
+  ['js', { label: 'JS', kind: 'javascript' }],
+  ['jsx', { label: 'JS', kind: 'javascript' }],
+  ['mjs', { label: 'JS', kind: 'javascript' }],
+  ['cjs', { label: 'JS', kind: 'javascript' }],
+  ['css', { label: '#', kind: 'css' }],
+  ['scss', { label: '#', kind: 'css' }],
+  ['sass', { label: '#', kind: 'css' }],
+  ['less', { label: '#', kind: 'css' }],
+  ['html', { label: '<>', kind: 'html' }],
+  ['htm', { label: '<>', kind: 'html' }],
+  ['vue', { label: 'V', kind: 'vue' }],
+  ['svelte', { label: 'S', kind: 'svelte' }],
+  ['py', { label: 'PY', kind: 'python' }],
+  ['go', { label: 'GO', kind: 'go' }],
+  ['rs', { label: 'RS', kind: 'rust' }],
+  ['swift', { label: 'SW', kind: 'swift' }],
+  ['java', { label: 'J', kind: 'java' }],
+  ['kt', { label: 'KT', kind: 'kotlin' }],
+  ['rb', { label: 'RB', kind: 'ruby' }],
+  ['php', { label: 'PHP', kind: 'php' }],
+  ['c', { label: 'C', kind: 'c' }],
+  ['h', { label: 'H', kind: 'c' }],
+  ['cc', { label: 'C++', kind: 'cpp' }],
+  ['cpp', { label: 'C++', kind: 'cpp' }],
+  ['hpp', { label: 'H++', kind: 'cpp' }],
+  ['cs', { label: 'C#', kind: 'csharp' }],
+  ['md', { label: 'M', kind: 'markdown' }],
+  ['markdown', { label: 'M', kind: 'markdown' }],
+  ['mdx', { label: 'M', kind: 'markdown' }],
+  ['json', { label: '{}', kind: 'json' }],
+  ['jsonc', { label: '{}', kind: 'json' }],
+  ['json5', { label: '{}', kind: 'json' }],
+  ['yaml', { label: '!', kind: 'yaml' }],
+  ['yml', { label: '!', kind: 'yaml' }]
+])
+
 function getRepositoryLabel(repository: Repository): string {
   const parts = repository.rootPath.split(/[\\/]/).filter(Boolean)
   const owner = parts.at(-2)
@@ -105,6 +157,12 @@ function fileNameFromPath(path: string): string {
 function parentPaths(path: string): string[] {
   const parts = path.split('/').filter(Boolean)
   return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
+}
+
+function fileExtension(name: string): string {
+  const normalizedName = name.toLowerCase()
+  const parts = normalizedName.split('.')
+  return parts.length > 1 ? (parts.at(-1) ?? '') : ''
 }
 
 function escapeHtml(value: string): string {
@@ -286,16 +344,90 @@ function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): R
   }
 
   const lowerName = node.name.toLowerCase()
-  if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
-    return <BookOpen className="file-icon" size={18} />
+
+  const renderFileIcon = (Icon: LucideIcon, kind: string): React.JSX.Element => (
+    <Icon className={`file-icon ${kind}-file-icon`} size={18} />
+  )
+  const renderFileBadge = (label: string, kind: string): React.JSX.Element => (
+    <span aria-hidden="true" className={`file-icon file-badge ${kind}-file-badge`}>
+      {label}
+    </span>
+  )
+  const badge = fileBadgeByExtension.get(fileExtension(lowerName))
+
+  if (/^license(\..*)?$/.test(lowerName)) {
+    return renderFileIcon(KeyRound, 'license')
   }
-  if (lowerName.endsWith('.svg') || /\.(png|jpe?g|gif|webp|ico)$/.test(lowerName)) {
-    return <FileImage className="file-icon" size={18} />
+
+  if (/^(changelog|authors|contributors|copying)(\..*)?$/.test(lowerName)) {
+    return renderFileIcon(BookOpen, 'document')
   }
-  if (/\.(html?|tsx?|jsx?|css|json|ya?ml|xml|sh|swift|go|rs|py)$/.test(lowerName)) {
-    return <FileCode2 className="file-icon" size={18} />
+
+  if (/^\.git(ignore|attributes|modules|config)$/.test(lowerName)) {
+    return renderFileIcon(GitBranch, 'git')
   }
-  return <File className="file-icon" size={18} />
+
+  if (lowerName === '.editorconfig') {
+    return renderFileIcon(FileCog, 'editorconfig')
+  }
+
+  if (/^(package(-lock)?|pnpm-lock|yarn|bun)\.(json|yaml|lock|toml)$/.test(lowerName)) {
+    return renderFileIcon(Package, 'package')
+  }
+
+  if (/(\.lock|lockfile)$/.test(lowerName)) {
+    return renderFileIcon(FileLock, 'lock')
+  }
+
+  if (badge) {
+    return renderFileBadge(badge.label, badge.kind)
+  }
+
+  if (/\.(txt|rst|adoc)$/.test(lowerName)) {
+    return renderFileIcon(FileText, 'document')
+  }
+
+  if (/\.(svg|png|jpe?g|gif|webp|avif|ico|bmp|tiff?)$/.test(lowerName)) {
+    return renderFileIcon(FileImage, 'image')
+  }
+
+  if (/\.(mp3|wav|flac|aac|m4a|ogg)$/.test(lowerName)) {
+    return renderFileIcon(FileAudio, 'media')
+  }
+
+  if (/\.(mp4|mov|webm|mkv|avi)$/.test(lowerName)) {
+    return renderFileIcon(FileVideo, 'media')
+  }
+
+  if (/\.(zip|tar|gz|tgz|bz2|xz|7z|rar)$/.test(lowerName)) {
+    return renderFileIcon(FileArchive, 'archive')
+  }
+
+  if (/\.(csv|tsv|xlsx?|ods)$/.test(lowerName)) {
+    return renderFileIcon(FileSpreadsheet, 'data')
+  }
+
+  if (/\.(sqlite|sqlite3|db|sql)$/.test(lowerName)) {
+    return renderFileIcon(Database, 'data')
+  }
+
+  if (/\.(toml|ini|env|properties|editorconfig)$/.test(lowerName)) {
+    return renderFileIcon(FileCog, 'config')
+  }
+
+  if (/\.(sh|bash|zsh|fish|ps1|bat|cmd)$/.test(lowerName)) {
+    return renderFileIcon(FileTerminal, 'script')
+  }
+
+  if (/\.(xml)$/.test(lowerName)) {
+    return renderFileIcon(FileType, 'markup')
+  }
+
+  if (/\.(graphql|gql)$/.test(lowerName)) {
+    return renderFileIcon(Braces, 'code')
+  }
+
+  return renderFileIcon(File, 'default')
 }
 
 function App(): React.JSX.Element {
@@ -543,11 +675,15 @@ function App(): React.JSX.Element {
 
       if (node.type === 'directory') {
         setActiveFilePath(undefined)
-        setExpandedPaths((current) => {
-          const next = new Set(current)
-          next.has(node.path) ? next.delete(node.path) : next.add(node.path)
-          return next
-        })
+        if (node.children?.length) {
+          setExpandedPaths((current) => {
+            if (current.has(node.path)) return current
+
+            const next = new Set(current)
+            next.add(node.path)
+            return next
+          })
+        }
       } else {
         setActiveFilePath(node.path)
         setOpenFileTabs((current) =>
@@ -561,6 +697,14 @@ function App(): React.JSX.Element {
     },
     [loadPreview]
   )
+
+  const toggleDirectory = useCallback((path: string): void => {
+    setExpandedPaths((current) => {
+      const next = new Set(current)
+      next.has(path) ? next.delete(path) : next.add(path)
+      return next
+    })
+  }, [])
 
   const selectFileTab = useCallback(
     async (tab: OpenFileTab): Promise<void> => {
@@ -781,10 +925,11 @@ function App(): React.JSX.Element {
                     <TreeRow
                       expandedPaths={expandedPaths}
                       key={node.path}
-                      level={1}
+                      level={0}
                       node={node}
                       selectedPath={selectedPath}
                       onSelect={handleSelect}
+                      onToggle={toggleDirectory}
                     />
                   ))}
                 </div>
@@ -885,49 +1030,74 @@ function TreeRow({
   level,
   expandedPaths,
   selectedPath,
-  onSelect
+  onSelect,
+  onToggle
 }: {
   node: TreeNode
   level: number
   expandedPaths: Set<string>
   selectedPath: string
   onSelect: (node: TreeNode) => Promise<void>
+  onToggle: (path: string) => void
 }): React.JSX.Element {
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
+  const selectNode = (): void => {
+    void onSelect(node)
+  }
 
   return (
     <>
-      <button
+      <div
+        aria-selected={selectedPath === node.path}
         className={selectedPath === node.path ? 'tree-row selected' : 'tree-row'}
+        role="treeitem"
         style={{ '--level': level } as CSSProperties}
-        type="button"
-        onClick={() => void onSelect(node)}
+        tabIndex={0}
+        onClick={selectNode}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          selectNode()
+        }}
       >
         {node.type === 'directory' ? (
-          expanded ? (
-            <ChevronDown size={16} />
-          ) : (
-            <ChevronRight size={16} />
-          )
+          <button
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
+            className="tree-toggle"
+            disabled={!hasChildren}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle(node.path)
+            }}
+          >
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
         ) : (
           <span className="tree-spacer" />
         )}
-        {iconForNode(node, expanded)}
-        <span>{node.name}</span>
-      </button>
-      {hasChildren &&
-        expanded &&
-        node.children?.map((child) => (
-          <TreeRow
-            expandedPaths={expandedPaths}
-            key={child.path}
-            level={level + 1}
-            node={child}
-            selectedPath={selectedPath}
-            onSelect={onSelect}
-          />
-        ))}
+        <span className="tree-node-button">
+          {iconForNode(node, expanded)}
+          <span>{node.name}</span>
+        </span>
+      </div>
+      {hasChildren && expanded && (
+        <div className="tree-children" style={{ '--level': level } as CSSProperties}>
+          {node.children?.map((child) => (
+            <TreeRow
+              expandedPaths={expandedPaths}
+              key={child.path}
+              level={level + 1}
+              node={child}
+              selectedPath={selectedPath}
+              onSelect={onSelect}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
     </>
   )
 }
@@ -984,11 +1154,13 @@ function PreviewContent({
 }): React.JSX.Element {
   if (preview.kind === 'directory') {
     if (preview.readme) {
+      const markdownPreview = getMarkdownPreview(preview.readme.content)
+
       return (
-        <article
-          className="markdown-body"
-          dangerouslySetInnerHTML={{ __html: markdownToHtml(preview.readme.content) }}
-        />
+        <article className="markdown-body">
+          {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
+          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
+        </article>
       )
     }
 
@@ -1005,11 +1177,13 @@ function PreviewContent({
   }
 
   if (preview.previewType === 'markdown' && preview.content) {
+    const markdownPreview = getMarkdownPreview(preview.content)
+
     return (
-      <article
-        className="markdown-body"
-        dangerouslySetInnerHTML={{ __html: markdownToHtml(preview.content) }}
-      />
+      <article className="markdown-body">
+        {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
+        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
+      </article>
     )
   }
 
