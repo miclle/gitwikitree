@@ -15,6 +15,7 @@ import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'pat
 import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { detectPreviewType, textPreviewProbeBytes, type PreviewType } from './preview-detection'
 import {
   createEmptySessionState,
   mergeSessionState,
@@ -59,7 +60,7 @@ type PreviewPayload =
       path: string
       name: string
       extension: string
-      previewType: 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+      previewType: PreviewType
       editable: boolean
       content?: string
       dataUrl?: string
@@ -322,60 +323,6 @@ function mimeForExtension(extension: string): string {
   }
 }
 
-function getPreviewType(
-  extension: string
-): 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported' {
-  if (['.md', '.markdown'].includes(extension)) return 'markdown'
-  if (['.html', '.htm'].includes(extension)) return 'html'
-  if (extension === '.svg') return 'svg'
-  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico'].includes(extension)) return 'image'
-  if (
-    [
-      '.txt',
-      '.json',
-      '.js',
-      '.jsx',
-      '.ts',
-      '.tsx',
-      '.css',
-      '.scss',
-      '.sass',
-      '.less',
-      '.yml',
-      '.yaml',
-      '.xml',
-      '.toml',
-      '.ini',
-      '.env',
-      '.gitignore',
-      '.dockerignore',
-      '.sh',
-      '.zsh',
-      '.bash',
-      '.py',
-      '.rb',
-      '.go',
-      '.rs',
-      '.swift',
-      '.java',
-      '.c',
-      '.h',
-      '.cpp',
-      '.hpp',
-      '.m',
-      '.mm',
-      '.sql',
-      '.csv',
-      '.log',
-      ''
-    ].includes(extension)
-  ) {
-    return 'text'
-  }
-
-  return 'unsupported'
-}
-
 function assertSafeGitRelativePath(relativePath: string): void {
   if (
     relativePath.includes('\0') ||
@@ -417,6 +364,18 @@ async function getRefFileSize(
     `${ref}:${relativePath}`
   ])
   return Number(stdout.trim()) || 0
+}
+
+async function readFileSample(path: string, bytes: number): Promise<Buffer> {
+  const file = await fs.open(path, 'r')
+
+  try {
+    const buffer = Buffer.alloc(bytes)
+    const { bytesRead } = await file.read(buffer, 0, bytes, 0)
+    return buffer.subarray(0, bytesRead)
+  } finally {
+    await file.close()
+  }
 }
 
 async function getPreview(
@@ -463,11 +422,25 @@ async function getPreview(
     }
   }
 
-  const extension = extname(target).toLowerCase()
-  const previewType = getPreviewType(extension)
   const size = isRefSource
     ? await getRefFileSize(repository.path, repository.activeRef, relativePath)
     : (stats?.size ?? 0)
+  const extension = extname(target).toLowerCase()
+  let previewBuffer: Buffer | undefined
+  let previewType = detectPreviewType(extension)
+
+  if (previewType === 'unsupported' && size <= maxTextPreviewBytes) {
+    const sample = isRefSource
+      ? (previewBuffer = await readRefFile(
+          repository.path,
+          repository.activeRef,
+          relativePath
+        )).subarray(0, textPreviewProbeBytes)
+      : await readFileSample(target, Math.min(size, textPreviewProbeBytes))
+
+    previewType = detectPreviewType(extension, sample)
+  }
+
   const payload = {
     kind: 'file' as const,
     path: toPosixPath(relativePath),
@@ -501,7 +474,10 @@ async function getPreview(
     return {
       ...payload,
       content: isRefSource
-        ? (await readRefFile(repository.path, repository.activeRef, relativePath)).toString('utf8')
+        ? (
+            previewBuffer ??
+            (await readRefFile(repository.path, repository.activeRef, relativePath))
+          ).toString('utf8')
         : await fs.readFile(target, 'utf8')
     }
   }
