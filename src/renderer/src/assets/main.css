@@ -584,7 +584,7 @@ kbd {
 
 .tree {
   overflow: auto;
-  padding: 0;
+  padding: 0 0 24px;
   background: #ffffff;
 }
 
