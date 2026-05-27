@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
+import { getOpenFileTabsForRecentFile } from '../../main/session-store'
 import {
   BookOpen,
   ChevronDown,
@@ -65,6 +66,17 @@ type OpenFileTab = {
   name: string
 }
 
+type SessionState = {
+  repositoryPath?: string
+  rootPath?: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
+  selectedPath: string
+  activeFilePath?: string
+  openFileTabs: OpenFileTab[]
+  expandedPaths: string[]
+}
+
 const defaultExpanded = new Set([''])
 
 function getRepositoryLabel(repository: Repository): string {
@@ -84,6 +96,15 @@ function findTreeNode(nodes: TreeNode[], path: string): TreeNode | undefined {
   }
 
   return undefined
+}
+
+function fileNameFromPath(path: string): string {
+  return path.split('/').filter(Boolean).at(-1) ?? path
+}
+
+function parentPaths(path: string): string[] {
+  const parts = path.split('/').filter(Boolean)
+  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
 }
 
 function escapeHtml(value: string): string {
@@ -278,6 +299,7 @@ function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): R
 }
 
 function App(): React.JSX.Element {
+  const didRestoreSession = useRef(false)
   const [repository, setRepository] = useState<Repository | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -367,9 +389,106 @@ function App(): React.JSX.Element {
     [loadPreview]
   )
 
+  const loadRepositoryWithSession = useCallback(
+    async (session: SessionState): Promise<void> => {
+      if (!session.repositoryPath) return
+
+      setLoading(true)
+      setError(undefined)
+
+      try {
+        const nextRepository =
+          session.source === 'git-ref' && session.activeRef
+            ? await window.api.loadRef(
+                session.rootPath ?? session.repositoryPath,
+                session.activeRef,
+                session.rootPath
+              )
+            : await window.api.loadRepository(session.repositoryPath)
+        const restoredTabs = session.openFileTabs.filter((tab) => {
+          const node = findTreeNode(nextRepository.tree, tab.path)
+          return node?.type === 'file'
+        })
+        const restoredActiveFile =
+          session.activeFilePath && restoredTabs.some((tab) => tab.path === session.activeFilePath)
+            ? session.activeFilePath
+            : restoredTabs[0]?.path
+        const selectedPath = restoredActiveFile ?? session.selectedPath ?? ''
+        const selectedNode = selectedPath
+          ? findTreeNode(nextRepository.tree, selectedPath)
+          : undefined
+        const nextSelectedPath = selectedNode ? selectedPath : ''
+
+        setRepository(nextRepository)
+        setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
+        setOpenFileTabs(restoredTabs)
+        setActiveFilePath(restoredActiveFile)
+        setSelectedPath(nextSelectedPath)
+        await loadPreview(nextSelectedPath, nextRepository)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [loadPreview]
+  )
+
+  const openFilePath = useCallback(
+    async (repoPath: string, filePath: string): Promise<void> => {
+      setLoading(true)
+      setError(undefined)
+
+      try {
+        const nextRepository = await window.api.loadRepository(repoPath)
+        const node = findTreeNode(nextRepository.tree, filePath)
+
+        setRepository(nextRepository)
+        setExpandedPaths(new Set(['', ...parentPaths(filePath)]))
+
+        if (node?.type === 'file') {
+          setSelectedPath(filePath)
+          setActiveFilePath(filePath)
+          setOpenFileTabs((current) =>
+            getOpenFileTabsForRecentFile({
+              currentRepositoryPath: repository?.path,
+              nextRepositoryPath: nextRepository.path,
+              currentTabs: current,
+              nextTab: { path: filePath, name: node.name }
+            })
+          )
+          await loadPreview(filePath, nextRepository)
+        } else {
+          setSelectedPath('')
+          setActiveFilePath(undefined)
+          await loadPreview('', nextRepository)
+          setError(`${fileNameFromPath(filePath)} is no longer available in this repository.`)
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [loadPreview, repository?.path]
+  )
+
+  useEffect(() => {
+    if (didRestoreSession.current) return
+    didRestoreSession.current = true
+
+    void window.api.getSession().then((session) => {
+      if (!session.repositoryPath) return
+      void loadRepositoryWithSession(session)
+    })
+  }, [loadRepositoryWithSession])
+
   useEffect(() => {
     const removeOpenPathListener = window.api.onOpenRepositoryPath((repoPath) => {
       void loadRepositoryPath(repoPath)
+    })
+    const removeOpenFileListener = window.api.onOpenFilePath(({ repoPath, filePath }) => {
+      void openFilePath(repoPath, filePath)
     })
     const removeOpenRequestListener = window.api.onOpenRepositoryRequest(() => {
       void openRepository()
@@ -377,9 +496,29 @@ function App(): React.JSX.Element {
 
     return () => {
       removeOpenPathListener()
+      removeOpenFileListener()
       removeOpenRequestListener()
     }
-  }, [loadRepositoryPath, openRepository])
+  }, [loadRepositoryPath, openFilePath, openRepository])
+
+  useEffect(() => {
+    if (!repository) return
+
+    const handle = window.setTimeout(() => {
+      void window.api.saveSession({
+        repositoryPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        selectedPath,
+        activeFilePath,
+        openFileTabs,
+        expandedPaths: Array.from(expandedPaths)
+      })
+    }, 250)
+
+    return () => window.clearTimeout(handle)
+  }, [activeFilePath, expandedPaths, openFileTabs, repository, selectedPath])
 
   useEffect(() => {
     if (!isResizing) return

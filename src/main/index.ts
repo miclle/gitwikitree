@@ -15,6 +15,14 @@ import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'pat
 import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import {
+  createEmptySessionState,
+  mergeSessionState,
+  normalizeSessionState,
+  recordRecentFile,
+  type RecentFileState,
+  type SessionState
+} from './session-store'
 
 const appName = 'Git Wikitree'
 const execFileAsync = promisify(execFile)
@@ -61,6 +69,7 @@ type PreviewPayload =
 app.setName(appName)
 
 const windows = new Set<BrowserWindow>()
+let sessionState = createEmptySessionState()
 
 function getInitialRepositoryPath(): string | undefined {
   const envPath = process.env['GITWIKITREE_OPEN_PATH']
@@ -574,7 +583,33 @@ async function saveFile(
   return getPreview(rootPath, relativePath, { source: 'working-tree' })
 }
 
-function createWindow(repoPath?: string): void {
+function getSessionFilePath(): string {
+  return join(app.getPath('userData'), 'session.json')
+}
+
+async function readStoredSession(): Promise<SessionState> {
+  try {
+    const content = await fs.readFile(getSessionFilePath(), 'utf8')
+    return normalizeSessionState(JSON.parse(content))
+  } catch {
+    return createEmptySessionState()
+  }
+}
+
+async function writeStoredSession(nextSessionState = sessionState): Promise<void> {
+  sessionState = normalizeSessionState(nextSessionState)
+  await fs.mkdir(app.getPath('userData'), { recursive: true })
+  await fs.writeFile(getSessionFilePath(), `${JSON.stringify(sessionState, null, 2)}\n`, 'utf8')
+}
+
+function sendOpenFile(targetWindow: BrowserWindow, file: RecentFileState): void {
+  targetWindow.webContents.send('repository:open-file', {
+    repoPath: file.repoPath,
+    filePath: file.filePath
+  })
+}
+
+function createWindow(repoPath?: string, filePath?: string): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
@@ -615,13 +650,39 @@ function createWindow(repoPath?: string): void {
   }
 
   mainWindow.webContents.once('did-finish-load', () => {
-    if (repoPath) {
+    if (repoPath && filePath) {
+      sendOpenFile(mainWindow, {
+        repoPath,
+        filePath,
+        name: basename(filePath),
+        openedAt: new Date().toISOString()
+      })
+    } else if (repoPath) {
       mainWindow.webContents.send('repository:open-path', repoPath)
     }
   })
 }
 
+function openRecentFile(file: RecentFileState): void {
+  const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+
+  if (targetWindow) {
+    sendOpenFile(targetWindow, file)
+    return
+  }
+
+  createWindow(file.repoPath, file.filePath)
+}
+
 function createAppMenu(): void {
+  const recentFileItems: MenuItemConstructorOptions[] =
+    sessionState.recentFiles.length > 0
+      ? sessionState.recentFiles.map((file) => ({
+          label: `${file.name} - ${file.repoPath}`,
+          click: () => openRecentFile(file)
+        }))
+      : [{ label: 'No Recent Files', enabled: false }]
+
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin'
       ? [
@@ -647,6 +708,10 @@ function createAppMenu(): void {
           label: 'Open Repository...',
           accelerator: 'CommandOrControl+O',
           click: () => BrowserWindow.getFocusedWindow()?.webContents.send('repository:open-request')
+        },
+        {
+          label: '最近打开的文件',
+          submenu: recentFileItems
         },
         { type: 'separator' },
         { role: process.platform === 'darwin' ? 'close' : 'quit' }
@@ -684,7 +749,9 @@ function createAppMenu(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  sessionState = await readStoredSession()
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.miclle.gitwikitree')
   createAppMenu()
@@ -730,22 +797,89 @@ app.whenReady().then(() => {
       : await dialog.showOpenDialog(options)
 
     if (result.canceled || result.filePaths.length === 0) return undefined
-    return loadRepository(result.filePaths[0])
+    const repository = await loadRepository(result.filePaths[0])
+    sessionState = mergeSessionState(sessionState, {
+      repositoryPath: repository.path,
+      rootPath: repository.rootPath,
+      activeRef: repository.activeRef,
+      source: repository.source,
+      selectedPath: '',
+      activeFilePath: undefined,
+      openFileTabs: [],
+      expandedPaths: ['']
+    })
+    await writeStoredSession()
+    return repository
   })
 
   ipcMain.handle('repository:load', async (_event, repoPath: string) => {
-    return loadRepository(repoPath)
+    const repository = await loadRepository(repoPath)
+    sessionState = mergeSessionState(sessionState, {
+      repositoryPath: repository.path,
+      rootPath: repository.rootPath,
+      activeRef: repository.activeRef,
+      source: repository.source
+    })
+    await writeStoredSession()
+    return repository
   })
 
   ipcMain.handle(
     'repository:load-ref',
     async (_event, repoPath: string, ref: string, rootPath?: string) => {
-      return loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
+      const repository = await loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
+      sessionState = mergeSessionState(sessionState, {
+        repositoryPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        selectedPath: '',
+        activeFilePath: undefined,
+        openFileTabs: [],
+        expandedPaths: ['']
+      })
+      await writeStoredSession()
+      return repository
     }
   )
 
   ipcMain.handle('repository:open-worktree', async (_event, repoPath: string, ref: string) => {
-    return openWorktree(repoPath, ref)
+    const repository = await openWorktree(repoPath, ref)
+    sessionState = mergeSessionState(sessionState, {
+      repositoryPath: repository.path,
+      rootPath: repository.rootPath,
+      activeRef: repository.activeRef,
+      source: repository.source,
+      selectedPath: '',
+      activeFilePath: undefined,
+      openFileTabs: [],
+      expandedPaths: ['']
+    })
+    await writeStoredSession()
+    return repository
+  })
+
+  ipcMain.handle('session:get', () => sessionState)
+
+  ipcMain.handle('session:save', async (_event, nextSessionState: Partial<SessionState>) => {
+    sessionState = mergeSessionState(sessionState, nextSessionState)
+    const activeFilePath = sessionState.activeFilePath
+
+    if (sessionState.repositoryPath && activeFilePath) {
+      sessionState = {
+        ...sessionState,
+        recentFiles: recordRecentFile(sessionState.recentFiles, {
+          repoPath: sessionState.repositoryPath,
+          filePath: activeFilePath,
+          name: basename(activeFilePath),
+          openedAt: new Date().toISOString()
+        })
+      }
+    }
+
+    await writeStoredSession()
+    createAppMenu()
+    return sessionState
   })
 
   ipcMain.handle(

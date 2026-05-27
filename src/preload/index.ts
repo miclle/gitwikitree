@@ -23,6 +23,8 @@ const api = {
   ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
   saveFile: (repoPath: string, relativePath: string, content: string) =>
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content),
+  getSession: () => ipcRenderer.invoke('session:get'),
+  saveSession: (session: unknown) => ipcRenderer.invoke('session:save', session),
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => {
     const listener = (_event: IpcRendererEvent, repoPath: string): void => callback(repoPath)
     ipcRenderer.on('repository:open-path', listener)
@@ -34,6 +36,15 @@ const api = {
     ipcRenderer.on('repository:open-request', listener)
 
     return () => ipcRenderer.removeListener('repository:open-request', listener)
+  },
+  onOpenFilePath: (callback: (payload: { repoPath: string; filePath: string }) => void) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      payload: { repoPath: string; filePath: string }
+    ): void => callback(payload)
+    ipcRenderer.on('repository:open-file', listener)
+
+    return () => ipcRenderer.removeListener('repository:open-file', listener)
   }
 }
 

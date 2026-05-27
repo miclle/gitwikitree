@@ -8,6 +8,7 @@
   "homepage": "https://github.com/miclle/gitwikitree",
   "scripts": {
     "format": "prettier --write .",
+    "test": "node --test tests/*.test.mjs",
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
