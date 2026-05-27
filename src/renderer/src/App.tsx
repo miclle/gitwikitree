@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Code2,
-  Copy,
   File,
   FileText,
   Folder,
@@ -321,14 +320,6 @@ function App(): React.JSX.Element {
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [tabPopover, setTabPopover] = useState<TabPopoverState | undefined>()
   const [isResizing, setIsResizing] = useState(false)
-
-  const fullSelectedPath = repository
-    ? repository.source === 'git-ref'
-      ? `${repository.path}@${repository.activeRef}${selectedPath ? `:${selectedPath}` : ''}`
-      : selectedPath
-        ? `${repository.path}/${selectedPath}`
-        : repository.path
-    : ''
 
   const loadPreview = useCallback(
     async (path: string, repo = repository): Promise<Preview | undefined> => {
@@ -695,11 +686,6 @@ function App(): React.JSX.Element {
     [hideTabPopover]
   )
 
-  const copyPath = useCallback(async (): Promise<void> => {
-    if (!fullSelectedPath) return
-    await navigator.clipboard.writeText(fullSelectedPath)
-  }, [fullSelectedPath])
-
   const switchRef = useCallback(
     async (ref: string): Promise<void> => {
       if (!repository || ref === repository.activeRef) return
@@ -1006,41 +992,31 @@ function App(): React.JSX.Element {
                     </span>
                   )
                 })}
-                <button
-                  className="copy-path-button"
-                  type="button"
-                  aria-label="Copy path"
-                  onClick={copyPath}
-                >
-                  <Copy size={17} />
-                </button>
               </div>
             </div>
 
-            <div className="blob-card">
-              <div className="preview-body">
-                {previewLoading && (
-                  <div className="loading-state">
-                    <Loader2 className="spin" size={26} />
-                  </div>
-                )}
-                {!previewLoading && preview && (
-                  <PreviewContent
-                    preview={preview}
-                    onSelectPath={(path) => {
-                      const node = findTreeNode(repository.tree, path)
-                      if (node) {
-                        void handleSelect(node)
-                        return
-                      }
+            <div className="preview-body">
+              {previewLoading && (
+                <div className="loading-state">
+                  <Loader2 className="spin" size={26} />
+                </div>
+              )}
+              {!previewLoading && preview && (
+                <PreviewContent
+                  preview={preview}
+                  onSelectPath={(path) => {
+                    const node = findTreeNode(repository.tree, path)
+                    if (node) {
+                      void handleSelect(node)
+                      return
+                    }
 
-                      setSelectedPath(path)
-                      setActiveFilePath(undefined)
-                      void loadPreview(path)
-                    }}
-                  />
-                )}
-              </div>
+                    setSelectedPath(path)
+                    setActiveFilePath(undefined)
+                    void loadPreview(path)
+                  }}
+                />
+              )}
             </div>
           </section>
         </section>

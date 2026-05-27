@@ -791,16 +791,16 @@ kbd {
   flex: 0 0 auto;
   justify-content: space-between;
   gap: 16px;
-  min-height: 38px;
-  padding: 24px 20px 18px;
+  min-height: 32px;
+  padding: 8px 20px;
 }
 
 .breadcrumb {
   min-width: 0;
-  gap: 8px;
+  gap: 0;
   color: var(--accent);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .breadcrumb button {
@@ -816,7 +816,14 @@ kbd {
   font-weight: 700;
 }
 
+.breadcrumb > span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .breadcrumb .slash {
+  margin: 0 8px;
   color: #59636e;
 }
 
@@ -825,28 +832,6 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.copy-path-button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 0;
-  color: #59636e;
-  background: transparent;
-}
-
-.blob-card {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  margin: 0 20px 20px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #ffffff;
 }
 
 .path-toolbar {
@@ -883,6 +868,7 @@ kbd {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  background: #ffffff;
   user-select: text;
 }
 
@@ -916,7 +902,9 @@ kbd {
 }
 
 .markdown-body {
-  max-width: 980px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
   padding: 24px 32px 40px;
   user-select: text;
 }
