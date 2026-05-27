@@ -3,6 +3,12 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 
+const rendererServer = {
+  host: '127.0.0.1',
+  port: 43173,
+  strictPort: true
+}
+
 function devContentSecurityPolicy(): Plugin {
   return {
     name: 'dev-content-security-policy',
@@ -22,6 +28,8 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src')
       }
     },
-    plugins: [devContentSecurityPolicy(), react()]
+    plugins: [devContentSecurityPolicy(), react()],
+    server: rendererServer,
+    preview: rendererServer
   }
 })

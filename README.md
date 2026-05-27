@@ -17,6 +17,11 @@ npm run dev
 npm run build
 ```
 
+The development renderer server listens on `127.0.0.1:43173` with strict port
+checking enabled. If that port is already in use, `npm run dev` fails instead of
+silently moving to another port, which keeps this Electron app from loading or
+serving another local app by mistake.
+
 ## Current Scope
 
 The app is initialized with a Git file management oriented shell: repository list, file tree, diff preview, and action toolbar. The next implementation step is to connect those surfaces to local filesystem and Git IPC APIs.
