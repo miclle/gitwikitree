@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import {
   BookOpen,
-  Bot,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Code2,
   Copy,
@@ -13,13 +14,10 @@ import {
   Folder,
   FolderOpen,
   GitBranch,
-  Github,
-  Lock,
   Loader2,
-  Menu,
   Plus,
   Search,
-  Terminal
+  X
 } from 'lucide-react'
 
 type TreeNode = {
@@ -62,7 +60,31 @@ type FilePreview = {
 
 type Preview = DirectoryPreview | FilePreview
 
+type OpenFileTab = {
+  path: string
+  name: string
+}
+
 const defaultExpanded = new Set([''])
+
+function getRepositoryLabel(repository: Repository): string {
+  const parts = repository.rootPath.split(/[\\/]/).filter(Boolean)
+  const owner = parts.at(-2)
+  return owner ? `${owner}/${repository.name}` : repository.name
+}
+
+function findTreeNode(nodes: TreeNode[], path: string): TreeNode | undefined {
+  for (const node of nodes) {
+    if (node.path === path) return node
+
+    if (node.children) {
+      const match = findTreeNode(node.children, path)
+      if (match) return match
+    }
+  }
+
+  return undefined
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -264,6 +286,9 @@ function App(): React.JSX.Element {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [sidebarWidth, setSidebarWidth] = useState(360)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
+  const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [isResizing, setIsResizing] = useState(false)
 
   const fullSelectedPath = repository
@@ -310,6 +335,8 @@ function App(): React.JSX.Element {
       setRepository(nextRepository)
       setSelectedPath('')
       setExpandedPaths(defaultExpanded)
+      setOpenFileTabs([])
+      setActiveFilePath(undefined)
       await loadPreview('', nextRepository)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -328,6 +355,8 @@ function App(): React.JSX.Element {
         setRepository(nextRepository)
         setSelectedPath('')
         setExpandedPaths(defaultExpanded)
+        setOpenFileTabs([])
+        setActiveFilePath(undefined)
         await loadPreview('', nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -374,16 +403,56 @@ function App(): React.JSX.Element {
       setSelectedPath(node.path)
 
       if (node.type === 'directory') {
+        setActiveFilePath(undefined)
         setExpandedPaths((current) => {
           const next = new Set(current)
           next.has(node.path) ? next.delete(node.path) : next.add(node.path)
           return next
         })
+      } else {
+        setActiveFilePath(node.path)
+        setOpenFileTabs((current) =>
+          current.some((tab) => tab.path === node.path)
+            ? current
+            : [...current, { path: node.path, name: node.name }]
+        )
       }
 
       await loadPreview(node.path)
     },
     [loadPreview]
+  )
+
+  const selectFileTab = useCallback(
+    async (tab: OpenFileTab): Promise<void> => {
+      setActiveFilePath(tab.path)
+      setSelectedPath(tab.path)
+      await loadPreview(tab.path)
+    },
+    [loadPreview]
+  )
+
+  const closeFileTab = useCallback(
+    (path: string): void => {
+      const tabIndex = openFileTabs.findIndex((tab) => tab.path === path)
+      const nextTabs = openFileTabs.filter((tab) => tab.path !== path)
+
+      setOpenFileTabs(nextTabs)
+
+      if (activeFilePath !== path) return
+
+      const nextTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)]
+      if (nextTab) {
+        setActiveFilePath(nextTab.path)
+        setSelectedPath(nextTab.path)
+        void loadPreview(nextTab.path)
+      } else {
+        setActiveFilePath(undefined)
+        setSelectedPath('')
+        void loadPreview('')
+      }
+    },
+    [activeFilePath, loadPreview, openFileTabs]
   )
 
   const copyPath = useCallback(async (): Promise<void> => {
@@ -407,6 +476,8 @@ function App(): React.JSX.Element {
         setRepository(nextRepository)
         setSelectedPath('')
         setExpandedPaths(defaultExpanded)
+        setOpenFileTabs([])
+        setActiveFilePath(undefined)
         await loadPreview('', nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -418,39 +489,94 @@ function App(): React.JSX.Element {
   )
 
   const breadcrumbParts = selectedPath ? selectedPath.split('/').filter(Boolean) : []
+  const repositoryLabel = repository ? getRepositoryLabel(repository) : ''
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
       {repository && (
-        <header className="github-topbar">
-          <div className="topbar-left">
-            <button className="topbar-icon-button" type="button" aria-label="Menu">
-              <Menu size={20} />
-            </button>
-            <Github className="github-mark" size={34} />
-            <div className="topbar-repo">
-              <span>miclle</span>
-              <span className="repo-slash">/</span>
-              <strong>{repository.name}</strong>
-              <Lock size={14} />
+        <header className="app-titlebar">
+          <div className="titlebar-main">
+            <div className="titlebar-left">
+              <div className="titlebar-window-controls">
+                <button
+                  className="window-control close"
+                  type="button"
+                  aria-label="Close window"
+                  onClick={() => window.api.controlWindow('close')}
+                />
+                <button
+                  className="window-control minimize"
+                  type="button"
+                  aria-label="Minimize window"
+                  onClick={() => window.api.controlWindow('minimize')}
+                />
+                <button
+                  className="window-control zoom"
+                  type="button"
+                  aria-label="Toggle fullscreen"
+                  onClick={() => window.api.controlWindow('toggle-maximize')}
+                />
+              </div>
+              <div className="titlebar-repository" title={repositoryLabel}>
+                {repositoryLabel}
+              </div>
+              <button
+                className="titlebar-icon-button sidebar-toggle-button"
+                type="button"
+                aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
+                aria-pressed={isSidebarOpen}
+                onClick={() => setIsSidebarOpen((current) => !current)}
+              >
+                {isSidebarOpen ? (
+                  <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
+                ) : (
+                  <IconLayoutSidebarLeftExpand size={20} stroke={2} />
+                )}
+              </button>
+              <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
+                <ChevronLeft size={16} />
+              </button>
+              <button className="titlebar-icon-button" type="button" aria-label="Forward" disabled>
+                <ChevronRight size={16} />
+              </button>
             </div>
-          </div>
-          <div className="topbar-right">
-            <div className="topbar-search">
-              <Search size={18} />
-              <span>
-                Type <kbd>/</kbd> to search
-              </span>
-            </div>
-            <button className="topbar-icon-button" type="button" aria-label="Terminal">
-              <Terminal size={18} />
-            </button>
-            <button className="topbar-icon-button" type="button" aria-label="Agents">
-              <Bot size={18} />
-            </button>
-            <button className="topbar-icon-button" type="button" aria-label="More">
-              <ChevronDown size={16} />
-            </button>
+            <nav className="titlebar-tabs" aria-label="Open tabs">
+              {openFileTabs.map((tab) => {
+                const active = tab.path === activeFilePath
+
+                return (
+                  <div
+                    className={active ? 'titlebar-tab active' : 'titlebar-tab'}
+                    role="tab"
+                    tabIndex={0}
+                    aria-selected={active}
+                    key={tab.path}
+                    title={tab.path}
+                    onClick={() => void selectFileTab(tab)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      void selectFileTab(tab)
+                    }}
+                  >
+                    <span className="titlebar-tab-corner" aria-hidden="true" />
+                    <FileText size={14} />
+                    <span className="titlebar-tab-name">{tab.name}</span>
+                    <button
+                      className="titlebar-tab-close"
+                      type="button"
+                      aria-label={`Close ${tab.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        closeFileTab(tab.path)
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )
+              })}
+            </nav>
           </div>
         </header>
       )}
@@ -473,55 +599,67 @@ function App(): React.JSX.Element {
         </section>
       ) : (
         <section
-          className="repo-layout"
-          style={{ gridTemplateColumns: `${sidebarWidth}px 1px minmax(0, 1fr)` }}
+          className={isSidebarOpen ? 'repo-layout' : 'repo-layout sidebar-collapsed'}
+          style={{
+            gridTemplateColumns: isSidebarOpen
+              ? `${sidebarWidth}px 1px minmax(0, 1fr)`
+              : 'minmax(0, 1fr)'
+          }}
         >
-          <aside className="tree-panel" aria-label="Files">
-            <div className="sidebar-controls">
-              <span className="branch-pill">
-                <GitBranch size={15} />
-                <select
-                  aria-label="Branch"
-                  disabled={loading}
-                  value={repository.activeRef}
-                  onChange={(event) => void switchRef(event.target.value)}
-                >
-                  {repository.refs.map((ref) => (
-                    <option key={`${ref.type}:${ref.name}`} value={ref.name}>
-                      {ref.name}
-                    </option>
+          {isSidebarOpen && (
+            <>
+              <aside className="tree-panel" aria-label="Files">
+                <div className="sidebar-controls">
+                  <span className="branch-pill">
+                    <GitBranch size={15} />
+                    <select
+                      aria-label="Branch"
+                      disabled={loading}
+                      value={repository.activeRef}
+                      onChange={(event) => void switchRef(event.target.value)}
+                    >
+                      {repository.refs.map((ref) => (
+                        <option key={`${ref.type}:${ref.name}`} value={ref.name}>
+                          {ref.name}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                  <button className="sidebar-control-button" type="button" aria-label="Add">
+                    <Plus size={18} />
+                  </button>
+                  <button
+                    className="sidebar-control-button"
+                    type="button"
+                    aria-label="Search files"
+                  >
+                    <Search size={18} />
+                  </button>
+                </div>
+
+                <div className="tree">
+                  {repository.tree.map((node) => (
+                    <TreeRow
+                      expandedPaths={expandedPaths}
+                      key={node.path}
+                      level={1}
+                      node={node}
+                      selectedPath={selectedPath}
+                      onSelect={handleSelect}
+                    />
                   ))}
-                </select>
-              </span>
-              <button className="sidebar-control-button" type="button" aria-label="Add">
-                <Plus size={18} />
-              </button>
-              <button className="sidebar-control-button" type="button" aria-label="Search files">
-                <Search size={18} />
-              </button>
-            </div>
+                </div>
+              </aside>
 
-            <div className="tree">
-              {repository.tree.map((node) => (
-                <TreeRow
-                  expandedPaths={expandedPaths}
-                  key={node.path}
-                  level={1}
-                  node={node}
-                  selectedPath={selectedPath}
-                  onSelect={handleSelect}
-                />
-              ))}
-            </div>
-          </aside>
-
-          <div
-            aria-label="Resize panels"
-            className="split-resizer"
-            role="separator"
-            tabIndex={0}
-            onMouseDown={() => setIsResizing(true)}
-          />
+              <div
+                aria-label="Resize panels"
+                className="split-resizer"
+                role="separator"
+                tabIndex={0}
+                onMouseDown={() => setIsResizing(true)}
+              />
+            </>
+          )}
 
           <section className="preview-panel">
             <div className="repo-pathbar">
@@ -530,6 +668,7 @@ function App(): React.JSX.Element {
                   type="button"
                   onClick={() => {
                     setSelectedPath('')
+                    setActiveFilePath(undefined)
                     void loadPreview('')
                   }}
                 >
@@ -549,6 +688,7 @@ function App(): React.JSX.Element {
                           type="button"
                           onClick={() => {
                             setSelectedPath(path)
+                            setActiveFilePath(undefined)
                             void loadPreview(path)
                           }}
                         >
@@ -580,7 +720,14 @@ function App(): React.JSX.Element {
                   <PreviewContent
                     preview={preview}
                     onSelectPath={(path) => {
+                      const node = findTreeNode(repository.tree, path)
+                      if (node) {
+                        void handleSelect(node)
+                        return
+                      }
+
                       setSelectedPath(path)
+                      setActiveFilePath(undefined)
                       void loadPreview(path)
                     }}
                   />

@@ -698,6 +698,27 @@ app.whenReady().then(() => {
 
   ipcMain.handle('window:new', () => createWindow())
 
+  ipcMain.handle('window:control', (event, action: 'close' | 'minimize' | 'toggle-maximize') => {
+    const browserWindow = BrowserWindow.fromWebContents(event.sender)
+    if (!browserWindow) return
+
+    if (action === 'close') {
+      browserWindow.close()
+      return
+    }
+
+    if (action === 'minimize') {
+      browserWindow.minimize()
+      return
+    }
+
+    if (browserWindow.isMaximized()) {
+      browserWindow.unmaximize()
+    } else {
+      browserWindow.maximize()
+    }
+  })
+
   ipcMain.handle('repository:pick', async () => {
     const browserWindow = BrowserWindow.getFocusedWindow()
     const options: OpenDialogOptions = {

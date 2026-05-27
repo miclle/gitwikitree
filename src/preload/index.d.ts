@@ -42,6 +42,7 @@ export type PreviewPayload = DirectoryPreview | FilePreview
 
 export type GitWikitreeAPI = {
   newWindow: () => Promise<void>
+  controlWindow: (action: 'close' | 'minimize' | 'toggle-maximize') => Promise<void>
   pickRepository: () => Promise<RepositoryPayload | undefined>
   loadRepository: (repoPath: string) => Promise<RepositoryPayload>
   loadRef: (repoPath: string, ref: string, rootPath?: string) => Promise<RepositoryPayload>

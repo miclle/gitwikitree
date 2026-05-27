@@ -4,6 +4,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   newWindow: (): Promise<void> => ipcRenderer.invoke('window:new'),
+  controlWindow: (action: 'close' | 'minimize' | 'toggle-maximize'): Promise<void> =>
+    ipcRenderer.invoke('window:control', action),
   pickRepository: () => ipcRenderer.invoke('repository:pick'),
   loadRepository: (repoPath: string) => ipcRenderer.invoke('repository:load', repoPath),
   loadRef: (repoPath: string, ref: string, rootPath?: string) =>
