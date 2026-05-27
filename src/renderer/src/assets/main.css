@@ -187,7 +187,7 @@ button:disabled {
   height: 30px;
   gap: 8px;
   margin-bottom: 4px;
-  padding: 0 12px;
+  padding: 0 34px 0 12px;
   border: 0;
   border-radius: 9px;
   color: #3f4854;
@@ -256,11 +256,13 @@ button:disabled {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  padding: 0;
   transform: translateY(-50%);
   place-items: center;
   border-radius: 50%;
   color: #344252;
-  background: #ffffff;
+  background: transparent;
+  line-height: 0;
   opacity: 0;
   pointer-events: none;
   transition:
@@ -274,13 +276,17 @@ button:disabled {
   background: #dfe8f6;
 }
 
+.titlebar-tab-close svg {
+  display: block;
+}
+
 .titlebar-tab:not(.active):hover {
   color: #1f2328;
   background: #a9c7f4;
 }
 
 .titlebar-tab:not(.active):hover .titlebar-tab-close {
-  background: #a9c7f4;
+  background: transparent;
 }
 
 .titlebar-tab:not(.active):hover .titlebar-tab-close:hover {
@@ -288,14 +294,15 @@ button:disabled {
 }
 
 .titlebar-tab.active:hover .titlebar-tab-close {
-  background: #ffffff;
+  background: transparent;
 }
 
 .titlebar-tab.active:hover .titlebar-tab-close:hover {
   background: #e8edf4;
 }
 
-.titlebar-tab:hover .titlebar-tab-close {
+.titlebar-tab:hover .titlebar-tab-close,
+.titlebar-tab.active .titlebar-tab-close {
   opacity: 1;
   pointer-events: auto;
 }
