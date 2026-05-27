@@ -4,11 +4,18 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { getOpenFileTabsForRecentFile } from '../../main/session-store'
-import { getMarkdownPreview } from './markdown-preview'
+import {
+  escapeHtml,
+  getMarkdownPreview,
+  isExternalLink,
+  markdownToHtml,
+  resolveMarkdownLinkPath
+} from './markdown-preview'
 import { getTreeIcon } from './tree-icons'
 import {
   ChevronDown,
@@ -117,175 +124,6 @@ function fileNameFromPath(path: string): string {
 function parentPaths(path: string): string[] {
   const parts = path.split('/').filter(Boolean)
   return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-function renderInlineMarkdown(value: string): string {
-  return escapeHtml(value)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-}
-
-function splitTableRow(row: string): string[] {
-  const trimmed = row.trim().replace(/^\|/, '').replace(/\|$/, '')
-  const cells: string[] = []
-  let current = ''
-  let escaped = false
-
-  for (const character of trimmed) {
-    if (escaped) {
-      current += character
-      escaped = false
-      continue
-    }
-
-    if (character === '\\') {
-      escaped = true
-      continue
-    }
-
-    if (character === '|') {
-      cells.push(current.trim())
-      current = ''
-      continue
-    }
-
-    current += character
-  }
-
-  cells.push(current.trim())
-  return cells
-}
-
-function getTableAlignments(
-  row: string
-): Array<'left' | 'center' | 'right' | undefined> | undefined {
-  const cells = splitTableRow(row)
-
-  if (cells.length === 0 || !cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))) {
-    return undefined
-  }
-
-  return cells.map((cell) => {
-    const compact = cell.replace(/\s+/g, '')
-    if (compact.startsWith(':') && compact.endsWith(':')) return 'center'
-    if (compact.endsWith(':')) return 'right'
-    if (compact.startsWith(':')) return 'left'
-    return undefined
-  })
-}
-
-function isTableStart(currentLine: string, nextLine?: string): boolean {
-  return Boolean(
-    currentLine.includes('|') && nextLine?.includes('|') && getTableAlignments(nextLine)
-  )
-}
-
-function renderTableCell(
-  tag: 'td' | 'th',
-  content: string,
-  alignment: 'left' | 'center' | 'right' | undefined
-): string {
-  const alignAttribute = alignment ? ` style="text-align: ${alignment}"` : ''
-  return `<${tag}${alignAttribute}>${renderInlineMarkdown(content)}</${tag}>`
-}
-
-function markdownToHtml(markdown: string): string {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const html: string[] = []
-  let inCode = false
-  let inList = false
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-
-    if (line.startsWith('```')) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-      html.push(inCode ? '</code></pre>' : '<pre><code>')
-      inCode = !inCode
-      continue
-    }
-
-    if (inCode) {
-      html.push(`${escapeHtml(line)}\n`)
-      continue
-    }
-
-    if (isTableStart(line, lines[index + 1])) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-
-      const headers = splitTableRow(line)
-      const alignments = getTableAlignments(lines[index + 1]) ?? []
-      const bodyRows: string[] = []
-      index += 2
-
-      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
-        const cells = splitTableRow(lines[index])
-        bodyRows.push(
-          `<tr>${headers
-            .map((_, cellIndex) =>
-              renderTableCell('td', cells[cellIndex] ?? '', alignments[cellIndex])
-            )
-            .join('')}</tr>`
-        )
-        index += 1
-      }
-
-      index -= 1
-      html.push(
-        `<table><thead><tr>${headers
-          .map((header, cellIndex) => renderTableCell('th', header, alignments[cellIndex]))
-          .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table>`
-      )
-      continue
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.*)$/)
-    if (heading) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-      const level = heading[1].length
-      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`)
-      continue
-    }
-
-    const listItem = line.match(/^\s*[-*]\s+(.*)$/)
-    if (listItem) {
-      if (!inList) {
-        html.push('<ul>')
-        inList = true
-      }
-      html.push(`<li>${renderInlineMarkdown(listItem[1])}</li>`)
-      continue
-    }
-
-    if (inList) {
-      html.push('</ul>')
-      inList = false
-    }
-
-    html.push(line.trim() ? `<p>${renderInlineMarkdown(line)}</p>` : '')
-  }
-
-  if (inList) html.push('</ul>')
-  if (inCode) html.push('</code></pre>')
-  return html.join('\n')
 }
 
 function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): React.JSX.Element {
@@ -1008,12 +846,11 @@ function App(): React.JSX.Element {
                     const node = findTreeNode(repository.tree, path)
                     if (node) {
                       void handleSelect(node)
-                      return
+                      return true
                     }
 
-                    setSelectedPath(path)
-                    setActiveFilePath(undefined)
-                    void loadPreview(path)
+                    setError(`${fileNameFromPath(path)} is no longer available in this repository.`)
+                    return false
                   }}
                 />
               )}
@@ -1150,14 +987,32 @@ function PreviewContent({
   onSelectPath
 }: {
   preview: Preview
-  onSelectPath: (path: string) => void
+  onSelectPath: (path: string) => boolean
 }): React.JSX.Element {
+  const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
+    if (!(event.target instanceof Element)) return
+
+    const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
+    if (!link || !event.currentTarget.contains(link)) return
+
+    const href = link.getAttribute('href') ?? ''
+    event.preventDefault()
+
+    if (isExternalLink(href)) {
+      window.open(href, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    const nextPath = resolveMarkdownLinkPath(href, sourcePath)
+    if (nextPath) onSelectPath(nextPath)
+  }
+
   if (preview.kind === 'directory') {
     if (preview.readme) {
       const markdownPreview = getMarkdownPreview(preview.readme.content)
 
       return (
-        <article className="markdown-body">
+        <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.readme.path)}>
           {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
           <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
         </article>
@@ -1180,7 +1035,7 @@ function PreviewContent({
     const markdownPreview = getMarkdownPreview(preview.content)
 
     return (
-      <article className="markdown-body">
+      <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.path)}>
         {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
         <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
       </article>
