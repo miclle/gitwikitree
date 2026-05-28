@@ -4,18 +4,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
-import {
-  escapeHtml,
-  getMarkdownPreview,
-  isExternalLink,
-  markdownHeadingId,
-  markdownToHtml,
-  resolveMarkdownLinkPath
-} from './markdown-preview'
 import {
   canMoveTabHistory,
   createFileTab,
@@ -23,29 +14,24 @@ import {
   navigateFileTabs,
   type OpenFileTab
 } from './app-navigation'
-import { getTreeIcon } from './tree-icons'
+import { PreviewContent } from './components/PreviewContent'
+import { TreeRow } from './components/TreeRow'
+import {
+  fileNameFromPath,
+  findTreeNode,
+  getRepositoryLabel,
+  hydrateOpenFileTab,
+  iconForNode,
+  parentPaths
+} from './app-utils'
 import type {
-  NavigationTarget,
   PreviewPayload,
   RecentFileState,
   RepositoryPayload,
   SessionState,
   TreeNode
 } from '../../shared/types'
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Code2,
-  File,
-  FileText,
-  Folder,
-  GitBranch,
-  Loader2,
-  Plus,
-  Search,
-  X
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code2, GitBranch, Loader2, Plus, Search, X } from 'lucide-react'
 
 type Repository = RepositoryPayload
 type Preview = PreviewPayload
@@ -59,84 +45,6 @@ type TabPopoverState = {
 const defaultExpanded = new Set([''])
 const tabPopoverWidth = 280
 const tabPopoverInset = 8
-
-function getRepositoryLabel(repository: Repository): string {
-  const parts = repository.rootPath.split(/[\\/]/).filter(Boolean)
-  const owner = parts.at(-2)
-  return owner ? `${owner}/${repository.name}` : repository.name
-}
-
-function findTreeNode(nodes: TreeNode[], path: string): TreeNode | undefined {
-  for (const node of nodes) {
-    if (node.path === path) return node
-
-    if (node.children) {
-      const match = findTreeNode(node.children, path)
-      if (match) return match
-    }
-  }
-
-  return undefined
-}
-
-function fileNameFromPath(path: string): string {
-  return path.split('/').filter(Boolean).at(-1) ?? path
-}
-
-function fallbackTabId(tab: NavigationTarget, index: number): string {
-  return `tab-${index}-${tab.path.replace(/[^a-z0-9]/gi, '-')}`
-}
-
-function hydrateOpenFileTab(
-  tab: {
-    path: string
-    name: string
-    id?: string
-    history?: NavigationTarget[]
-    historyIndex?: number
-  },
-  index: number
-): OpenFileTab {
-  const target = { path: tab.path, name: tab.name }
-  const history = tab.history?.length ? tab.history : [target]
-  const historyIndex =
-    typeof tab.historyIndex === 'number'
-      ? Math.min(Math.max(tab.historyIndex, 0), history.length - 1)
-      : history.findIndex((item) => item.path === tab.path)
-
-  return {
-    id: tab.id ?? fallbackTabId(tab, index),
-    ...target,
-    history,
-    historyIndex: historyIndex >= 0 ? historyIndex : history.length - 1
-  }
-}
-
-function shouldOpenInNewTab(event: {
-  button?: number
-  ctrlKey?: boolean
-  metaKey?: boolean
-}): boolean {
-  return event.button === 1 || Boolean(event.ctrlKey || event.metaKey)
-}
-
-function parentPaths(path: string): string[] {
-  const parts = path.split('/').filter(Boolean)
-  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
-}
-
-function iconForNode(node: Pick<TreeNode, 'type' | 'name'>, expanded = false): React.JSX.Element {
-  const treeIcon = getTreeIcon(node, expanded)
-  if (treeIcon) {
-    return <img alt={treeIcon.alt} className="tree-icon" draggable={false} src={treeIcon.src} />
-  }
-
-  return node.type === 'directory' ? (
-    <Folder className="tree-icon" size={16} />
-  ) : (
-    <File className="tree-icon" size={16} />
-  )
-}
 
 function App(): React.JSX.Element {
   const didRestoreSession = useRef(false)
@@ -941,273 +849,6 @@ function App(): React.JSX.Element {
         </section>
       )}
     </main>
-  )
-}
-
-function TreeRow({
-  node,
-  level,
-  expandedPaths,
-  selectedPath,
-  onSelect,
-  onToggle
-}: {
-  node: TreeNode
-  level: number
-  expandedPaths: Set<string>
-  selectedPath: string
-  onSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
-  onToggle: (path: string) => void
-}): React.JSX.Element {
-  const expanded = expandedPaths.has(node.path)
-  const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
-  const selectNode = (openInNewTab = false): void => {
-    void onSelect(node, { openInNewTab })
-  }
-
-  return (
-    <>
-      <div
-        aria-selected={selectedPath === node.path}
-        className={selectedPath === node.path ? 'tree-row selected' : 'tree-row'}
-        role="treeitem"
-        style={{ '--level': level } as CSSProperties}
-        tabIndex={0}
-        onClick={(event) => selectNode(shouldOpenInNewTab(event))}
-        onAuxClick={(event) => {
-          if (!shouldOpenInNewTab(event)) return
-          event.preventDefault()
-          selectNode(true)
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return
-          event.preventDefault()
-          selectNode()
-        }}
-      >
-        {node.type === 'directory' ? (
-          <button
-            aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
-            className="tree-toggle"
-            disabled={!hasChildren}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggle(node.path)
-            }}
-          >
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </button>
-        ) : (
-          <span className="tree-spacer" />
-        )}
-        <span className="tree-node-button">
-          {iconForNode(node, expanded)}
-          <span>{node.name}</span>
-        </span>
-      </div>
-      {hasChildren && expanded && (
-        <div className="tree-children" style={{ '--level': level } as CSSProperties}>
-          {node.children?.map((child) => (
-            <TreeRow
-              expandedPaths={expandedPaths}
-              key={child.path}
-              level={level + 1}
-              node={child}
-              selectedPath={selectedPath}
-              onSelect={onSelect}
-              onToggle={onToggle}
-            />
-          ))}
-        </div>
-      )}
-    </>
-  )
-}
-
-function highlightCodeLine(line: string): string {
-  const tokenPattern =
-    /('[^']*'|"[^"]*"|`[^`]*`)|\b(import|from|type|const|let|function|return|if|else|for|while|async|await|try|catch|finally|switch|case|break|continue|true|false|undefined|null)\b|\b(\d+(?:\.\d+)?)\b/g
-  let cursor = 0
-  let html = ''
-
-  for (const match of line.matchAll(tokenPattern)) {
-    const index = match.index ?? 0
-    html += escapeHtml(line.slice(cursor, index))
-
-    if (match[1]) {
-      html += `<span class="tok-string">${escapeHtml(match[1])}</span>`
-    } else if (match[2]) {
-      html += `<span class="tok-keyword">${escapeHtml(match[2])}</span>`
-    } else if (match[3]) {
-      html += `<span class="tok-number">${escapeHtml(match[3])}</span>`
-    }
-
-    cursor = index + match[0].length
-  }
-
-  return html + escapeHtml(line.slice(cursor))
-}
-
-function CodePreview({ content }: { content: string }): React.JSX.Element {
-  const lines = content.split('\n')
-
-  return (
-    <table className="code-table" aria-label="Source code">
-      <tbody>
-        {lines.map((line, index) => (
-          <tr key={`${index}-${line}`}>
-            <td className="line-number">{index + 1}</td>
-            <td className="line-code">
-              <span dangerouslySetInnerHTML={{ __html: highlightCodeLine(line) || ' ' }} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function PreviewContent({
-  preview,
-  onSelectPath
-}: {
-  preview: Preview
-  onSelectPath: (path: string, openInNewTab?: boolean) => boolean
-}): React.JSX.Element {
-  const scrollToMarkdownAnchor = (href: string, container: HTMLElement): void => {
-    const hash = href.trim().slice(1)
-    if (!hash) return
-
-    let anchor = hash
-    try {
-      anchor = decodeURIComponent(hash)
-    } catch {
-      anchor = hash
-    }
-
-    const escapedAnchor = CSS.escape(anchor)
-    const target = container.querySelector<HTMLElement>(
-      `[id="${escapedAnchor}"], [name="${escapedAnchor}"]`
-    )
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
-    if (!(event.target instanceof Element)) return
-
-    const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
-    if (!link || !event.currentTarget.contains(link)) return
-
-    const href = link.getAttribute('href') ?? ''
-    event.preventDefault()
-
-    if (href.trim().startsWith('#')) {
-      scrollToMarkdownAnchor(href, event.currentTarget)
-      return
-    }
-
-    if (isExternalLink(href)) {
-      window.open(href, '_blank', 'noopener,noreferrer')
-      return
-    }
-
-    const nextPath = resolveMarkdownLinkPath(href, sourcePath)
-    if (nextPath) onSelectPath(nextPath, shouldOpenInNewTab(event))
-  }
-
-  if (preview.kind === 'directory') {
-    if (preview.readme) {
-      const markdownPreview = getMarkdownPreview(preview.readme.content)
-
-      return (
-        <article
-          className="markdown-body"
-          onAuxClick={handleMarkdownLinkClick(preview.readme.path)}
-          onClick={handleMarkdownLinkClick(preview.readme.path)}
-        >
-          {markdownPreview.title && (
-            <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
-          )}
-          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
-        </article>
-      )
-    }
-
-    return (
-      <div className="directory-list">
-        {(preview.entries ?? []).map((entry) => (
-          <button
-            key={entry.path}
-            type="button"
-            onAuxClick={(event) => {
-              if (!shouldOpenInNewTab(event)) return
-              event.preventDefault()
-              onSelectPath(entry.path, true)
-            }}
-            onClick={(event) => onSelectPath(entry.path, shouldOpenInNewTab(event))}
-          >
-            {iconForNode(entry)}
-            <span>{entry.name}</span>
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  if (preview.previewType === 'markdown' && preview.content) {
-    const markdownPreview = getMarkdownPreview(preview.content)
-
-    return (
-      <article
-        className="markdown-body"
-        onAuxClick={handleMarkdownLinkClick(preview.path)}
-        onClick={handleMarkdownLinkClick(preview.path)}
-      >
-        {markdownPreview.title && (
-          <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
-        )}
-        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
-      </article>
-    )
-  }
-
-  if (preview.previewType === 'html' && preview.content) {
-    return (
-      <iframe className="html-preview" title={preview.path} sandbox="" srcDoc={preview.content} />
-    )
-  }
-
-  if (preview.previewType === 'svg' && preview.content) {
-    return (
-      <div className="image-preview">
-        <img
-          alt={preview.name}
-          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.content)}`}
-        />
-      </div>
-    )
-  }
-
-  if (preview.previewType === 'image' && preview.dataUrl) {
-    return (
-      <div className="image-preview">
-        <img alt={preview.name} src={preview.dataUrl} />
-      </div>
-    )
-  }
-
-  if (preview.content) {
-    return <CodePreview content={preview.content} />
-  }
-
-  return (
-    <div className="unsupported-preview">
-      <FileText size={32} />
-      <strong>Preview unavailable</strong>
-      <span>This file type is not rendered yet.</span>
-    </div>
   )
 }
 
