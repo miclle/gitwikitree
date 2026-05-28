@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { loadSingleTranspiledModule } from './helpers/transpile-modules.mjs'
+import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 
 async function loadMarkdownPreview() {
-  const { module } = await loadSingleTranspiledModule('src/renderer/src/markdown-preview.ts')
+  const { module } = await loadTranspiledModule({
+    entry: 'src/renderer/src/markdown-preview.ts',
+    modules: ['src/renderer/src/markdown-preview.ts', 'src/renderer/src/code-highlight.ts']
+  })
   return module
 }
 
@@ -46,7 +49,7 @@ test('markdownToHtml marks links so the preview can intercept clicks', async () 
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('[Design doc](docs/design.md)')
 
-  assert.equal(html, '<p><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>')
+  assert.equal(html, '<p><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>\n')
 })
 
 test('markdownToHtml adds stable heading ids for anchor links', async () => {
@@ -55,8 +58,18 @@ test('markdownToHtml adds stable heading ids for anchor links', async () => {
 
   assert.equal(
     html,
-    '<h1 id="getting-started">Getting Started</h1>\n\n<h2 id="getting-started-1">Getting Started</h2>\n\n<h2 id="api-reference">API <code>Reference</code></h2>'
+    '<h1 id="getting-started">Getting Started</h1>\n<h2 id="getting-started-1">Getting Started</h2>\n<h2 id="api-reference">API <code>Reference</code></h2>\n'
   )
+})
+
+test('markdownToHtml renders GitHub flavored markdown and highlighted code blocks', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('- [x] Done\n\n```ts\nconst ok = true\n```')
+
+  assert.match(html, /<input checked="" disabled="" type="checkbox">/)
+  assert.match(html, /<button type="button" class="markdown-code-copy" data-copy-code="true"/)
+  assert.match(html, /<code class="hljs language-ts">/)
+  assert.match(html, /<span class="hljs-keyword">const<\/span>/)
 })
 
 test('markdownHeadingId preserves non-Latin heading text', async () => {

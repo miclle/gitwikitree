@@ -1,56 +1,46 @@
 import { type MouseEvent as ReactMouseEvent } from 'react'
+import DOMPurify from 'dompurify'
 import { FileText } from 'lucide-react'
 import {
-  escapeHtml,
   getMarkdownPreview,
   isExternalLink,
   markdownHeadingId,
   markdownToHtml,
   resolveMarkdownLinkPath
 } from '../markdown-preview'
+import { highlightCodeBlock, languageForExtension } from '../code-highlight'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
 import type { PreviewPayload } from '../../../shared/types'
 
-function highlightCodeLine(line: string): string {
-  const tokenPattern =
-    /('[^']*'|"[^"]*"|`[^`]*`)|\b(import|from|type|const|let|function|return|if|else|for|while|async|await|try|catch|finally|switch|case|break|continue|true|false|undefined|null)\b|\b(\d+(?:\.\d+)?)\b/g
-  let cursor = 0
-  let html = ''
-
-  for (const match of line.matchAll(tokenPattern)) {
-    const index = match.index ?? 0
-    html += escapeHtml(line.slice(cursor, index))
-
-    if (match[1]) {
-      html += `<span class="tok-string">${escapeHtml(match[1])}</span>`
-    } else if (match[2]) {
-      html += `<span class="tok-keyword">${escapeHtml(match[2])}</span>`
-    } else if (match[3]) {
-      html += `<span class="tok-number">${escapeHtml(match[3])}</span>`
-    }
-
-    cursor = index + match[0].length
-  }
-
-  return html + escapeHtml(line.slice(cursor))
+function sanitizeMarkdownHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ADD_ATTR: ['data-copy-code', 'data-markdown-link'],
+    ALLOW_DATA_ATTR: true
+  })
 }
 
-function CodePreview({ content }: { content: string }): React.JSX.Element {
-  const lines = content.split('\n')
+function CodePreview({
+  content,
+  extension
+}: {
+  content: string
+  extension: string
+}): React.JSX.Element {
+  const lineCount = Math.max(1, content.split('\n').length)
+  const language = languageForExtension(extension)
 
   return (
-    <table className="code-table" aria-label="Source code">
-      <tbody>
-        {lines.map((line, index) => (
-          <tr key={`${index}-${line}`}>
-            <td className="line-number">{index + 1}</td>
-            <td className="line-code">
-              <span dangerouslySetInnerHTML={{ __html: highlightCodeLine(line) || ' ' }} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="code-preview-shell" aria-label="Source code">
+      <pre className="code-line-gutter" aria-hidden="true">
+        {Array.from({ length: lineCount }, (_, index) => index + 1).join('\n')}
+      </pre>
+      <pre className="code-source">
+        <code
+          className={language ? `hljs language-${language}` : 'hljs'}
+          dangerouslySetInnerHTML={{ __html: highlightCodeBlock(content, language) || ' ' }}
+        />
+      </pre>
+    </div>
   )
 }
 
@@ -61,6 +51,38 @@ export function PreviewContent({
   preview: PreviewPayload
   onSelectPath: (path: string, openInNewTab?: boolean) => boolean
 }): React.JSX.Element {
+  const setCopyButtonState = (
+    button: HTMLButtonElement,
+    state: 'copied' | 'failed',
+    label: string,
+    resetDelay = 1200
+  ): void => {
+    button.dataset.copyState = state
+    button.textContent = label
+    button.setAttribute('aria-label', label === 'Copied' ? 'Code copied' : 'Copy failed')
+
+    window.setTimeout(() => {
+      button.dataset.copyState = 'idle'
+      button.textContent = 'Copy'
+      button.setAttribute('aria-label', 'Copy code')
+    }, resetDelay)
+  }
+
+  const handleMarkdownCodeCopy = async (button: HTMLButtonElement): Promise<void> => {
+    const code = button
+      .closest('.markdown-code-block')
+      ?.querySelector<HTMLElement>('pre code')?.textContent
+
+    if (!code) return
+
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopyButtonState(button, 'copied', 'Copied')
+    } catch {
+      setCopyButtonState(button, 'failed', 'Failed')
+    }
+  }
+
   const scrollToMarkdownAnchor = (href: string, container: HTMLElement): void => {
     const hash = href.trim().slice(1)
     if (!hash) return
@@ -81,6 +103,13 @@ export function PreviewContent({
 
   const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return
+
+    const copyButton = event.target.closest<HTMLButtonElement>('button[data-copy-code]')
+    if (copyButton && event.currentTarget.contains(copyButton)) {
+      event.preventDefault()
+      void handleMarkdownCodeCopy(copyButton)
+      return
+    }
 
     const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
     if (!link || !event.currentTarget.contains(link)) return
@@ -115,7 +144,11 @@ export function PreviewContent({
           {markdownPreview.title && (
             <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
           )}
-          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
+          <div
+            dangerouslySetInnerHTML={{
+              __html: sanitizeMarkdownHtml(markdownToHtml(markdownPreview.content))
+            }}
+          />
         </article>
       )
     }
@@ -141,7 +174,7 @@ export function PreviewContent({
     )
   }
 
-  if (preview.previewType === 'markdown' && preview.content) {
+  if (preview.previewType === 'markdown' && preview.content !== undefined) {
     const markdownPreview = getMarkdownPreview(preview.content)
 
     return (
@@ -153,18 +186,22 @@ export function PreviewContent({
         {markdownPreview.title && (
           <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
         )}
-        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
+        <div
+          dangerouslySetInnerHTML={{
+            __html: sanitizeMarkdownHtml(markdownToHtml(markdownPreview.content))
+          }}
+        />
       </article>
     )
   }
 
-  if (preview.previewType === 'html' && preview.content) {
+  if (preview.previewType === 'html' && preview.content !== undefined) {
     return (
       <iframe className="html-preview" title={preview.path} sandbox="" srcDoc={preview.content} />
     )
   }
 
-  if (preview.previewType === 'svg' && preview.content) {
+  if (preview.previewType === 'svg' && preview.content !== undefined) {
     return (
       <div className="image-preview">
         <img
@@ -183,8 +220,8 @@ export function PreviewContent({
     )
   }
 
-  if (preview.content) {
-    return <CodePreview content={preview.content} />
+  if (preview.content !== undefined) {
+    return <CodePreview content={preview.content} extension={preview.extension} />
   }
 
   return (

@@ -1,3 +1,6 @@
+import { Marked, Renderer, type Tokens } from 'marked'
+import { highlightCodeBlock } from './code-highlight'
+
 export type MarkdownPreview = {
   title?: string
   content: string
@@ -32,13 +35,6 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function renderInlineMarkdown(value: string): string {
-  return escapeHtml(value)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" data-markdown-link="true">$1</a>')
-}
-
 function plainInlineMarkdown(value: string): string {
   return value
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
@@ -58,70 +54,6 @@ export function markdownHeadingId(value: string): string {
     .replace(/-+/g, '-')
 
   return slug || 'section'
-}
-
-function splitTableRow(row: string): string[] {
-  const trimmed = row.trim().replace(/^\|/, '').replace(/\|$/, '')
-  const cells: string[] = []
-  let current = ''
-  let escaped = false
-
-  for (const character of trimmed) {
-    if (escaped) {
-      current += character
-      escaped = false
-      continue
-    }
-
-    if (character === '\\') {
-      escaped = true
-      continue
-    }
-
-    if (character === '|') {
-      cells.push(current.trim())
-      current = ''
-      continue
-    }
-
-    current += character
-  }
-
-  cells.push(current.trim())
-  return cells
-}
-
-function getTableAlignments(
-  row: string
-): Array<'left' | 'center' | 'right' | undefined> | undefined {
-  const cells = splitTableRow(row)
-
-  if (cells.length === 0 || !cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))) {
-    return undefined
-  }
-
-  return cells.map((cell) => {
-    const compact = cell.replace(/\s+/g, '')
-    if (compact.startsWith(':') && compact.endsWith(':')) return 'center'
-    if (compact.endsWith(':')) return 'right'
-    if (compact.startsWith(':')) return 'left'
-    return undefined
-  })
-}
-
-function isTableStart(currentLine: string, nextLine?: string): boolean {
-  return Boolean(
-    currentLine.includes('|') && nextLine?.includes('|') && getTableAlignments(nextLine)
-  )
-}
-
-function renderTableCell(
-  tag: 'td' | 'th',
-  content: string,
-  alignment: 'left' | 'center' | 'right' | undefined
-): string {
-  const alignAttribute = alignment ? ` style="text-align: ${alignment}"` : ''
-  return `<${tag}${alignAttribute}>${renderInlineMarkdown(content)}</${tag}>`
 }
 
 function decodeLinkPath(path: string): string {
@@ -150,99 +82,47 @@ function normalizeRepositoryPath(path: string): string | undefined {
   return segments.join('/')
 }
 
-export function markdownToHtml(markdown: string): string {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const html: string[] = []
+function renderMarkdownLink(href: string, title: string | null, html: string): string {
+  const titleAttribute = title ? ` title="${escapeHtml(title)}"` : ''
+  return `<a href="${escapeHtml(href)}"${titleAttribute} data-markdown-link="true">${html}</a>`
+}
+
+function createMarkdownRenderer(): Renderer {
+  const renderer = new Renderer()
   const headingIds = new Map<string, number>()
-  let inCode = false
-  let inList = false
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-
-    if (line.startsWith('```')) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-      html.push(inCode ? '</code></pre>' : '<pre><code>')
-      inCode = !inCode
-      continue
-    }
-
-    if (inCode) {
-      html.push(`${escapeHtml(line)}\n`)
-      continue
-    }
-
-    if (isTableStart(line, lines[index + 1])) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-
-      const headers = splitTableRow(line)
-      const alignments = getTableAlignments(lines[index + 1]) ?? []
-      const bodyRows: string[] = []
-      index += 2
-
-      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
-        const cells = splitTableRow(lines[index])
-        bodyRows.push(
-          `<tr>${headers
-            .map((_, cellIndex) =>
-              renderTableCell('td', cells[cellIndex] ?? '', alignments[cellIndex])
-            )
-            .join('')}</tr>`
-        )
-        index += 1
-      }
-
-      index -= 1
-      html.push(
-        `<table><thead><tr>${headers
-          .map((header, cellIndex) => renderTableCell('th', header, alignments[cellIndex]))
-          .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table>`
-      )
-      continue
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.*)$/)
-    if (heading) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-      const level = heading[1].length
-      const baseId = markdownHeadingId(heading[2])
-      const idCount = headingIds.get(baseId) ?? 0
-      headingIds.set(baseId, idCount + 1)
-      const id = idCount === 0 ? baseId : `${baseId}-${idCount}`
-      html.push(`<h${level} id="${escapeHtml(id)}">${renderInlineMarkdown(heading[2])}</h${level}>`)
-      continue
-    }
-
-    const listItem = line.match(/^\s*[-*]\s+(.*)$/)
-    if (listItem) {
-      if (!inList) {
-        html.push('<ul>')
-        inList = true
-      }
-      html.push(`<li>${renderInlineMarkdown(listItem[1])}</li>`)
-      continue
-    }
-
-    if (inList) {
-      html.push('</ul>')
-      inList = false
-    }
-
-    html.push(line.trim() ? `<p>${renderInlineMarkdown(line)}</p>` : '')
+  renderer.heading = function ({ tokens, text, depth }: Tokens.Heading): string {
+    const baseId = markdownHeadingId(text)
+    const idCount = headingIds.get(baseId) ?? 0
+    headingIds.set(baseId, idCount + 1)
+    const id = idCount === 0 ? baseId : `${baseId}-${idCount}`
+    return `<h${depth} id="${escapeHtml(id)}">${this.parser.parseInline(tokens)}</h${depth}>\n`
   }
 
-  if (inList) html.push('</ul>')
-  if (inCode) html.push('</code></pre>')
-  return html.join('\n')
+  renderer.link = function ({ href, title, tokens }: Tokens.Link): string {
+    return renderMarkdownLink(href, title ?? null, this.parser.parseInline(tokens))
+  }
+
+  renderer.code = function ({ text, lang }: Tokens.Code): string {
+    const language = lang?.match(/^\S+/)?.[0]
+    return `<div class="markdown-code-block"><button type="button" class="markdown-code-copy" data-copy-code="true" aria-label="Copy code" title="Copy code">Copy</button><pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlightCodeBlock(
+      text,
+      language
+    )}</code></pre></div>\n`
+  }
+
+  return renderer
+}
+
+export function markdownToHtml(markdown: string): string {
+  const parser = new Marked({
+    async: false,
+    breaks: false,
+    gfm: true,
+    renderer: createMarkdownRenderer()
+  })
+
+  return parser.parse(markdown) as string
 }
 
 export function isExternalLink(href: string): boolean {

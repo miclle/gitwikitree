@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import ts from 'typescript'
@@ -22,6 +22,11 @@ export async function loadTranspiledModule({
   compilerOptions = {}
 }) {
   const tempDir = await mkdtemp(join(tmpdir(), prefix))
+  await symlink(
+    new URL('../../node_modules', import.meta.url),
+    join(tempDir, 'node_modules'),
+    'dir'
+  )
 
   for (const sourcePath of modules) {
     const targetPath = join(tempDir, toModulePath(sourcePath))

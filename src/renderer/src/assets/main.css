@@ -1,4 +1,6 @@
 @import './base.css';
+@import 'github-markdown-css/github-markdown-light.css';
+@import 'highlight.js/styles/github.css';
 
 :root {
   --bg: #ffffff;
@@ -921,7 +923,13 @@ kbd {
   width: 100%;
   max-width: none;
   padding: 24px 32px 40px;
+  color: var(--text);
+  background: #ffffff;
   user-select: text;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
 }
 
 .markdown-body h1,
@@ -1012,7 +1020,7 @@ kbd {
 }
 
 .markdown-body pre,
-.code-preview {
+.code-preview-shell {
   overflow: auto;
   margin: 0;
   padding: 16px;
@@ -1020,50 +1028,116 @@ kbd {
   user-select: text;
 }
 
-.code-table {
-  width: 100%;
-  border-spacing: 0;
-  border-collapse: collapse;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 14px;
-  line-height: 24px;
-  user-select: text;
+.markdown-code-block {
+  position: relative;
+  margin: 0 0 16px;
 }
 
-.code-table tr:hover {
+.markdown-code-block pre {
+  margin-bottom: 0;
+  padding-right: 84px;
+}
+
+.markdown-code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  min-width: 54px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(31, 35, 40, 0.14);
+  border-radius: 6px;
+  color: #57606a;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 26px;
+  opacity: 0;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.markdown-code-block:hover .markdown-code-copy,
+.markdown-code-copy:focus-visible,
+.markdown-code-copy[data-copy-state='copied'],
+.markdown-code-copy[data-copy-state='failed'] {
+  opacity: 1;
+}
+
+.markdown-code-copy:hover {
+  border-color: rgba(31, 35, 40, 0.22);
+  color: #24292f;
   background: #f6f8fa;
 }
 
-.line-number {
-  width: 72px;
-  padding: 0 18px;
-  color: #59636e;
-  text-align: right;
-  user-select: none;
-  vertical-align: top;
-  white-space: nowrap;
+.markdown-code-copy[data-copy-state='copied'] {
+  color: var(--success);
 }
 
-.line-code {
-  padding: 0 16px 0 10px;
-  color: #24292f;
-  vertical-align: top;
-  white-space: pre;
-}
-
-.tok-keyword {
+.markdown-code-copy[data-copy-state='failed'] {
   color: #cf222e;
 }
 
-.tok-string {
-  color: #0a3069;
+.code-preview-shell {
+  display: grid;
+  grid-template-columns: minmax(56px, max-content) max-content;
+  min-height: 100%;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 24px;
+  background: #ffffff;
 }
 
-.tok-number {
-  color: #0550ae;
+.code-line-gutter,
+.code-source {
+  margin: 0;
+  padding: 16px 0;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  tab-size: 2;
 }
 
-.markdown-body pre {
+.code-line-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-height: 100%;
+  padding-right: 18px;
+  padding-left: 18px;
+  border-right: 1px solid var(--border-muted);
+  color: #59636e;
+  text-align: right;
+  user-select: none;
+  background: #ffffff;
+}
+
+.code-source {
+  min-width: 100%;
+  padding-right: 24px;
+  padding-left: 16px;
+  color: var(--text);
+}
+
+.code-source code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  overflow: visible;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre;
+}
+
+.markdown-body > pre,
+.markdown-body :not(.markdown-code-block) > pre {
   margin-bottom: 16px;
   border-radius: 6px;
 }
@@ -1072,14 +1146,6 @@ kbd {
   padding: 0;
   background: transparent;
   font-size: 13px;
-}
-
-.code-preview {
-  min-height: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 20px;
-  white-space: pre;
 }
 
 .html-preview {
