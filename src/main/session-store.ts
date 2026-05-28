@@ -5,6 +5,9 @@ export const maxOpenFileTabs = 30
 export type OpenFileTabState = {
   path: string
   name: string
+  id?: string
+  history?: Array<{ path: string; name: string }>
+  historyIndex?: number
 }
 
 export type RecentFileState = {
@@ -33,6 +36,7 @@ export type SessionState = {
   source?: 'working-tree' | 'git-ref' | 'worktree'
   selectedPath: string
   activeFilePath?: string
+  activeFileTabId?: string
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
   recentRepositories: RecentRepositoryState[]
@@ -72,17 +76,43 @@ function normalizeOptionalRelativePath(value: unknown): string | undefined {
 function normalizeOpenFileTabs(value: unknown): OpenFileTabState[] {
   if (!Array.isArray(value)) return []
 
-  const seen = new Set<string>()
+  const seenIds = new Set<string>()
   const tabs: OpenFileTabState[] = []
 
   for (const item of value) {
     const record = asRecord(item)
     const path = normalizeOptionalRelativePath(record.path)
     const name = asString(record.name)
+    const id = asString(record.id)
 
-    if (!path || !name || seen.has(path)) continue
-    seen.add(path)
-    tabs.push({ path, name })
+    if (!path || !name || (id && seenIds.has(id))) continue
+
+    const fallbackTarget = { path, name }
+    const rawHistory = Array.isArray(record.history) ? record.history : []
+    const history = rawHistory
+      .map((historyItem) => {
+        const historyRecord = asRecord(historyItem)
+        const historyPath = normalizeOptionalRelativePath(historyRecord.path)
+        const historyName = asString(historyRecord.name)
+
+        return historyPath && historyName ? { path: historyPath, name: historyName } : undefined
+      })
+      .filter((historyItem): historyItem is { path: string; name: string } => Boolean(historyItem))
+    const normalizedHistory = history.length ? history : [fallbackTarget]
+    const rawHistoryIndex = record.historyIndex
+    const historyIndex =
+      typeof rawHistoryIndex === 'number' && Number.isInteger(rawHistoryIndex)
+        ? Math.min(Math.max(rawHistoryIndex, 0), normalizedHistory.length - 1)
+        : normalizedHistory.findIndex((historyItem) => historyItem.path === path)
+
+    if (id) seenIds.add(id)
+    tabs.push({
+      path,
+      name,
+      ...(id ? { id } : {}),
+      history: normalizedHistory,
+      historyIndex: historyIndex >= 0 ? historyIndex : normalizedHistory.length - 1
+    })
     if (tabs.length >= maxOpenFileTabs) break
   }
 
@@ -208,6 +238,7 @@ export function normalizeSessionState(value: unknown): SessionState {
   const source = record.source
   const openFileTabs = normalizeOpenFileTabs(record.openFileTabs)
   const activeFilePath = normalizeOptionalRelativePath(record.activeFilePath)
+  const activeFileTabId = asString(record.activeFileTabId)
   const recentFiles = normalizeRecentFiles(record.recentFiles)
   const recentRepositories = normalizeRecentRepositories(record.recentRepositories)
 
@@ -221,6 +252,7 @@ export function normalizeSessionState(value: unknown): SessionState {
         : undefined,
     selectedPath: normalizeRelativePath(record.selectedPath),
     activeFilePath,
+    activeFileTabId,
     openFileTabs,
     expandedPaths: normalizeExpandedPaths(record.expandedPaths),
     recentRepositories: recentRepositories.length

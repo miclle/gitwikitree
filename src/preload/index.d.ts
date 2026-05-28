@@ -43,6 +43,9 @@ export type PreviewPayload = DirectoryPreview | FilePreview
 export type OpenFileTabState = {
   path: string
   name: string
+  id?: string
+  history?: Array<{ path: string; name: string }>
+  historyIndex?: number
 }
 
 export type RecentFileState = {
@@ -71,6 +74,7 @@ export type SessionState = {
   source?: 'working-tree' | 'git-ref' | 'worktree'
   selectedPath: string
   activeFilePath?: string
+  activeFileTabId?: string
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
   recentRepositories: RecentRepositoryState[]

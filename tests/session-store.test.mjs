@@ -229,6 +229,56 @@ test('normalizeSessionState drops invalid paths and caps recent files', async ()
   assert.equal(state.recentFiles.length, maxRecentFiles)
 })
 
+test('normalizeSessionState preserves per-tab history and duplicate file tabs', async () => {
+  const { normalizeSessionState } = await loadSessionStore()
+  const state = normalizeSessionState({
+    repositoryPath: '/repo',
+    selectedPath: 'README.md',
+    activeFilePath: 'README.md',
+    activeFileTabId: 'tab-b',
+    openFileTabs: [
+      {
+        id: 'tab-a',
+        path: 'docs/guide.md',
+        name: 'guide.md',
+        history: [
+          { path: 'README.md', name: 'README.md' },
+          { path: 'docs/guide.md', name: 'guide.md' }
+        ],
+        historyIndex: 1
+      },
+      {
+        id: 'tab-b',
+        path: 'docs/guide.md',
+        name: 'guide.md',
+        history: [{ path: 'docs/guide.md', name: 'guide.md' }],
+        historyIndex: 0
+      }
+    ]
+  })
+
+  assert.equal(state.activeFileTabId, 'tab-b')
+  assert.deepEqual(state.openFileTabs, [
+    {
+      id: 'tab-a',
+      path: 'docs/guide.md',
+      name: 'guide.md',
+      history: [
+        { path: 'README.md', name: 'README.md' },
+        { path: 'docs/guide.md', name: 'guide.md' }
+      ],
+      historyIndex: 1
+    },
+    {
+      id: 'tab-b',
+      path: 'docs/guide.md',
+      name: 'guide.md',
+      history: [{ path: 'docs/guide.md', name: 'guide.md' }],
+      historyIndex: 0
+    }
+  ])
+})
+
 test('getOpenFileTabsForRecentFile resets tabs when switching repositories', async () => {
   const { getOpenFileTabsForRecentFile } = await loadSessionStore()
   const tabs = getOpenFileTabsForRecentFile({
@@ -238,7 +288,14 @@ test('getOpenFileTabsForRecentFile resets tabs when switching repositories', asy
     nextTab: { path: 'docs/new.md', name: 'new.md' }
   })
 
-  assert.deepEqual(tabs, [{ path: 'docs/new.md', name: 'new.md' }])
+  assert.deepEqual(tabs, [
+    {
+      path: 'docs/new.md',
+      name: 'new.md',
+      history: [{ path: 'docs/new.md', name: 'new.md' }],
+      historyIndex: 0
+    }
+  ])
 })
 
 test('getOpenFileTabsForRecentFile keeps existing tabs for the same repository', async () => {
@@ -251,7 +308,17 @@ test('getOpenFileTabsForRecentFile keeps existing tabs for the same repository',
   })
 
   assert.deepEqual(tabs, [
-    { path: 'old.md', name: 'old.md' },
-    { path: 'docs/new.md', name: 'new.md' }
+    {
+      path: 'old.md',
+      name: 'old.md',
+      history: [{ path: 'old.md', name: 'old.md' }],
+      historyIndex: 0
+    },
+    {
+      path: 'docs/new.md',
+      name: 'new.md',
+      history: [{ path: 'docs/new.md', name: 'new.md' }],
+      historyIndex: 0
+    }
   ])
 })

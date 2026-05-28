@@ -8,7 +8,6 @@ import {
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
-import { getOpenFileTabsForRecentFile } from '../../main/session-store'
 import {
   escapeHtml,
   getMarkdownPreview,
@@ -17,6 +16,14 @@ import {
   markdownToHtml,
   resolveMarkdownLinkPath
 } from './markdown-preview'
+import {
+  canMoveTabHistory,
+  createFileTab,
+  moveActiveTabHistory,
+  navigateFileTabs,
+  type NavigationTarget,
+  type OpenFileTab
+} from './app-navigation'
 import { getTreeIcon } from './tree-icons'
 import {
   ChevronDown,
@@ -73,11 +80,6 @@ type FilePreview = {
 
 type Preview = DirectoryPreview | FilePreview
 
-type OpenFileTab = {
-  path: string
-  name: string
-}
-
 type RecentFileState = {
   repoPath: string
   rootPath?: string
@@ -101,7 +103,14 @@ type SessionState = {
   source?: 'working-tree' | 'git-ref' | 'worktree'
   selectedPath: string
   activeFilePath?: string
-  openFileTabs: OpenFileTab[]
+  activeFileTabId?: string
+  openFileTabs: Array<{
+    path: string
+    name: string
+    id?: string
+    history?: NavigationTarget[]
+    historyIndex?: number
+  }>
   expandedPaths: string[]
 }
 
@@ -132,6 +141,43 @@ function fileNameFromPath(path: string): string {
   return path.split('/').filter(Boolean).at(-1) ?? path
 }
 
+function fallbackTabId(tab: NavigationTarget, index: number): string {
+  return `tab-${index}-${tab.path.replace(/[^a-z0-9]/gi, '-')}`
+}
+
+function hydrateOpenFileTab(
+  tab: {
+    path: string
+    name: string
+    id?: string
+    history?: NavigationTarget[]
+    historyIndex?: number
+  },
+  index: number
+): OpenFileTab {
+  const target = { path: tab.path, name: tab.name }
+  const history = tab.history?.length ? tab.history : [target]
+  const historyIndex =
+    typeof tab.historyIndex === 'number'
+      ? Math.min(Math.max(tab.historyIndex, 0), history.length - 1)
+      : history.findIndex((item) => item.path === tab.path)
+
+  return {
+    id: tab.id ?? fallbackTabId(tab, index),
+    ...target,
+    history,
+    historyIndex: historyIndex >= 0 ? historyIndex : history.length - 1
+  }
+}
+
+function shouldOpenInNewTab(event: {
+  button?: number
+  ctrlKey?: boolean
+  metaKey?: boolean
+}): boolean {
+  return event.button === 1 || Boolean(event.ctrlKey || event.metaKey)
+}
+
 function parentPaths(path: string): string[] {
   const parts = path.split('/').filter(Boolean)
   return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'))
@@ -156,6 +202,7 @@ function App(): React.JSX.Element {
   const tabPopoverTimer = useRef<number | undefined>(undefined)
   const tabPopoverHideTimer = useRef<number | undefined>(undefined)
   const isTabPopoverVisible = useRef(false)
+  const nextTabId = useRef(0)
   const [repository, setRepository] = useState<Repository | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -167,8 +214,14 @@ function App(): React.JSX.Element {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
+  const [activeFileTabId, setActiveFileTabId] = useState<string | undefined>()
   const [tabPopover, setTabPopover] = useState<TabPopoverState | undefined>()
   const [isResizing, setIsResizing] = useState(false)
+
+  const createNextTabId = useCallback((): string => {
+    nextTabId.current += 1
+    return `tab-${Date.now().toString(36)}-${nextTabId.current}`
+  }, [])
 
   const loadPreview = useCallback(
     async (path: string, repo = repository): Promise<Preview | undefined> => {
@@ -208,6 +261,7 @@ function App(): React.JSX.Element {
       setExpandedPaths(defaultExpanded)
       setOpenFileTabs([])
       setActiveFilePath(undefined)
+      setActiveFileTabId(undefined)
       await loadPreview('', nextRepository)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -228,6 +282,7 @@ function App(): React.JSX.Element {
         setExpandedPaths(defaultExpanded)
         setOpenFileTabs([])
         setActiveFilePath(undefined)
+        setActiveFileTabId(undefined)
         await loadPreview('', nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -254,14 +309,20 @@ function App(): React.JSX.Element {
                 session.rootPath
               )
             : await window.api.loadRepository(session.repositoryPath)
-        const restoredTabs = session.openFileTabs.filter((tab) => {
-          const node = findTreeNode(nextRepository.tree, tab.path)
-          return node?.type === 'file'
-        })
+        const restoredTabs = session.openFileTabs
+          .filter((tab) => {
+            const node = findTreeNode(nextRepository.tree, tab.path)
+            return node?.type === 'file'
+          })
+          .map((tab, index) => hydrateOpenFileTab(tab, index))
         const restoredActiveFile =
           session.activeFilePath && restoredTabs.some((tab) => tab.path === session.activeFilePath)
             ? session.activeFilePath
             : restoredTabs[0]?.path
+        const restoredActiveTabId =
+          restoredTabs.find((tab) => tab.id === session.activeFileTabId)?.id ??
+          restoredTabs.find((tab) => tab.path === restoredActiveFile)?.id ??
+          restoredTabs[0]?.id
         const selectedPath = restoredActiveFile ?? session.selectedPath ?? ''
         const selectedNode = selectedPath
           ? findTreeNode(nextRepository.tree, selectedPath)
@@ -272,6 +333,7 @@ function App(): React.JSX.Element {
         setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
         setOpenFileTabs(restoredTabs)
         setActiveFilePath(restoredActiveFile)
+        setActiveFileTabId(restoredActiveTabId)
         setSelectedPath(nextSelectedPath)
         await loadPreview(nextSelectedPath, nextRepository)
       } catch (reason) {
@@ -291,7 +353,11 @@ function App(): React.JSX.Element {
       try {
         const nextRepository =
           file.source === 'git-ref' && file.activeRef
-            ? await window.api.loadRef(file.rootPath ?? file.repoPath, file.activeRef, file.rootPath)
+            ? await window.api.loadRef(
+                file.rootPath ?? file.repoPath,
+                file.activeRef,
+                file.rootPath
+              )
             : await window.api.loadRepository(file.repoPath)
         const filePath = file.filePath
         const node = findTreeNode(nextRepository.tree, filePath)
@@ -302,18 +368,18 @@ function App(): React.JSX.Element {
         if (node?.type === 'file') {
           setSelectedPath(filePath)
           setActiveFilePath(filePath)
+          const tab = createFileTab({ path: filePath, name: node.name }, createNextTabId())
+          setActiveFileTabId(tab.id)
           setOpenFileTabs((current) =>
-            getOpenFileTabsForRecentFile({
-              currentRepositoryPath: repository?.path,
-              nextRepositoryPath: nextRepository.path,
-              currentTabs: current,
-              nextTab: { path: filePath, name: node.name }
-            })
+            repository?.path === nextRepository.path
+              ? [...current.filter((item) => item.path !== filePath), tab]
+              : [tab]
           )
           await loadPreview(filePath, nextRepository)
         } else {
           setSelectedPath('')
           setActiveFilePath(undefined)
+          setActiveFileTabId(undefined)
           await loadPreview('', nextRepository)
           setError(`${fileNameFromPath(filePath)} is no longer available in this repository.`)
         }
@@ -323,7 +389,7 @@ function App(): React.JSX.Element {
         setLoading(false)
       }
     },
-    [loadPreview, repository?.path]
+    [createNextTabId, loadPreview, repository?.path]
   )
 
   useEffect(() => {
@@ -365,13 +431,14 @@ function App(): React.JSX.Element {
         source: repository.source,
         selectedPath,
         activeFilePath,
+        activeFileTabId,
         openFileTabs,
         expandedPaths: Array.from(expandedPaths)
       })
     }, 250)
 
     return () => window.clearTimeout(handle)
-  }, [activeFilePath, expandedPaths, openFileTabs, repository, selectedPath])
+  }, [activeFilePath, activeFileTabId, expandedPaths, openFileTabs, repository, selectedPath])
 
   useEffect(() => {
     if (!isResizing) return
@@ -391,11 +458,12 @@ function App(): React.JSX.Element {
   }, [isResizing])
 
   const handleSelect = useCallback(
-    async (node: TreeNode): Promise<void> => {
+    async (node: TreeNode, options: { openInNewTab?: boolean } = {}): Promise<void> => {
       setSelectedPath(node.path)
 
       if (node.type === 'directory') {
         setActiveFilePath(undefined)
+        setActiveFileTabId(undefined)
         if (node.children?.length) {
           setExpandedPaths((current) => {
             if (current.has(node.path)) return current
@@ -407,16 +475,20 @@ function App(): React.JSX.Element {
         }
       } else {
         setActiveFilePath(node.path)
-        setOpenFileTabs((current) =>
-          current.some((tab) => tab.path === node.path)
-            ? current
-            : [...current, { path: node.path, name: node.name }]
-        )
+        const result = navigateFileTabs({
+          tabs: openFileTabs,
+          activeTabId: activeFileTabId,
+          target: { path: node.path, name: node.name },
+          openInNewTab: Boolean(options.openInNewTab),
+          nextTabId: createNextTabId()
+        })
+        setOpenFileTabs(result.tabs)
+        setActiveFileTabId(result.activeTabId)
       }
 
       await loadPreview(node.path)
     },
-    [loadPreview]
+    [activeFileTabId, createNextTabId, loadPreview, openFileTabs]
   )
 
   const toggleDirectory = useCallback((path: string): void => {
@@ -429,6 +501,7 @@ function App(): React.JSX.Element {
 
   const selectFileTab = useCallback(
     async (tab: OpenFileTab): Promise<void> => {
+      setActiveFileTabId(tab.id)
       setActiveFilePath(tab.path)
       setSelectedPath(tab.path)
       await loadPreview(tab.path)
@@ -437,31 +510,33 @@ function App(): React.JSX.Element {
   )
 
   const closeFileTab = useCallback(
-    (path: string): void => {
-      const tabIndex = openFileTabs.findIndex((tab) => tab.path === path)
-      const nextTabs = openFileTabs.filter((tab) => tab.path !== path)
+    (id: string): void => {
+      const tabIndex = openFileTabs.findIndex((tab) => tab.id === id)
+      const nextTabs = openFileTabs.filter((tab) => tab.id !== id)
 
       setOpenFileTabs(nextTabs)
 
-      if (activeFilePath !== path) return
+      if (activeFileTabId !== id) return
 
       const nextTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)]
       if (nextTab) {
+        setActiveFileTabId(nextTab.id)
         setActiveFilePath(nextTab.path)
         setSelectedPath(nextTab.path)
         void loadPreview(nextTab.path)
       } else {
+        setActiveFileTabId(undefined)
         setActiveFilePath(undefined)
         setSelectedPath('')
         void loadPreview('')
       }
     },
-    [activeFilePath, loadPreview, openFileTabs]
+    [activeFileTabId, loadPreview, openFileTabs]
   )
 
   const closeCurrentTabOrWindow = useCallback((): void => {
-    const activeTab = activeFilePath
-      ? openFileTabs.find((tab) => tab.path === activeFilePath)
+    const activeTab = activeFileTabId
+      ? openFileTabs.find((tab) => tab.id === activeFileTabId)
       : undefined
     const tabToClose = activeTab ?? openFileTabs.at(-1)
 
@@ -470,8 +545,21 @@ function App(): React.JSX.Element {
       return
     }
 
-    closeFileTab(tabToClose.path)
-  }, [activeFilePath, closeFileTab, openFileTabs])
+    closeFileTab(tabToClose.id)
+  }, [activeFileTabId, closeFileTab, openFileTabs])
+
+  const navigateActiveTabHistory = useCallback(
+    async (delta: -1 | 1): Promise<void> => {
+      const result = moveActiveTabHistory(openFileTabs, activeFileTabId, delta)
+      if (!result.target) return
+
+      setOpenFileTabs(result.tabs)
+      setActiveFilePath(result.target.path)
+      setSelectedPath(result.target.path)
+      await loadPreview(result.target.path)
+    },
+    [activeFileTabId, loadPreview, openFileTabs]
+  )
 
   useEffect(() => {
     return window.api.onCloseCurrentTabOrWindow(closeCurrentTabOrWindow)
@@ -575,6 +663,7 @@ function App(): React.JSX.Element {
         setExpandedPaths(defaultExpanded)
         setOpenFileTabs([])
         setActiveFilePath(undefined)
+        setActiveFileTabId(undefined)
         await loadPreview('', nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -587,6 +676,8 @@ function App(): React.JSX.Element {
 
   const breadcrumbParts = selectedPath ? selectedPath.split('/').filter(Boolean) : []
   const repositoryLabel = repository ? getRepositoryLabel(repository) : ''
+  const canNavigateBack = canMoveTabHistory(openFileTabs, activeFileTabId, -1)
+  const canNavigateForward = canMoveTabHistory(openFileTabs, activeFileTabId, 1)
   const tabPopoverStyle: CSSProperties | undefined = tabPopover
     ? ({ '--tab-popover-left': `${tabPopover.left}px` } as CSSProperties)
     : undefined
@@ -654,14 +745,21 @@ function App(): React.JSX.Element {
                   >
                     <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
                   </button>
-                  <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
+                  <button
+                    className="titlebar-icon-button"
+                    type="button"
+                    aria-label="Back"
+                    disabled={!canNavigateBack}
+                    onClick={() => void navigateActiveTabHistory(-1)}
+                  >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     className="titlebar-icon-button"
                     type="button"
                     aria-label="Forward"
-                    disabled
+                    disabled={!canNavigateForward}
+                    onClick={() => void navigateActiveTabHistory(1)}
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -755,14 +853,21 @@ function App(): React.JSX.Element {
                 >
                   <IconLayoutSidebarLeftExpand size={20} stroke={2} />
                 </button>
-                <button className="titlebar-icon-button" type="button" aria-label="Back" disabled>
+                <button
+                  className="titlebar-icon-button"
+                  type="button"
+                  aria-label="Back"
+                  disabled={!canNavigateBack}
+                  onClick={() => void navigateActiveTabHistory(-1)}
+                >
                   <ChevronLeft size={16} />
                 </button>
                 <button
                   className="titlebar-icon-button"
                   type="button"
                   aria-label="Forward"
-                  disabled
+                  disabled={!canNavigateForward}
+                  onClick={() => void navigateActiveTabHistory(1)}
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -779,7 +884,7 @@ function App(): React.JSX.Element {
               }}
             >
               {openFileTabs.map((tab) => {
-                const active = tab.path === activeFilePath
+                const active = tab.id === activeFileTabId
 
                 return (
                   <div
@@ -808,7 +913,7 @@ function App(): React.JSX.Element {
                       onClick={(event) => {
                         event.stopPropagation()
                         hideTabPopover()
-                        closeFileTab(tab.path)
+                        closeFileTab(tab.id)
                       }}
                     >
                       <X size={13} />
@@ -834,6 +939,7 @@ function App(): React.JSX.Element {
                   onClick={() => {
                     setSelectedPath('')
                     setActiveFilePath(undefined)
+                    setActiveFileTabId(undefined)
                     void loadPreview('')
                   }}
                 >
@@ -854,6 +960,7 @@ function App(): React.JSX.Element {
                           onClick={() => {
                             setSelectedPath(path)
                             setActiveFilePath(undefined)
+                            setActiveFileTabId(undefined)
                             void loadPreview(path)
                           }}
                         >
@@ -875,10 +982,10 @@ function App(): React.JSX.Element {
               {!previewLoading && preview && (
                 <PreviewContent
                   preview={preview}
-                  onSelectPath={(path) => {
+                  onSelectPath={(path, openInNewTab = false) => {
                     const node = findTreeNode(repository.tree, path)
                     if (node) {
-                      void handleSelect(node)
+                      void handleSelect(node, { openInNewTab })
                       return true
                     }
 
@@ -907,13 +1014,13 @@ function TreeRow({
   level: number
   expandedPaths: Set<string>
   selectedPath: string
-  onSelect: (node: TreeNode) => Promise<void>
+  onSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   onToggle: (path: string) => void
 }): React.JSX.Element {
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
-  const selectNode = (): void => {
-    void onSelect(node)
+  const selectNode = (openInNewTab = false): void => {
+    void onSelect(node, { openInNewTab })
   }
 
   return (
@@ -924,7 +1031,12 @@ function TreeRow({
         role="treeitem"
         style={{ '--level': level } as CSSProperties}
         tabIndex={0}
-        onClick={selectNode}
+        onClick={(event) => selectNode(shouldOpenInNewTab(event))}
+        onAuxClick={(event) => {
+          if (!shouldOpenInNewTab(event)) return
+          event.preventDefault()
+          selectNode(true)
+        }}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
@@ -1020,7 +1132,7 @@ function PreviewContent({
   onSelectPath
 }: {
   preview: Preview
-  onSelectPath: (path: string) => boolean
+  onSelectPath: (path: string, openInNewTab?: boolean) => boolean
 }): React.JSX.Element {
   const scrollToMarkdownAnchor = (href: string, container: HTMLElement): void => {
     const hash = href.trim().slice(1)
@@ -1060,7 +1172,7 @@ function PreviewContent({
     }
 
     const nextPath = resolveMarkdownLinkPath(href, sourcePath)
-    if (nextPath) onSelectPath(nextPath)
+    if (nextPath) onSelectPath(nextPath, shouldOpenInNewTab(event))
   }
 
   if (preview.kind === 'directory') {
@@ -1068,7 +1180,11 @@ function PreviewContent({
       const markdownPreview = getMarkdownPreview(preview.readme.content)
 
       return (
-        <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.readme.path)}>
+        <article
+          className="markdown-body"
+          onAuxClick={handleMarkdownLinkClick(preview.readme.path)}
+          onClick={handleMarkdownLinkClick(preview.readme.path)}
+        >
           {markdownPreview.title && (
             <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
           )}
@@ -1080,7 +1196,16 @@ function PreviewContent({
     return (
       <div className="directory-list">
         {(preview.entries ?? []).map((entry) => (
-          <button key={entry.path} type="button" onClick={() => onSelectPath(entry.path)}>
+          <button
+            key={entry.path}
+            type="button"
+            onAuxClick={(event) => {
+              if (!shouldOpenInNewTab(event)) return
+              event.preventDefault()
+              onSelectPath(entry.path, true)
+            }}
+            onClick={(event) => onSelectPath(entry.path, shouldOpenInNewTab(event))}
+          >
             {iconForNode(entry)}
             <span>{entry.name}</span>
           </button>
@@ -1093,7 +1218,11 @@ function PreviewContent({
     const markdownPreview = getMarkdownPreview(preview.content)
 
     return (
-      <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.path)}>
+      <article
+        className="markdown-body"
+        onAuxClick={handleMarkdownLinkClick(preview.path)}
+        onClick={handleMarkdownLinkClick(preview.path)}
+      >
         {markdownPreview.title && (
           <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
         )}
