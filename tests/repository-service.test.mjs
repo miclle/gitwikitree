@@ -1,47 +1,33 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
-import ts from 'typescript'
+import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 
 const execFileAsync = promisify(execFile)
 
 async function loadRepositoryService() {
-  const tempDir = await mkdtemp(join(tmpdir(), 'gitwikitree-service-test-'))
-  const mainDir = join(tempDir, 'src/main')
-  const sharedDir = join(tempDir, 'src/shared')
+  const { module, tempDir } = await loadTranspiledModule({
+    entry: 'src/main/repository-service.ts',
+    prefix: 'gitwikitree-service-test-',
+    modules: [
+      'src/main/repository-service.ts',
+      'src/main/repository-loader.ts',
+      'src/main/repository-preview.ts',
+      'src/main/repository-worktree.ts',
+      'src/main/repository-paths.ts',
+      'src/main/repository-tree.ts',
+      'src/main/git-service.ts',
+      'src/main/preview-detection.ts',
+      'src/shared/types.ts'
+    ]
+  })
 
-  await mkdir(mainDir, { recursive: true })
-  await mkdir(sharedDir, { recursive: true })
-
-  const files = [
-    ['../src/main/repository-service.ts', join(mainDir, 'repository-service.mjs')],
-    ['../src/main/preview-detection.ts', join(mainDir, 'preview-detection.mjs')],
-    ['../src/shared/types.ts', join(sharedDir, 'types.mjs')]
-  ]
-
-  for (const [sourcePath, outputPath] of files) {
-    const source = await readFile(new URL(sourcePath, import.meta.url), 'utf8')
-    const { outputText } = ts.transpileModule(source, {
-      compilerOptions: {
-        module: ts.ModuleKind.ES2022,
-        target: ts.ScriptTarget.ES2022
-      }
-    })
-    await writeFile(
-      outputPath,
-      outputText
-        .replaceAll("from './preview-detection'", "from './preview-detection.mjs'")
-        .replaceAll("from '../shared/types'", "from '../shared/types.mjs")
-    )
-  }
-
-  const service = await import(`file://${join(mainDir, 'repository-service.mjs')}`)
-  return { service, tempDir }
+  return { service: module, tempDir }
 }
 
 async function createRepository() {

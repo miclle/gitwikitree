@@ -1,22 +1,11 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import ts from 'typescript'
+import { loadSingleTranspiledModule } from './helpers/transpile-modules.mjs'
 
 async function loadAppNavigation() {
-  const source = await readFile(
-    new URL('../src/renderer/src/app-navigation.ts', import.meta.url),
-    'utf8'
-  )
-  const { outputText } = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2022
-    }
-  })
-
-  return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(outputText)}`)
+  const { module } = await loadSingleTranspiledModule('src/renderer/src/app-navigation.ts')
+  return module
 }
 
 test('navigateFileTabs replaces the active tab for ordinary navigation and records history', async () => {

@@ -1,19 +1,14 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import ts from 'typescript'
+import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 
 async function loadSessionStore() {
-  const source = await readFile(new URL('../src/main/session-store.ts', import.meta.url), 'utf8')
-  const { outputText } = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2022
-    }
+  const { module } = await loadTranspiledModule({
+    entry: 'src/main/session-store.ts',
+    modules: ['src/main/session-store.ts', 'src/shared/types.ts']
   })
-
-  return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(outputText)}`)
+  return module
 }
 
 test('recordRecentFile keeps the newest file first and de-duplicates entries', async () => {

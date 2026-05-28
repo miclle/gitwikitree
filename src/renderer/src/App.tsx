@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent
-} from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import {
   canMoveTabHistory,
@@ -16,6 +9,9 @@ import {
 } from './app-navigation'
 import { PreviewContent } from './components/PreviewContent'
 import { TreeRow } from './components/TreeRow'
+import { usePanelResize } from './hooks/usePanelResize'
+import { useSessionPersistence } from './hooks/useSessionPersistence'
+import { useTabPopover } from './hooks/useTabPopover'
 import {
   fileNameFromPath,
   findTreeNode,
@@ -36,22 +32,10 @@ import { ChevronLeft, ChevronRight, Code2, GitBranch, Loader2, Plus, Search, X }
 type Repository = RepositoryPayload
 type Preview = PreviewPayload
 
-type TabPopoverState = {
-  tab: OpenFileTab
-  left: number
-  visible: boolean
-}
-
 const defaultExpanded = new Set([''])
-const tabPopoverWidth = 280
-const tabPopoverInset = 8
 
 function App(): React.JSX.Element {
   const didRestoreSession = useRef(false)
-  const titlebarTabsRef = useRef<HTMLElement | null>(null)
-  const tabPopoverTimer = useRef<number | undefined>(undefined)
-  const tabPopoverHideTimer = useRef<number | undefined>(undefined)
-  const isTabPopoverVisible = useRef(false)
   const nextTabId = useRef(0)
   const [repository, setRepository] = useState<Repository | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
@@ -60,13 +44,19 @@ function App(): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const [sidebarWidth, setSidebarWidth] = useState(360)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [activeFileTabId, setActiveFileTabId] = useState<string | undefined>()
-  const [tabPopover, setTabPopover] = useState<TabPopoverState | undefined>()
-  const [isResizing, setIsResizing] = useState(false)
+  const { sidebarWidth, isResizing, startResizing } = usePanelResize()
+  const {
+    titlebarTabsRef,
+    tabPopover,
+    tabPopoverStyle,
+    showTabPopover,
+    hideTabPopover,
+    handleTitlebarTabsPointerLeave
+  } = useTabPopover()
 
   const createNextTabId = useCallback((): string => {
     nextTabId.current += 1
@@ -270,42 +260,14 @@ function App(): React.JSX.Element {
     }
   }, [loadRepositoryPath, openFilePath, openRepository])
 
-  useEffect(() => {
-    if (!repository) return
-
-    const handle = window.setTimeout(() => {
-      void window.api.saveSession({
-        repositoryPath: repository.path,
-        rootPath: repository.rootPath,
-        activeRef: repository.activeRef,
-        source: repository.source,
-        selectedPath,
-        activeFilePath,
-        activeFileTabId,
-        openFileTabs,
-        expandedPaths: Array.from(expandedPaths)
-      })
-    }, 250)
-
-    return () => window.clearTimeout(handle)
-  }, [activeFilePath, activeFileTabId, expandedPaths, openFileTabs, repository, selectedPath])
-
-  useEffect(() => {
-    if (!isResizing) return
-
-    const handleMouseMove = (event: MouseEvent): void => {
-      setSidebarWidth(Math.min(Math.max(event.clientX, 280), 520))
-    }
-    const handleMouseUp = (): void => setIsResizing(false)
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing])
+  useSessionPersistence({
+    repository,
+    selectedPath,
+    activeFilePath,
+    activeFileTabId,
+    openFileTabs,
+    expandedPaths
+  })
 
   const handleSelect = useCallback(
     async (node: TreeNode, options: { openInNewTab?: boolean } = {}): Promise<void> => {
@@ -415,86 +377,6 @@ function App(): React.JSX.Element {
     return window.api.onCloseCurrentTabOrWindow(closeCurrentTabOrWindow)
   }, [closeCurrentTabOrWindow])
 
-  const clearTabPopoverTimer = useCallback((): void => {
-    if (tabPopoverTimer.current === undefined) return
-    window.clearTimeout(tabPopoverTimer.current)
-    tabPopoverTimer.current = undefined
-  }, [])
-
-  const clearTabPopoverHideTimer = useCallback((): void => {
-    if (tabPopoverHideTimer.current === undefined) return
-    window.clearTimeout(tabPopoverHideTimer.current)
-    tabPopoverHideTimer.current = undefined
-  }, [])
-
-  const getTabPopoverLeft = useCallback((tabElement: HTMLElement): number => {
-    const tabsRect = titlebarTabsRef.current?.getBoundingClientRect()
-    const tabRect = tabElement.getBoundingClientRect()
-    const center = tabRect.left + tabRect.width / 2 - (tabsRect?.left ?? 0)
-
-    if (!tabsRect) return center
-
-    const popoverWidth = Math.min(tabPopoverWidth, window.innerWidth * 0.7)
-    const minLeft = popoverWidth / 2 + tabPopoverInset
-    const maxLeft = tabsRect.width - popoverWidth / 2 - tabPopoverInset
-
-    if (maxLeft < minLeft) return tabsRect.width / 2
-
-    return Math.min(Math.max(center, minLeft), maxLeft)
-  }, [])
-
-  const showTabPopover = useCallback(
-    (tab: OpenFileTab, tabElement: HTMLElement): void => {
-      clearTabPopoverTimer()
-      clearTabPopoverHideTimer()
-
-      const left = getTabPopoverLeft(tabElement)
-
-      if (isTabPopoverVisible.current) {
-        setTabPopover({ tab, left, visible: true })
-        return
-      }
-
-      setTabPopover({ tab, left, visible: false })
-      tabPopoverTimer.current = window.setTimeout(() => {
-        isTabPopoverVisible.current = true
-        tabPopoverTimer.current = undefined
-        setTabPopover({ tab, left, visible: true })
-      }, 360)
-    },
-    [clearTabPopoverHideTimer, clearTabPopoverTimer, getTabPopoverLeft]
-  )
-
-  const hideTabPopover = useCallback(
-    (delayed = false): void => {
-      clearTabPopoverTimer()
-      clearTabPopoverHideTimer()
-
-      const hide = (): void => {
-        tabPopoverHideTimer.current = undefined
-        isTabPopoverVisible.current = false
-        setTabPopover((current) => (current ? { ...current, visible: false } : undefined))
-      }
-
-      if (!delayed) {
-        hide()
-        return
-      }
-
-      tabPopoverHideTimer.current = window.setTimeout(hide, 120)
-    },
-    [clearTabPopoverHideTimer, clearTabPopoverTimer]
-  )
-
-  const handleTitlebarTabsPointerLeave = useCallback(
-    (event: ReactPointerEvent<HTMLElement>): void => {
-      const nextTarget = event.relatedTarget
-      if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
-      hideTabPopover(true)
-    },
-    [hideTabPopover]
-  )
-
   const switchRef = useCallback(
     async (ref: string): Promise<void> => {
       if (!repository || ref === repository.activeRef) return
@@ -528,10 +410,6 @@ function App(): React.JSX.Element {
   const repositoryLabel = repository ? getRepositoryLabel(repository) : ''
   const canNavigateBack = canMoveTabHistory(openFileTabs, activeFileTabId, -1)
   const canNavigateForward = canMoveTabHistory(openFileTabs, activeFileTabId, 1)
-  const tabPopoverStyle: CSSProperties | undefined = tabPopover
-    ? ({ '--tab-popover-left': `${tabPopover.left}px` } as CSSProperties)
-    : undefined
-
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
       {error && <div className="error-banner">{error}</div>}
@@ -663,7 +541,7 @@ function App(): React.JSX.Element {
                 className="split-resizer"
                 role="separator"
                 tabIndex={0}
-                onMouseDown={() => setIsResizing(true)}
+                onMouseDown={startResizing}
               />
             </>
           )}
