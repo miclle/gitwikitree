@@ -14,6 +14,13 @@ async function readMainCss() {
   return readFile(new URL('../src/renderer/src/assets/main.css', import.meta.url), 'utf8')
 }
 
+async function readPanelResizeHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 test('preview titlebar places file tabs in the titlebar row', async () => {
   const source = await readWorkspaceView()
 
@@ -68,4 +75,40 @@ test('expanded sidebar keeps sidebar and history controls out of the sidebar tit
     /HistoryButtons|aria-label="Hide files"/,
     'expanded sidebar should leave sidebar and history controls in the preview titlebar'
   )
+})
+
+test('files sidebar resize keeps a 170px minimum width', async () => {
+  const source = await readPanelResizeHook()
+
+  assert.match(
+    source,
+    /Math\.min\(Math\.max\(event\.clientX,\s*170\),\s*520\)/,
+    'files sidebar should clamp drag resizing to a 170px minimum'
+  )
+})
+
+test('files tree rows use compact spacing for narrow sidebars', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /\.tree-row\s*\{[\s\S]*?width:\s*calc\(100% - 4px\);[\s\S]*?min-height:\s*28px;[\s\S]*?margin:\s*0 2px;[\s\S]*?padding:\s*0 6px 0 calc\(6px \+ \(var\(--level, 0\) \* 14px\)\);[\s\S]*?border-radius:\s*6px;/,
+    'files tree rows should use compact height, margins, indentation, and radius'
+  )
+  assert.match(
+    css,
+    /\.tree-toggle\s*\{[\s\S]*?width:\s*16px;[\s\S]*?height:\s*28px;[\s\S]*?margin-right:\s*1px;/,
+    'files tree toggles should stay compact'
+  )
+  assert.match(
+    css,
+    /\.tree-node-button\s*\{[\s\S]*?gap:\s*5px;[\s\S]*?height:\s*28px;/,
+    'files tree labels should use compact icon spacing and height'
+  )
+  assert.match(
+    css,
+    /\.tree-node-button span:last-child\s*\{[\s\S]*?font-size:\s*13px;[\s\S]*?line-height:\s*18px;/,
+    'files tree labels should use compact readable text'
+  )
+  assert.match(css, /\.tree-spacer\s*\{[\s\S]*?width:\s*17px;/, 'file rows should align compactly')
 })

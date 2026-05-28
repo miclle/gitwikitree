@@ -12,7 +12,7 @@ export function usePanelResize(): {
     if (!isResizing) return
 
     const handleMouseMove = (event: MouseEvent): void => {
-      setSidebarWidth(Math.min(Math.max(event.clientX, 280), 520))
+      setSidebarWidth(Math.min(Math.max(event.clientX, 170), 520))
     }
     const handleMouseUp = (): void => setIsResizing(false)
 
