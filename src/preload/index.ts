@@ -1,11 +1,26 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { TreeItemOpenPayload } from '../shared/types'
+
+let pendingOpenTreeItem: TreeItemOpenPayload | undefined
+const openTreeItemCallbacks = new Set<(payload: TreeItemOpenPayload) => void>()
+
+ipcRenderer.on('repository:open-tree-item', (_event, payload: TreeItemOpenPayload) => {
+  if (openTreeItemCallbacks.size === 0) {
+    pendingOpenTreeItem = payload
+    return
+  }
+
+  for (const callback of openTreeItemCallbacks) callback(payload)
+})
 
 // Custom APIs for renderer
 const api = {
   newWindow: (): Promise<void> => ipcRenderer.invoke('window:new'),
   controlWindow: (action: 'close' | 'minimize' | 'toggle-maximize'): Promise<void> =>
     ipcRenderer.invoke('window:control', action),
+  showTreeItemContextMenu: (item: TreeItemOpenPayload): Promise<void> =>
+    ipcRenderer.invoke('context-menu:tree-item', item),
   pickRepository: () => ipcRenderer.invoke('repository:pick'),
   loadRepository: (repoPath: string) => ipcRenderer.invoke('repository:load', repoPath),
   loadRef: (repoPath: string, ref: string, rootPath?: string) =>
@@ -63,6 +78,25 @@ const api = {
     ipcRenderer.on('repository:open-file', listener)
 
     return () => ipcRenderer.removeListener('repository:open-file', listener)
+  },
+  onOpenTreeItem: (callback: (payload: TreeItemOpenPayload) => void) => {
+    openTreeItemCallbacks.add(callback)
+
+    if (pendingOpenTreeItem) {
+      const payload = pendingOpenTreeItem
+      pendingOpenTreeItem = undefined
+      callback(payload)
+    }
+
+    return () => {
+      openTreeItemCallbacks.delete(callback)
+    }
+  },
+  onOpenTreeItemInNewTab: (callback: (path: string) => void) => {
+    const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
+    ipcRenderer.on('tree-item:open-in-new-tab', listener)
+
+    return () => ipcRenderer.removeListener('tree-item:open-in-new-tab', listener)
   },
   onCloseCurrentTabOrWindow: (callback: () => void) => {
     const listener = (): void => callback()

@@ -17,6 +17,7 @@ import type {
   RecentFileState,
   RepositoryPayload,
   SessionState,
+  TreeItemOpenPayload,
   TreeNode
 } from '../../../shared/types'
 
@@ -63,6 +64,7 @@ export function useRepositoryWorkspace(): {
   openRepository: () => Promise<void>
   handleSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   toggleDirectory: (path: string) => void
+  showTreeItemContextMenu: (node: TreeNode) => Promise<void>
   selectFileTab: (tab: OpenFileTab) => Promise<void>
   closeFileTab: (id: string) => void
   navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
@@ -76,6 +78,7 @@ export function useRepositoryWorkspace(): {
   canNavigateForward: boolean
 } {
   const didRestoreSession = useRef(false)
+  const didReceiveOpenIntent = useRef(false)
   const nextTabId = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
@@ -278,22 +281,63 @@ export function useRepositoryWorkspace(): {
     [createNextTabId, loadPreview, repository?.path]
   )
 
-  useEffect(() => {
-    if (didRestoreSession.current) return
-    didRestoreSession.current = true
+  const openTreeItem = useCallback(
+    async (item: TreeItemOpenPayload): Promise<void> => {
+      setLoading(true)
+      setError(undefined)
 
-    void window.api.getSession().then((session) => {
-      if (!session.repositoryPath) return
-      void loadRepositoryWithSession(session)
-    })
-  }, [loadRepositoryWithSession])
+      try {
+        const nextRepository =
+          item.source === 'git-ref' && item.activeRef
+            ? await window.api.loadRef(
+                item.rootPath ?? item.repoPath,
+                item.activeRef,
+                item.rootPath
+              )
+            : await window.api.loadRepository(item.repoPath)
+        const resolved = resolveRepositoryNavigationTarget(nextRepository, item.path)
+
+        setRepository(nextRepository)
+        setExpandedPaths(new Set(['', ...parentPaths(item.path)]))
+
+        if (!resolved) {
+          setSelectedPath('')
+          setActiveFilePath(undefined)
+          setActiveFileTabId(undefined)
+          setOpenFileTabs([])
+          await loadPreview('', nextRepository)
+          setError(`${fileNameFromPath(item.path)} is no longer available in this repository.`)
+          return
+        }
+
+        const { target } = resolved
+        setSelectedPath(target.path)
+        setActiveFilePath(target.type === 'directory' ? undefined : target.path)
+        const tab = createFileTab(target, createNextTabId())
+        setActiveFileTabId(tab.id)
+        setOpenFileTabs([tab])
+        await loadPreview(target.path, nextRepository)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [createNextTabId, loadPreview]
+  )
 
   useEffect(() => {
     const removeOpenPathListener = window.api.onOpenRepositoryPath((repoPath) => {
+      didReceiveOpenIntent.current = true
       void loadRepositoryPath(repoPath)
     })
     const removeOpenFileListener = window.api.onOpenFilePath((file) => {
+      didReceiveOpenIntent.current = true
       void openFilePath(file)
+    })
+    const removeOpenTreeItemListener = window.api.onOpenTreeItem((item) => {
+      didReceiveOpenIntent.current = true
+      void openTreeItem(item)
     })
     const removeOpenRequestListener = window.api.onOpenRepositoryRequest(() => {
       void openRepository()
@@ -302,9 +346,21 @@ export function useRepositoryWorkspace(): {
     return () => {
       removeOpenPathListener()
       removeOpenFileListener()
+      removeOpenTreeItemListener()
       removeOpenRequestListener()
     }
-  }, [loadRepositoryPath, openFilePath, openRepository])
+  }, [loadRepositoryPath, openFilePath, openRepository, openTreeItem])
+
+  useEffect(() => {
+    if (didRestoreSession.current) return
+    didRestoreSession.current = true
+    if (didReceiveOpenIntent.current) return
+
+    void window.api.getSession().then((session) => {
+      if (didReceiveOpenIntent.current || !session.repositoryPath) return
+      void loadRepositoryWithSession(session)
+    })
+  }, [loadRepositoryWithSession])
 
   useSessionPersistence({
     repository,
@@ -355,6 +411,23 @@ export function useRepositoryWorkspace(): {
       await loadPreview(node.path)
     },
     [activeFileTabId, createNextTabId, loadPreview, openFileTabs]
+  )
+
+  const showTreeItemContextMenu = useCallback(
+    async (node: TreeNode): Promise<void> => {
+      if (!repository) return
+
+      await window.api.showTreeItemContextMenu({
+        repoPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        path: node.path,
+        name: node.name,
+        type: node.type
+      })
+    },
+    [repository]
   )
 
   const toggleDirectory = useCallback((path: string): void => {
@@ -538,6 +611,12 @@ export function useRepositoryWorkspace(): {
     [activeFileTabId, createNextTabId, handleSelect, loadPreview, openFileTabs, repository]
   )
 
+  useEffect(() => {
+    return window.api.onOpenTreeItemInNewTab((path) => {
+      selectPreviewPath(path, true)
+    })
+  }, [selectPreviewPath])
+
   return {
     repository,
     selectedPath,
@@ -562,6 +641,7 @@ export function useRepositoryWorkspace(): {
     openRepository,
     handleSelect,
     toggleDirectory,
+    showTreeItemContextMenu,
     selectFileTab,
     closeFileTab,
     navigateActiveTabHistory,

@@ -3,12 +3,14 @@ import type {
   PreviewPayload,
   RecentFileState,
   RepositoryPayload,
-  SessionState
+  SessionState,
+  TreeItemOpenPayload
 } from '../shared/types'
 
 export type GitWikitreeAPI = {
   newWindow: () => Promise<void>
   controlWindow: (action: 'close' | 'minimize' | 'toggle-maximize') => Promise<void>
+  showTreeItemContextMenu: (item: TreeItemOpenPayload) => Promise<void>
   pickRepository: () => Promise<RepositoryPayload | undefined>
   loadRepository: (repoPath: string) => Promise<RepositoryPayload>
   loadRef: (repoPath: string, ref: string, rootPath?: string) => Promise<RepositoryPayload>
@@ -28,6 +30,8 @@ export type GitWikitreeAPI = {
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => () => void
   onOpenRepositoryRequest: (callback: () => void) => () => void
   onOpenFilePath: (callback: (payload: RecentFileState) => void) => () => void
+  onOpenTreeItem: (callback: (payload: TreeItemOpenPayload) => void) => () => void
+  onOpenTreeItemInNewTab: (callback: (path: string) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
 }
 

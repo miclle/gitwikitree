@@ -15,6 +15,7 @@ import { promises as fs } from 'fs'
 import { basename, isAbsolute, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { createTreeItemContextMenuItems, type TreeItemContext } from './context-menu'
 import {
   clearRecentFiles,
   createEmptySessionState,
@@ -96,7 +97,24 @@ function canOpenExternalUrl(url: string): boolean {
   }
 }
 
-function showContextMenu(targetWindow: BrowserWindow, params: ContextMenuParams): void {
+async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean> {
+  try {
+    return (
+      (await params.frame?.executeJavaScript(
+        `Boolean(document.elementFromPoint(${params.x}, ${params.y})?.closest('[data-tree-item="true"]'))`
+      )) === true
+    )
+  } catch {
+    return false
+  }
+}
+
+async function showContextMenu(
+  targetWindow: BrowserWindow,
+  params: ContextMenuParams
+): Promise<void> {
+  if (await isTreeItemContextMenu(params)) return
+
   const items: MenuItemConstructorOptions[] = []
   const addSeparator = (): void => {
     if (items.length > 0 && items.at(-1)?.type !== 'separator') {
@@ -172,7 +190,7 @@ function showContextMenu(targetWindow: BrowserWindow, params: ContextMenuParams)
   Menu.buildFromTemplate(items).popup({ window: targetWindow })
 }
 
-function createWindow(repoPath?: string, file?: RecentFileState): void {
+function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: TreeItemContext): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
@@ -206,7 +224,7 @@ function createWindow(repoPath?: string, file?: RecentFileState): void {
   })
 
   mainWindow.webContents.on('context-menu', (_event, params) => {
-    showContextMenu(mainWindow, params)
+    void showContextMenu(mainWindow, params)
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -218,7 +236,9 @@ function createWindow(repoPath?: string, file?: RecentFileState): void {
   }
 
   mainWindow.webContents.once('did-finish-load', () => {
-    if (file) {
+    if (treeItem) {
+      mainWindow.webContents.send('repository:open-tree-item', treeItem)
+    } else if (file) {
       sendOpenFile(mainWindow, file)
     } else if (repoPath) {
       mainWindow.webContents.send('repository:open-path', repoPath)
@@ -414,6 +434,19 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('window:new', () => createWindow())
+
+  ipcMain.handle('context-menu:tree-item', (event, item: TreeItemContext) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+    if (!targetWindow) return
+
+    const menuItems = createTreeItemContextMenuItems({
+      item,
+      sender: event.sender,
+      openInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem)
+    })
+
+    Menu.buildFromTemplate(menuItems).popup({ window: targetWindow })
+  })
 
   ipcMain.handle('window:control', (event, action: 'close' | 'minimize' | 'toggle-maximize') => {
     const browserWindow = BrowserWindow.fromWebContents(event.sender)

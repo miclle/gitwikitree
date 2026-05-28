@@ -30,6 +30,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openRepository,
     handleSelect,
     toggleDirectory,
+    showTreeItemContextMenu,
     selectFileTab,
     closeFileTab,
     navigateActiveTabHistory,
@@ -181,6 +182,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       selectedPath={selectedPath}
                       onSelect={handleSelect}
                       onToggle={toggleDirectory}
+                      onOpenContextMenu={showTreeItemContextMenu}
                     />
                   ))}
                 </div>

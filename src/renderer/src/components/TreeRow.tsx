@@ -9,7 +9,8 @@ export function TreeRow({
   expandedPaths,
   selectedPath,
   onSelect,
-  onToggle
+  onToggle,
+  onOpenContextMenu
 }: {
   node: TreeNode
   level: number
@@ -17,6 +18,7 @@ export function TreeRow({
   selectedPath: string
   onSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   onToggle: (path: string) => void
+  onOpenContextMenu: (node: TreeNode) => Promise<void>
 }): React.JSX.Element {
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
@@ -29,6 +31,7 @@ export function TreeRow({
       <div
         aria-selected={selectedPath === node.path}
         className={selectedPath === node.path ? 'tree-row selected' : 'tree-row'}
+        data-tree-item="true"
         role="treeitem"
         style={{ '--level': level } as CSSProperties}
         tabIndex={0}
@@ -37,6 +40,10 @@ export function TreeRow({
           if (!shouldOpenInNewTab(event)) return
           event.preventDefault()
           selectNode(true)
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          void onOpenContextMenu(node)
         }}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return
@@ -77,6 +84,7 @@ export function TreeRow({
               selectedPath={selectedPath}
               onSelect={onSelect}
               onToggle={onToggle}
+              onOpenContextMenu={onOpenContextMenu}
             />
           ))}
         </div>

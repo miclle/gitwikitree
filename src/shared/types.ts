@@ -10,6 +10,13 @@ export type TreeNode = {
   index?: { name: string; path: string }
 }
 
+export type TreeItemOpenPayload = Pick<TreeNode, 'name' | 'path' | 'type'> & {
+  repoPath: string
+  rootPath?: string
+  activeRef?: string
+  source?: RepositorySource
+}
+
 export type RepositoryRef = {
   name: string
   type: 'local' | 'remote'
