@@ -39,6 +39,7 @@ const api = {
   saveFile: (repoPath: string, relativePath: string, content: string) =>
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content),
   getSession: () => ipcRenderer.invoke('session:get'),
+  getProjectSession: (repoPath: string) => ipcRenderer.invoke('session:get-project', repoPath),
   saveSession: (session: unknown) => ipcRenderer.invoke('session:save', session),
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => {
     const listener = (_event: IpcRendererEvent, repoPath: string): void => callback(repoPath)

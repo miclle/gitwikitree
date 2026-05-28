@@ -14,6 +14,7 @@ import { resolveRepositoryNavigationTarget } from '../repository-navigation'
 import type {
   NavigationTarget,
   PreviewPayload,
+  ProjectSessionState,
   RecentFileState,
   RepositoryPayload,
   SessionState,
@@ -131,6 +132,44 @@ export function useRepositoryWorkspace(): {
     [repository]
   )
 
+  const restoreRepositorySession = useCallback(
+    async (nextRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
+      const restoredTabs = session.openFileTabs
+        .map((tab) => {
+          const resolved = resolveRepositoryNavigationTarget(nextRepository, tab.path)
+          if (!resolved) return undefined
+
+          return {
+            ...tab,
+            ...resolved.target,
+            history: resolveHistoryTargets(nextRepository, tab.history)
+          }
+        })
+        .filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))
+        .map((tab, index) => hydrateOpenFileTab(tab, index))
+      const restoredActiveTab =
+        restoredTabs.find((tab) => tab.id === session.activeFileTabId) ?? restoredTabs[0]
+      const restoredActiveTabId =
+        restoredActiveTab?.id ??
+        restoredTabs.find((tab) => tab.path === session.activeFilePath)?.id ??
+        restoredTabs[0]?.id
+      const restoredActiveFile =
+        restoredActiveTab?.type === 'directory' ? undefined : restoredActiveTab?.path
+      const selectedPath = restoredActiveTab?.path ?? session.selectedPath ?? ''
+      const selectedTarget = resolveRepositoryNavigationTarget(nextRepository, selectedPath)
+      const nextSelectedPath = selectedTarget?.target.path ?? ''
+
+      setRepository(nextRepository)
+      setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
+      setOpenFileTabs(restoredTabs)
+      setActiveFilePath(restoredActiveFile)
+      setActiveFileTabId(restoredActiveTabId)
+      setSelectedPath(nextSelectedPath)
+      await loadPreview(nextSelectedPath, nextRepository)
+    },
+    [loadPreview]
+  )
+
   const openRepository = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(undefined)
@@ -138,6 +177,12 @@ export function useRepositoryWorkspace(): {
     try {
       const nextRepository = await window.api.pickRepository()
       if (!nextRepository) return
+
+      const projectSession = await window.api.getProjectSession(nextRepository.path)
+      if (projectSession) {
+        await restoreRepositorySession(nextRepository, projectSession)
+        return
+      }
 
       setRepository(nextRepository)
       setSelectedPath('')
@@ -151,7 +196,7 @@ export function useRepositoryWorkspace(): {
     } finally {
       setLoading(false)
     }
-  }, [loadPreview])
+  }, [loadPreview, restoreRepositorySession])
 
   const loadRepositoryPath = useCallback(
     async (repoPath: string): Promise<void> => {
@@ -160,6 +205,12 @@ export function useRepositoryWorkspace(): {
 
       try {
         const nextRepository = await window.api.loadRepository(repoPath)
+        const projectSession = await window.api.getProjectSession(nextRepository.path)
+        if (projectSession) {
+          await restoreRepositorySession(nextRepository, projectSession)
+          return
+        }
+
         setRepository(nextRepository)
         setSelectedPath('')
         setExpandedPaths(defaultExpanded)
@@ -173,7 +224,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [loadPreview]
+    [loadPreview, restoreRepositorySession]
   )
 
   const loadRepositoryWithSession = useCallback(
@@ -192,45 +243,14 @@ export function useRepositoryWorkspace(): {
                 session.rootPath
               )
             : await window.api.loadRepository(session.repositoryPath)
-        const restoredTabs = session.openFileTabs
-          .map((tab) => {
-            const resolved = resolveRepositoryNavigationTarget(nextRepository, tab.path)
-            if (!resolved) return undefined
-
-            return {
-              ...tab,
-              ...resolved.target,
-              history: resolveHistoryTargets(nextRepository, tab.history)
-            }
-          })
-          .filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))
-          .map((tab, index) => hydrateOpenFileTab(tab, index))
-        const restoredActiveTab =
-          restoredTabs.find((tab) => tab.id === session.activeFileTabId) ?? restoredTabs[0]
-        const restoredActiveTabId =
-          restoredActiveTab?.id ??
-          restoredTabs.find((tab) => tab.path === session.activeFilePath)?.id ??
-          restoredTabs[0]?.id
-        const restoredActiveFile =
-          restoredActiveTab?.type === 'directory' ? undefined : restoredActiveTab?.path
-        const selectedPath = restoredActiveTab?.path ?? session.selectedPath ?? ''
-        const selectedTarget = resolveRepositoryNavigationTarget(nextRepository, selectedPath)
-        const nextSelectedPath = selectedTarget?.target.path ?? ''
-
-        setRepository(nextRepository)
-        setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
-        setOpenFileTabs(restoredTabs)
-        setActiveFilePath(restoredActiveFile)
-        setActiveFileTabId(restoredActiveTabId)
-        setSelectedPath(nextSelectedPath)
-        await loadPreview(nextSelectedPath, nextRepository)
+        await restoreRepositorySession(nextRepository, session)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
       } finally {
         setLoading(false)
       }
     },
-    [loadPreview]
+    [restoreRepositorySession]
   )
 
   const openFilePath = useCallback(

@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   PreviewPayload,
+  ProjectSessionState,
   RecentFileState,
   RepositoryPayload,
   SessionState,
@@ -26,6 +27,7 @@ export type GitWikitreeAPI = {
   ) => Promise<PreviewPayload>
   saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
   getSession: () => Promise<SessionState>
+  getProjectSession: (repoPath: string) => Promise<ProjectSessionState | undefined>
   saveSession: (session: Partial<SessionState>) => Promise<SessionState>
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => () => void
   onOpenRepositoryRequest: (callback: () => void) => () => void

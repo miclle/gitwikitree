@@ -5,15 +5,18 @@ export const maxOpenFileTabs = 30
 import type {
   NavigationTarget,
   OpenFileTabState,
+  ProjectSessionState,
   RecentFileState,
   RecentRepositoryState,
-  SessionState
+  SessionState,
+  WindowState
 } from '../shared/types'
 
 const emptySessionState: SessionState = {
   selectedPath: '',
   openFileTabs: [],
   expandedPaths: [''],
+  projectSessions: {},
   recentRepositories: [],
   recentFiles: []
 }
@@ -187,6 +190,29 @@ function normalizeRecentRepositories(value: unknown): RecentRepositoryState[] {
   return repositories
 }
 
+function normalizeCoordinate(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) ? value : undefined
+}
+
+function normalizeDimension(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 320 && value <= 10000
+    ? value
+    : fallback
+}
+
+function normalizeWindowState(value: unknown): WindowState | undefined {
+  const record = asRecord(value)
+  if (!Object.keys(record).length) return undefined
+
+  return {
+    ...(normalizeCoordinate(record.x) !== undefined ? { x: normalizeCoordinate(record.x) } : {}),
+    ...(normalizeCoordinate(record.y) !== undefined ? { y: normalizeCoordinate(record.y) } : {}),
+    width: normalizeDimension(record.width, 1220),
+    height: normalizeDimension(record.height, 820),
+    ...(typeof record.isMaximized === 'boolean' ? { isMaximized: record.isMaximized } : {})
+  }
+}
+
 function getRecentRepositoriesFromFiles(recentFiles: RecentFileState[]): RecentRepositoryState[] {
   const seen = new Set<string>()
   const repositories: RecentRepositoryState[] = []
@@ -209,28 +235,76 @@ function getRecentRepositoriesFromFiles(recentFiles: RecentFileState[]): RecentR
   return repositories
 }
 
-export function normalizeSessionState(value: unknown): SessionState {
+function normalizeProjectSessionState(value: unknown): ProjectSessionState {
   const record = asRecord(value)
   const source = record.source
+  const repositoryPath = asString(record.repositoryPath)
+  const rootPath = asString(record.rootPath)
+  const activeRef = asString(record.activeRef)
   const openFileTabs = normalizeOpenFileTabs(record.openFileTabs)
   const activeFilePath = normalizeOptionalRelativePath(record.activeFilePath)
   const activeFileTabId = asString(record.activeFileTabId)
-  const recentFiles = normalizeRecentFiles(record.recentFiles)
-  const recentRepositories = normalizeRecentRepositories(record.recentRepositories)
+  const windowState = normalizeWindowState(record.windowState)
+  const normalizedSource =
+    source === 'git-ref' || source === 'worktree' || source === 'working-tree' ? source : undefined
 
   return {
-    repositoryPath: asString(record.repositoryPath),
-    rootPath: asString(record.rootPath),
-    activeRef: asString(record.activeRef),
-    source:
-      source === 'git-ref' || source === 'worktree' || source === 'working-tree'
-        ? source
-        : undefined,
+    ...(repositoryPath ? { repositoryPath } : {}),
+    ...(rootPath ? { rootPath } : {}),
+    ...(activeRef ? { activeRef } : {}),
+    ...(normalizedSource ? { source: normalizedSource } : {}),
     selectedPath: normalizeRelativePath(record.selectedPath),
-    activeFilePath,
-    activeFileTabId,
+    ...(activeFilePath ? { activeFilePath } : {}),
+    ...(activeFileTabId ? { activeFileTabId } : {}),
     openFileTabs,
     expandedPaths: normalizeExpandedPaths(record.expandedPaths),
+    ...(windowState ? { windowState } : {})
+  }
+}
+
+function projectSessionFromSessionState(sessionState: ProjectSessionState): ProjectSessionState {
+  return normalizeProjectSessionState(sessionState)
+}
+
+function normalizeProjectSessions(value: unknown): Record<string, ProjectSessionState> {
+  const record = asRecord(value)
+  const projectSessions: Record<string, ProjectSessionState> = {}
+
+  for (const [repoPath, projectSession] of Object.entries(record)) {
+    const normalized = normalizeProjectSessionState({
+      ...asRecord(projectSession),
+      repositoryPath: asString(asRecord(projectSession).repositoryPath) ?? repoPath
+    })
+    if (!normalized.repositoryPath) continue
+
+    projectSessions[normalized.repositoryPath] = normalized
+  }
+
+  return projectSessions
+}
+
+export function normalizeSessionState(
+  value: unknown,
+  options: { migrateCurrentProject?: boolean } = {}
+): SessionState {
+  const record = asRecord(value)
+  const recentFiles = normalizeRecentFiles(record.recentFiles)
+  const recentRepositories = normalizeRecentRepositories(record.recentRepositories)
+  const projectSessions = normalizeProjectSessions(record.projectSessions)
+  const currentProject = normalizeProjectSessionState(record)
+  const migrateCurrentProject = options.migrateCurrentProject ?? true
+
+  if (
+    migrateCurrentProject &&
+    currentProject.repositoryPath &&
+    !projectSessions[currentProject.repositoryPath]
+  ) {
+    projectSessions[currentProject.repositoryPath] = projectSessionFromSessionState(currentProject)
+  }
+
+  return {
+    ...currentProject,
+    projectSessions,
     recentRepositories: recentRepositories.length
       ? recentRepositories
       : getRecentRepositoriesFromFiles(recentFiles),
@@ -296,6 +370,13 @@ export function clearRecentFiles(sessionState: SessionState): SessionState {
   })
 }
 
+export function getProjectSessionState(
+  sessionState: SessionState,
+  repoPath: string
+): ProjectSessionState | undefined {
+  return sessionState.projectSessions[repoPath]
+}
+
 export function getOpenFileTabsForRecentFile({
   currentRepositoryPath,
   nextRepositoryPath,
@@ -314,14 +395,52 @@ export function getOpenFileTabsForRecentFile({
 
 export function mergeSessionState(
   current: SessionState,
-  next: Partial<SessionState>
+  next: Partial<SessionState>,
+  options: { syncProjectSession?: boolean } = {}
 ): SessionState {
-  return normalizeSessionState({
+  const projectSessions = {
+    ...current.projectSessions,
+    ...next.projectSessions
+  }
+  const merged = normalizeSessionState({
     ...emptySessionState,
     ...current,
     ...next,
+    projectSessions,
     recentRepositories: next.recentRepositories ?? current.recentRepositories,
     recentFiles: next.recentFiles ?? current.recentFiles
+  })
+  const syncProjectSession = options.syncProjectSession ?? true
+
+  if (!syncProjectSession || !merged.repositoryPath) {
+    return normalizeSessionState(
+      {
+        ...merged,
+        projectSessions
+      },
+      { migrateCurrentProject: false }
+    )
+  }
+
+  return normalizeSessionState({
+    ...merged,
+    projectSessions: {
+      ...merged.projectSessions,
+      [merged.repositoryPath]: {
+        ...merged.projectSessions[merged.repositoryPath],
+        repositoryPath: merged.repositoryPath,
+        rootPath: merged.rootPath,
+        activeRef: merged.activeRef,
+        source: merged.source,
+        selectedPath: merged.selectedPath,
+        activeFilePath: merged.activeFilePath,
+        activeFileTabId: merged.activeFileTabId,
+        openFileTabs: merged.openFileTabs,
+        expandedPaths: merged.expandedPaths,
+        windowState:
+          merged.windowState ?? merged.projectSessions[merged.repositoryPath]?.windowState
+      }
+    }
   })
 }
 
@@ -330,6 +449,7 @@ export function createEmptySessionState(): SessionState {
     ...emptySessionState,
     openFileTabs: [],
     expandedPaths: [''],
+    projectSessions: {},
     recentRepositories: [],
     recentFiles: []
   }

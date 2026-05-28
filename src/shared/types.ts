@@ -88,7 +88,15 @@ export type RecentRepositoryState = {
   source?: RepositorySource
 }
 
-export type SessionState = {
+export type WindowState = {
+  x?: number
+  y?: number
+  width: number
+  height: number
+  isMaximized?: boolean
+}
+
+export type ProjectSessionState = {
   repositoryPath?: string
   rootPath?: string
   activeRef?: string
@@ -98,6 +106,11 @@ export type SessionState = {
   activeFileTabId?: string
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
+  windowState?: WindowState
+}
+
+export type SessionState = ProjectSessionState & {
+  projectSessions: Record<string, ProjectSessionState>
   recentRepositories: RecentRepositoryState[]
   recentFiles: RecentFileState[]
 }

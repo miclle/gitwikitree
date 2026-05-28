@@ -340,6 +340,119 @@ test('normalizeSessionState preserves root directory tabs', async () => {
   ])
 })
 
+test('normalizeSessionState migrates the active project into project sessions', async () => {
+  const { normalizeSessionState } = await loadSessionStore()
+  const state = normalizeSessionState({
+    repositoryPath: '/repo-a',
+    selectedPath: 'README.md',
+    activeFilePath: 'README.md',
+    activeFileTabId: 'tab-a',
+    openFileTabs: [{ id: 'tab-a', path: 'README.md', name: 'README.md' }],
+    expandedPaths: ['', 'docs'],
+    windowState: { x: 12, y: 24, width: 1300, height: 900, isMaximized: true }
+  })
+
+  assert.deepEqual(state.projectSessions['/repo-a'], {
+    repositoryPath: '/repo-a',
+    selectedPath: 'README.md',
+    activeFilePath: 'README.md',
+    activeFileTabId: 'tab-a',
+    openFileTabs: [
+      {
+        id: 'tab-a',
+        path: 'README.md',
+        name: 'README.md',
+        history: [{ path: 'README.md', name: 'README.md' }],
+        historyIndex: 0
+      }
+    ],
+    expandedPaths: ['', 'docs'],
+    windowState: { x: 12, y: 24, width: 1300, height: 900, isMaximized: true }
+  })
+})
+
+test('mergeSessionState updates only the active project session', async () => {
+  const { mergeSessionState } = await loadSessionStore()
+  const current = {
+    repositoryPath: '/repo-a',
+    selectedPath: 'README.md',
+    openFileTabs: [{ path: 'README.md', name: 'README.md' }],
+    expandedPaths: [''],
+    projectSessions: {
+      '/repo-b': {
+        repositoryPath: '/repo-b',
+        selectedPath: 'guide.md',
+        openFileTabs: [{ path: 'guide.md', name: 'guide.md' }],
+        expandedPaths: ['', 'docs'],
+        windowState: { width: 1440, height: 960 }
+      }
+    },
+    recentRepositories: [],
+    recentFiles: []
+  }
+
+  const next = mergeSessionState(current, {
+    repositoryPath: '/repo-a',
+    selectedPath: 'docs/intro.md',
+    activeFilePath: 'docs/intro.md',
+    openFileTabs: [{ path: 'docs/intro.md', name: 'intro.md' }],
+    expandedPaths: ['', 'docs'],
+    windowState: { width: 1220, height: 820 }
+  })
+
+  assert.equal(next.projectSessions['/repo-a'].selectedPath, 'docs/intro.md')
+  assert.equal(next.projectSessions['/repo-b'].selectedPath, 'guide.md')
+  assert.deepEqual(next.projectSessions['/repo-b'].windowState, { width: 1440, height: 960 })
+})
+
+test('mergeSessionState can update repository metadata without replacing project tabs', async () => {
+  const { mergeSessionState } = await loadSessionStore()
+  const current = {
+    repositoryPath: '/repo-a',
+    selectedPath: 'README.md',
+    openFileTabs: [{ path: 'README.md', name: 'README.md' }],
+    expandedPaths: [''],
+    projectSessions: {
+      '/repo-b': {
+        repositoryPath: '/repo-b',
+        selectedPath: 'guide.md',
+        activeFilePath: 'guide.md',
+        openFileTabs: [{ path: 'guide.md', name: 'guide.md' }],
+        expandedPaths: ['', 'docs']
+      }
+    },
+    recentRepositories: [],
+    recentFiles: []
+  }
+
+  const next = mergeSessionState(
+    current,
+    {
+      repositoryPath: '/repo-b',
+      rootPath: '/repo-b',
+      activeRef: 'main',
+      source: 'working-tree',
+      selectedPath: '',
+      activeFilePath: undefined,
+      activeFileTabId: undefined,
+      openFileTabs: [],
+      expandedPaths: ['']
+    },
+    { syncProjectSession: false }
+  )
+
+  assert.equal(next.repositoryPath, '/repo-b')
+  assert.deepEqual(next.openFileTabs, [])
+  assert.deepEqual(next.projectSessions['/repo-b'].openFileTabs, [
+    {
+      path: 'guide.md',
+      name: 'guide.md',
+      history: [{ path: 'guide.md', name: 'guide.md' }],
+      historyIndex: 0
+    }
+  ])
+})
+
 test('getOpenFileTabsForRecentFile resets tabs when switching repositories', async () => {
   const { getOpenFileTabsForRecentFile } = await loadSessionStore()
   const tabs = getOpenFileTabsForRecentFile({

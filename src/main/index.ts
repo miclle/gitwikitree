@@ -20,6 +20,7 @@ import {
   clearRecentFiles,
   createEmptySessionState,
   findRepositoryWindowIndex,
+  getProjectSessionState,
   getRecentFileOpenPayload,
   getRecentRepositories,
   mergeSessionState,
@@ -32,7 +33,8 @@ import type {
   RecentFileState,
   RecentRepositoryState,
   RepositoryPayload,
-  SessionState
+  SessionState,
+  WindowState
 } from '../shared/types'
 
 const appName = 'Git Wikitree'
@@ -42,6 +44,7 @@ app.setName(appName)
 
 const windows = new Set<BrowserWindow>()
 const windowRepositoryPaths = new Map<BrowserWindow, string>()
+const windowStateSaveTimers = new Map<BrowserWindow, ReturnType<typeof setTimeout>>()
 let sessionState = createEmptySessionState()
 
 function getInitialRepositoryPath(): string | undefined {
@@ -76,6 +79,84 @@ async function writeStoredSession(nextSessionState = sessionState): Promise<void
   sessionState = normalizeSessionState(nextSessionState)
   await fs.mkdir(app.getPath('userData'), { recursive: true })
   await fs.writeFile(getSessionFilePath(), `${JSON.stringify(sessionState, null, 2)}\n`, 'utf8')
+}
+
+function getSavedWindowState(repoPath?: string): WindowState | undefined {
+  return repoPath
+    ? getProjectSessionState(sessionState, repoPath)?.windowState
+    : sessionState.windowState
+}
+
+function getBrowserWindowBounds(repoPath?: string): Partial<WindowState> {
+  const windowState = getSavedWindowState(repoPath)
+  if (!windowState) return {}
+
+  return {
+    ...(typeof windowState.x === 'number' ? { x: windowState.x } : {}),
+    ...(typeof windowState.y === 'number' ? { y: windowState.y } : {}),
+    width: windowState.width,
+    height: windowState.height
+  }
+}
+
+function readWindowState(browserWindow: BrowserWindow): WindowState {
+  const bounds = browserWindow.isMaximized()
+    ? browserWindow.getNormalBounds()
+    : browserWindow.getBounds()
+
+  return {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    isMaximized: browserWindow.isMaximized()
+  }
+}
+
+async function saveWindowState(browserWindow: BrowserWindow): Promise<void> {
+  if (browserWindow.isDestroyed()) return
+
+  const repoPath = windowRepositoryPaths.get(browserWindow)
+  const windowState = readWindowState(browserWindow)
+
+  if (!repoPath) {
+    await writeStoredSession({ ...sessionState, windowState })
+    return
+  }
+
+  sessionState = mergeSessionState(sessionState, {
+    projectSessions: {
+      [repoPath]: {
+        repositoryPath: repoPath,
+        selectedPath: '',
+        openFileTabs: [],
+        expandedPaths: [''],
+        ...getProjectSessionState(sessionState, repoPath),
+        windowState
+      }
+    }
+  })
+  await writeStoredSession()
+}
+
+function scheduleWindowStateSave(browserWindow: BrowserWindow): void {
+  const currentTimer = windowStateSaveTimers.get(browserWindow)
+  if (currentTimer) clearTimeout(currentTimer)
+
+  windowStateSaveTimers.set(
+    browserWindow,
+    setTimeout(() => {
+      windowStateSaveTimers.delete(browserWindow)
+      void saveWindowState(browserWindow)
+    }, 350)
+  )
+}
+
+function flushWindowStateSave(browserWindow: BrowserWindow): void {
+  const currentTimer = windowStateSaveTimers.get(browserWindow)
+  if (currentTimer) clearTimeout(currentTimer)
+  windowStateSaveTimers.delete(browserWindow)
+  void saveWindowState(browserWindow)
 }
 
 function sendOpenFile(targetWindow: BrowserWindow, file: RecentFileState): void {
@@ -192,9 +273,11 @@ async function showContextMenu(
 }
 
 function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: TreeItemContext): void {
+  const savedWindowState = getSavedWindowState(repoPath)
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
+    ...getBrowserWindowBounds(repoPath),
     minWidth: 1024,
     minHeight: 720,
     title: appName,
@@ -209,13 +292,34 @@ function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: Tree
   })
 
   windows.add(mainWindow)
+  if (repoPath) windowRepositoryPaths.set(mainWindow, repoPath)
 
+  mainWindow.on('close', () => {
+    flushWindowStateSave(mainWindow)
+  })
   mainWindow.on('closed', () => {
+    const currentTimer = windowStateSaveTimers.get(mainWindow)
+    if (currentTimer) clearTimeout(currentTimer)
+    windowStateSaveTimers.delete(mainWindow)
     windows.delete(mainWindow)
     windowRepositoryPaths.delete(mainWindow)
   })
 
+  mainWindow.on('resize', () => {
+    scheduleWindowStateSave(mainWindow)
+  })
+  mainWindow.on('move', () => {
+    scheduleWindowStateSave(mainWindow)
+  })
+  mainWindow.on('maximize', () => {
+    scheduleWindowStateSave(mainWindow)
+  })
+  mainWindow.on('unmaximize', () => {
+    scheduleWindowStateSave(mainWindow)
+  })
+
   mainWindow.on('ready-to-show', () => {
+    if (savedWindowState?.isMaximized) mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -527,16 +631,20 @@ app.whenReady().then(async () => {
     const sourceWindow = browserWindow ?? BrowserWindow.getFocusedWindow()
     if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
     recordLoadedRepository(repository)
-    sessionState = mergeSessionState(sessionState, {
-      repositoryPath: repository.path,
-      rootPath: repository.rootPath,
-      activeRef: repository.activeRef,
-      source: repository.source,
-      selectedPath: '',
-      activeFilePath: undefined,
-      openFileTabs: [],
-      expandedPaths: ['']
-    })
+    sessionState = mergeSessionState(
+      sessionState,
+      {
+        repositoryPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        selectedPath: '',
+        activeFilePath: undefined,
+        openFileTabs: [],
+        expandedPaths: ['']
+      },
+      { syncProjectSession: false }
+    )
     await writeStoredSession()
     return repository
   })
@@ -546,12 +654,21 @@ app.whenReady().then(async () => {
     const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
     if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
     recordLoadedRepository(repository)
-    sessionState = mergeSessionState(sessionState, {
-      repositoryPath: repository.path,
-      rootPath: repository.rootPath,
-      activeRef: repository.activeRef,
-      source: repository.source
-    })
+    sessionState = mergeSessionState(
+      sessionState,
+      {
+        repositoryPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        selectedPath: '',
+        activeFilePath: undefined,
+        activeFileTabId: undefined,
+        openFileTabs: [],
+        expandedPaths: ['']
+      },
+      { syncProjectSession: false }
+    )
     await writeStoredSession()
     return repository
   })
@@ -563,16 +680,20 @@ app.whenReady().then(async () => {
       const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
       if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
       recordLoadedRepository(repository)
-      sessionState = mergeSessionState(sessionState, {
-        repositoryPath: repository.path,
-        rootPath: repository.rootPath,
-        activeRef: repository.activeRef,
-        source: repository.source,
-        selectedPath: '',
-        activeFilePath: undefined,
-        openFileTabs: [],
-        expandedPaths: ['']
-      })
+      sessionState = mergeSessionState(
+        sessionState,
+        {
+          repositoryPath: repository.path,
+          rootPath: repository.rootPath,
+          activeRef: repository.activeRef,
+          source: repository.source,
+          selectedPath: '',
+          activeFilePath: undefined,
+          openFileTabs: [],
+          expandedPaths: ['']
+        },
+        { syncProjectSession: false }
+      )
       await writeStoredSession()
       return repository
     }
@@ -583,21 +704,29 @@ app.whenReady().then(async () => {
     const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
     if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
     recordLoadedRepository(repository)
-    sessionState = mergeSessionState(sessionState, {
-      repositoryPath: repository.path,
-      rootPath: repository.rootPath,
-      activeRef: repository.activeRef,
-      source: repository.source,
-      selectedPath: '',
-      activeFilePath: undefined,
-      openFileTabs: [],
-      expandedPaths: ['']
-    })
+    sessionState = mergeSessionState(
+      sessionState,
+      {
+        repositoryPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        selectedPath: '',
+        activeFilePath: undefined,
+        openFileTabs: [],
+        expandedPaths: ['']
+      },
+      { syncProjectSession: false }
+    )
     await writeStoredSession()
     return repository
   })
 
   ipcMain.handle('session:get', () => sessionState)
+
+  ipcMain.handle('session:get-project', (_event, repoPath: string) => {
+    return getProjectSessionState(sessionState, repoPath)
+  })
 
   ipcMain.handle('session:save', async (_event, nextSessionState: Partial<SessionState>) => {
     sessionState = mergeSessionState(sessionState, nextSessionState)
