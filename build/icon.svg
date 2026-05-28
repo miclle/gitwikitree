@@ -25,56 +25,58 @@
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" rx="226" fill="url(#background)"/>
-  <path
-    d="M185 732c98 95 228 144 390 136 118-6 206-43 265-107"
-    fill="none"
-    stroke="#6df0be"
-    stroke-width="28"
-    stroke-linecap="round"
-    opacity="0.14"/>
+  <g transform="translate(61.44 61.44) scale(0.88)">
+    <rect width="1024" height="1024" rx="226" fill="url(#background)"/>
+    <path
+      d="M185 732c98 95 228 144 390 136 118-6 206-43 265-107"
+      fill="none"
+      stroke="#6df0be"
+      stroke-width="28"
+      stroke-linecap="round"
+      opacity="0.14"/>
 
-  <g filter="url(#softShadow)">
-    <path
-      d="M232 245c0-28 25-49 53-43 76 16 151 52 227 108v534c-76-57-151-93-227-108-28-6-53 15-53 43V245Z"
-      fill="url(#page)"/>
-    <path
-      d="M792 245c0-28-25-49-53-43-76 16-151 52-227 108v534c76-57 151-93 227-108 28-6 53 15 53 43V245Z"
-      fill="#e8fff0"/>
-    <path
-      d="M512 310c-76-56-151-92-227-108-28-6-53 15-53 43v534c0-28 25-49 53-43 76 15 151 51 227 108V310Z"
-      fill="url(#pageShadow)"/>
-    <path
-      d="M512 310c76-56 151-92 227-108 28-6 53 15 53 43v534c0-28-25-49-53-43-76 15-151 51-227 108V310Z"
-      fill="#ffffff"
-      opacity="0.10"/>
-    <path d="M512 292v560" stroke="#174238" stroke-width="20" stroke-linecap="round" opacity="0.24"/>
-    <path d="M315 357c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
-    <path d="M315 470c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
-    <path d="M709 357c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
-    <path d="M709 470c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
-  </g>
+    <g filter="url(#softShadow)">
+      <path
+        d="M232 245c0-28 25-49 53-43 76 16 151 52 227 108v534c-76-57-151-93-227-108-28-6-53 15-53 43V245Z"
+        fill="url(#page)"/>
+      <path
+        d="M792 245c0-28-25-49-53-43-76 16-151 52-227 108v534c76-57 151-93 227-108 28-6 53 15 53 43V245Z"
+        fill="#e8fff0"/>
+      <path
+        d="M512 310c-76-56-151-92-227-108-28-6-53 15-53 43v534c0-28 25-49 53-43 76 15 151 51 227 108V310Z"
+        fill="url(#pageShadow)"/>
+      <path
+        d="M512 310c76-56 151-92 227-108 28-6 53 15 53 43v534c0-28-25-49-53-43-76 15-151 51-227 108V310Z"
+        fill="#ffffff"
+        opacity="0.10"/>
+      <path d="M512 292v560" stroke="#174238" stroke-width="20" stroke-linecap="round" opacity="0.24"/>
+      <path d="M315 357c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
+      <path d="M315 470c52 13 102 35 150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
+      <path d="M709 357c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.17"/>
+      <path d="M709 470c-52 13-102 35-150 66" stroke="#174238" stroke-width="18" stroke-linecap="round" opacity="0.11"/>
+    </g>
 
-  <g fill="none" stroke="url(#branch)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M512 743V592"/>
-    <path d="M512 592c0-92 0-170 0-249"/>
-    <path d="M512 592c-91-35-151-86-195-152"/>
-    <path d="M512 592c90-34 150-85 195-152"/>
-    <path d="M512 414c44-46 85-80 128-102"/>
-  </g>
+    <g fill="none" stroke="url(#branch)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M512 743V592"/>
+      <path d="M512 592c0-92 0-170 0-249"/>
+      <path d="M512 592c-91-35-151-86-195-152"/>
+      <path d="M512 592c90-34 150-85 195-152"/>
+      <path d="M512 414c44-46 85-80 128-102"/>
+    </g>
 
-  <g filter="url(#nodeShadow)">
-    <circle cx="512" cy="743" r="58" fill="#0d2a34"/>
-    <circle cx="512" cy="743" r="33" fill="#7af8bf"/>
-    <circle cx="512" cy="592" r="50" fill="#0d2a34"/>
-    <circle cx="512" cy="592" r="27" fill="#45d8dd"/>
-    <circle cx="317" cy="440" r="55" fill="#0d2a34"/>
-    <circle cx="317" cy="440" r="31" fill="#7af8bf"/>
-    <circle cx="707" cy="440" r="55" fill="#0d2a34"/>
-    <circle cx="707" cy="440" r="31" fill="#7af8bf"/>
-    <circle cx="512" cy="343" r="55" fill="#0d2a34"/>
-    <circle cx="512" cy="343" r="31" fill="#7af8bf"/>
-    <circle cx="640" cy="312" r="47" fill="#0d2a34"/>
-    <circle cx="640" cy="312" r="25" fill="#45d8dd"/>
+    <g filter="url(#nodeShadow)">
+      <circle cx="512" cy="743" r="58" fill="#0d2a34"/>
+      <circle cx="512" cy="743" r="33" fill="#7af8bf"/>
+      <circle cx="512" cy="592" r="50" fill="#0d2a34"/>
+      <circle cx="512" cy="592" r="27" fill="#45d8dd"/>
+      <circle cx="317" cy="440" r="55" fill="#0d2a34"/>
+      <circle cx="317" cy="440" r="31" fill="#7af8bf"/>
+      <circle cx="707" cy="440" r="55" fill="#0d2a34"/>
+      <circle cx="707" cy="440" r="31" fill="#7af8bf"/>
+      <circle cx="512" cy="343" r="55" fill="#0d2a34"/>
+      <circle cx="512" cy="343" r="31" fill="#7af8bf"/>
+      <circle cx="640" cy="312" r="47" fill="#0d2a34"/>
+      <circle cx="640" cy="312" r="25" fill="#45d8dd"/>
+    </g>
   </g>
 </svg>
