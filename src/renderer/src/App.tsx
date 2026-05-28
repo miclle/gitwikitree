@@ -78,6 +78,16 @@ type OpenFileTab = {
   name: string
 }
 
+type RecentFileState = {
+  repoPath: string
+  rootPath?: string
+  filePath: string
+  name: string
+  openedAt: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
+}
+
 type TabPopoverState = {
   tab: OpenFileTab
   left: number
@@ -274,12 +284,16 @@ function App(): React.JSX.Element {
   )
 
   const openFilePath = useCallback(
-    async (repoPath: string, filePath: string): Promise<void> => {
+    async (file: RecentFileState): Promise<void> => {
       setLoading(true)
       setError(undefined)
 
       try {
-        const nextRepository = await window.api.loadRepository(repoPath)
+        const nextRepository =
+          file.source === 'git-ref' && file.activeRef
+            ? await window.api.loadRef(file.rootPath ?? file.repoPath, file.activeRef, file.rootPath)
+            : await window.api.loadRepository(file.repoPath)
+        const filePath = file.filePath
         const node = findTreeNode(nextRepository.tree, filePath)
 
         setRepository(nextRepository)
@@ -326,8 +340,8 @@ function App(): React.JSX.Element {
     const removeOpenPathListener = window.api.onOpenRepositoryPath((repoPath) => {
       void loadRepositoryPath(repoPath)
     })
-    const removeOpenFileListener = window.api.onOpenFilePath(({ repoPath, filePath }) => {
-      void openFilePath(repoPath, filePath)
+    const removeOpenFileListener = window.api.onOpenFilePath((file) => {
+      void openFilePath(file)
     })
     const removeOpenRequestListener = window.api.onOpenRepositoryRequest(() => {
       void openRepository()

@@ -47,9 +47,21 @@ export type OpenFileTabState = {
 
 export type RecentFileState = {
   repoPath: string
+  rootPath?: string
   filePath: string
   name: string
   openedAt: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
+}
+
+export type RecentRepositoryState = {
+  repoPath: string
+  rootPath?: string
+  name: string
+  openedAt: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
 }
 
 export type SessionState = {
@@ -61,6 +73,7 @@ export type SessionState = {
   activeFilePath?: string
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
+  recentRepositories: RecentRepositoryState[]
   recentFiles: RecentFileState[]
 }
 
@@ -85,9 +98,7 @@ export type GitWikitreeAPI = {
   saveSession: (session: Partial<SessionState>) => Promise<SessionState>
   onOpenRepositoryPath: (callback: (repoPath: string) => void) => () => void
   onOpenRepositoryRequest: (callback: () => void) => () => void
-  onOpenFilePath: (
-    callback: (payload: { repoPath: string; filePath: string }) => void
-  ) => () => void
+  onOpenFilePath: (callback: (payload: RecentFileState) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
 }
 

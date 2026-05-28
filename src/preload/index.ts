@@ -37,10 +37,28 @@ const api = {
 
     return () => ipcRenderer.removeListener('repository:open-request', listener)
   },
-  onOpenFilePath: (callback: (payload: { repoPath: string; filePath: string }) => void) => {
+  onOpenFilePath: (
+    callback: (payload: {
+      repoPath: string
+      rootPath?: string
+      filePath: string
+      name: string
+      openedAt: string
+      activeRef?: string
+      source?: 'working-tree' | 'git-ref' | 'worktree'
+    }) => void
+  ) => {
     const listener = (
       _event: IpcRendererEvent,
-      payload: { repoPath: string; filePath: string }
+      payload: {
+        repoPath: string
+        rootPath?: string
+        filePath: string
+        name: string
+        openedAt: string
+        activeRef?: string
+        source?: 'working-tree' | 'git-ref' | 'worktree'
+      }
     ): void => callback(payload)
     ipcRenderer.on('repository:open-file', listener)
 

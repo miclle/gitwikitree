@@ -47,6 +47,159 @@ test('recordRecentFile keeps the newest file first and de-duplicates entries', a
   assert.equal(deduped[0].openedAt, '2026-05-27T01:00:00.000Z')
 })
 
+test('recordRecentFile preserves the repository ref context for recent files', async () => {
+  const { recordRecentFile } = await loadSessionStore()
+  const recentFiles = recordRecentFile([], {
+    repoPath: '/repo',
+    rootPath: '/repo-root',
+    filePath: 'README.md',
+    name: 'README.md',
+    openedAt: '2026-05-27T00:00:00.000Z',
+    activeRef: 'feature/docs',
+    source: 'git-ref'
+  })
+
+  assert.deepEqual(recentFiles[0], {
+    repoPath: '/repo',
+    rootPath: '/repo-root',
+    filePath: 'README.md',
+    name: 'README.md',
+    openedAt: '2026-05-27T00:00:00.000Z',
+    activeRef: 'feature/docs',
+    source: 'git-ref'
+  })
+})
+
+test('getRecentFileOpenPayload preserves the repository ref context', async () => {
+  const { getRecentFileOpenPayload } = await loadSessionStore()
+  const payload = getRecentFileOpenPayload({
+    repoPath: '/repo',
+    rootPath: '/repo-root',
+    filePath: 'README.md',
+    name: 'README.md',
+    openedAt: '2026-05-27T00:00:00.000Z',
+    activeRef: 'feature/docs',
+    source: 'git-ref'
+  })
+
+  assert.deepEqual(payload, {
+    repoPath: '/repo',
+    rootPath: '/repo-root',
+    filePath: 'README.md',
+    name: 'README.md',
+    openedAt: '2026-05-27T00:00:00.000Z',
+    activeRef: 'feature/docs',
+    source: 'git-ref'
+  })
+})
+
+test('getRecentRepositories returns newest unique repositories from recent files', async () => {
+  const { getRecentRepositories } = await loadSessionStore()
+  const repositories = getRecentRepositories([
+    {
+      repoPath: '/repo-a',
+      filePath: 'README.md',
+      name: 'README.md',
+      openedAt: '2026-05-27T03:00:00.000Z'
+    },
+    {
+      repoPath: '/repo-b',
+      filePath: 'docs/guide.md',
+      name: 'guide.md',
+      openedAt: '2026-05-27T02:00:00.000Z'
+    },
+    {
+      repoPath: '/repo-a',
+      filePath: 'docs/intro.md',
+      name: 'intro.md',
+      openedAt: '2026-05-27T01:00:00.000Z'
+    }
+  ])
+
+  assert.deepEqual(repositories, ['/repo-a', '/repo-b'])
+})
+
+test('recordRecentRepository keeps projects even when no files were opened', async () => {
+  const { recordRecentRepository } = await loadSessionStore()
+  const repositories = recordRecentRepository([], {
+    repoPath: '/repo-a',
+    name: 'repo-a',
+    openedAt: '2026-05-27T00:00:00.000Z'
+  })
+
+  assert.deepEqual(repositories, [
+    {
+      repoPath: '/repo-a',
+      name: 'repo-a',
+      openedAt: '2026-05-27T00:00:00.000Z'
+    }
+  ])
+})
+
+test('normalizeSessionState keeps recent repositories independently from recent files', async () => {
+  const { getRecentRepositories, normalizeSessionState } = await loadSessionStore()
+  const state = normalizeSessionState({
+    selectedPath: '',
+    openFileTabs: [],
+    expandedPaths: [''],
+    recentRepositories: [
+      {
+        repoPath: '/repo-without-files',
+        name: 'repo-without-files',
+        openedAt: '2026-05-27T00:00:00.000Z'
+      }
+    ],
+    recentFiles: []
+  })
+
+  assert.deepEqual(state.recentRepositories, [
+    {
+      repoPath: '/repo-without-files',
+      name: 'repo-without-files',
+      openedAt: '2026-05-27T00:00:00.000Z'
+    }
+  ])
+  assert.deepEqual(getRecentRepositories(state.recentRepositories, state.recentFiles), [
+    '/repo-without-files'
+  ])
+})
+
+test('findRepositoryWindowIndex returns the first window for an open repository', async () => {
+  const { findRepositoryWindowIndex } = await loadSessionStore()
+
+  assert.equal(
+    findRepositoryWindowIndex('/repo-b', [undefined, '/repo-a', '/repo-b', '/repo-b']),
+    2
+  )
+  assert.equal(findRepositoryWindowIndex('/repo-c', [undefined, '/repo-a', '/repo-b']), -1)
+})
+
+test('clearRecentFiles removes only recent files from session state', async () => {
+  const { clearRecentFiles } = await loadSessionStore()
+  const state = clearRecentFiles({
+    repositoryPath: '/repo',
+    rootPath: '/repo',
+    activeRef: 'main',
+    source: 'working-tree',
+    selectedPath: 'README.md',
+    activeFilePath: 'README.md',
+    openFileTabs: [{ path: 'README.md', name: 'README.md' }],
+    expandedPaths: ['', 'docs'],
+    recentFiles: [
+      {
+        repoPath: '/repo',
+        filePath: 'README.md',
+        name: 'README.md',
+        openedAt: '2026-05-27T00:00:00.000Z'
+      }
+    ]
+  })
+
+  assert.equal(state.repositoryPath, '/repo')
+  assert.equal(state.activeFilePath, 'README.md')
+  assert.deepEqual(state.recentFiles, [])
+})
+
 test('normalizeSessionState drops invalid paths and caps recent files', async () => {
   const { maxRecentFiles, normalizeSessionState } = await loadSessionStore()
   const state = normalizeSessionState({

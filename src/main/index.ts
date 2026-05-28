@@ -17,11 +17,17 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { detectPreviewType, textPreviewProbeBytes, type PreviewType } from './preview-detection'
 import {
+  clearRecentFiles,
   createEmptySessionState,
+  findRepositoryWindowIndex,
+  getRecentFileOpenPayload,
+  getRecentRepositories,
   mergeSessionState,
   normalizeSessionState,
+  recordRecentRepository,
   recordRecentFile,
   type RecentFileState,
+  type RecentRepositoryState,
   type SessionState
 } from './session-store'
 
@@ -70,6 +76,7 @@ type PreviewPayload =
 app.setName(appName)
 
 const windows = new Set<BrowserWindow>()
+const windowRepositoryPaths = new Map<BrowserWindow, string>()
 let sessionState = createEmptySessionState()
 
 function getInitialRepositoryPath(): string | undefined {
@@ -579,10 +586,7 @@ async function writeStoredSession(nextSessionState = sessionState): Promise<void
 }
 
 function sendOpenFile(targetWindow: BrowserWindow, file: RecentFileState): void {
-  targetWindow.webContents.send('repository:open-file', {
-    repoPath: file.repoPath,
-    filePath: file.filePath
-  })
+  targetWindow.webContents.send('repository:open-file', getRecentFileOpenPayload(file))
 }
 
 function closeFocusedFileTabOrWindow(): void {
@@ -592,7 +596,7 @@ function closeFocusedFileTabOrWindow(): void {
   targetWindow.webContents.send('tab:close-current-or-window')
 }
 
-function createWindow(repoPath?: string, filePath?: string): void {
+function createWindow(repoPath?: string, file?: RecentFileState): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
@@ -613,6 +617,7 @@ function createWindow(repoPath?: string, filePath?: string): void {
 
   mainWindow.on('closed', () => {
     windows.delete(mainWindow)
+    windowRepositoryPaths.delete(mainWindow)
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -633,13 +638,8 @@ function createWindow(repoPath?: string, filePath?: string): void {
   }
 
   mainWindow.webContents.once('did-finish-load', () => {
-    if (repoPath && filePath) {
-      sendOpenFile(mainWindow, {
-        repoPath,
-        filePath,
-        name: basename(filePath),
-        openedAt: new Date().toISOString()
-      })
+    if (file) {
+      sendOpenFile(mainWindow, file)
     } else if (repoPath) {
       mainWindow.webContents.send('repository:open-path', repoPath)
     }
@@ -654,10 +654,72 @@ function openRecentFile(file: RecentFileState): void {
     return
   }
 
-  createWindow(file.repoPath, file.filePath)
+  createWindow(file.repoPath, file)
+}
+
+function openRecentRepository(repoPath: string): void {
+  const openWindows = BrowserWindow.getAllWindows()
+  const windowIndex = findRepositoryWindowIndex(
+    repoPath,
+    openWindows.map((window) => windowRepositoryPaths.get(window))
+  )
+  const repositoryWindow = windowIndex >= 0 ? openWindows[windowIndex] : undefined
+
+  if (repositoryWindow) {
+    if (repositoryWindow.isMinimized()) repositoryWindow.restore()
+    repositoryWindow.show()
+    repositoryWindow.focus()
+    return
+  }
+
+  const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+
+  if (targetWindow) {
+    targetWindow.webContents.send('repository:open-path', repoPath)
+    return
+  }
+
+  createWindow(repoPath)
+}
+
+async function clearRecentMenuItems(): Promise<void> {
+  sessionState = clearRecentFiles(sessionState)
+  await writeStoredSession()
+  createAppMenu()
+}
+
+function getRecentRepositoryState(repository: RepositoryPayload): RecentRepositoryState {
+  return {
+    repoPath: repository.path,
+    rootPath: repository.rootPath,
+    name: basename(repository.path),
+    openedAt: new Date().toISOString(),
+    activeRef: repository.activeRef,
+    source: repository.source
+  }
+}
+
+function recordLoadedRepository(repository: RepositoryPayload): void {
+  sessionState = {
+    ...sessionState,
+    recentRepositories: recordRecentRepository(
+      sessionState.recentRepositories,
+      getRecentRepositoryState(repository)
+    )
+  }
 }
 
 function createAppMenu(): void {
+  const recentRepositoryItems: MenuItemConstructorOptions[] =
+    sessionState.recentRepositories.length > 0 || sessionState.recentFiles.length > 0
+      ? getRecentRepositories(sessionState.recentRepositories, sessionState.recentFiles).map(
+          (repoPath) => ({
+            label: `${basename(repoPath)} - ${repoPath}`,
+            click: () => openRecentRepository(repoPath)
+          })
+        )
+      : [{ label: 'No Recent Projects', enabled: false }]
+
   const recentFileItems: MenuItemConstructorOptions[] =
     sessionState.recentFiles.length > 0
       ? sessionState.recentFiles.map((file) => ({
@@ -665,6 +727,22 @@ function createAppMenu(): void {
           click: () => openRecentFile(file)
         }))
       : [{ label: 'No Recent Files', enabled: false }]
+
+  const recentItems: MenuItemConstructorOptions[] = [
+    { label: '最近打开的项目', enabled: false },
+    ...recentRepositoryItems,
+    { type: 'separator' },
+    { label: '最近打开的文件', enabled: false },
+    ...recentFileItems,
+    { type: 'separator' },
+    {
+      label: '清除最近打开...',
+      enabled: sessionState.recentRepositories.length > 0 || sessionState.recentFiles.length > 0,
+      click: () => {
+        void clearRecentMenuItems()
+      }
+    }
+  ]
 
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin'
@@ -694,7 +772,7 @@ function createAppMenu(): void {
         },
         {
           label: '最近打开的文件',
-          submenu: recentFileItems
+          submenu: recentItems
         },
         { type: 'separator' },
         {
@@ -790,6 +868,9 @@ app.whenReady().then(async () => {
 
     if (result.canceled || result.filePaths.length === 0) return undefined
     const repository = await loadRepository(result.filePaths[0])
+    const sourceWindow = browserWindow ?? BrowserWindow.getFocusedWindow()
+    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
+    recordLoadedRepository(repository)
     sessionState = mergeSessionState(sessionState, {
       repositoryPath: repository.path,
       rootPath: repository.rootPath,
@@ -806,6 +887,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('repository:load', async (_event, repoPath: string) => {
     const repository = await loadRepository(repoPath)
+    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
+    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
+    recordLoadedRepository(repository)
     sessionState = mergeSessionState(sessionState, {
       repositoryPath: repository.path,
       rootPath: repository.rootPath,
@@ -820,6 +904,9 @@ app.whenReady().then(async () => {
     'repository:load-ref',
     async (_event, repoPath: string, ref: string, rootPath?: string) => {
       const repository = await loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
+      const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
+      if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
+      recordLoadedRepository(repository)
       sessionState = mergeSessionState(sessionState, {
         repositoryPath: repository.path,
         rootPath: repository.rootPath,
@@ -837,6 +924,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('repository:open-worktree', async (_event, repoPath: string, ref: string) => {
     const repository = await openWorktree(repoPath, ref)
+    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
+    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
+    recordLoadedRepository(repository)
     sessionState = mergeSessionState(sessionState, {
       repositoryPath: repository.path,
       rootPath: repository.rootPath,
@@ -855,6 +945,23 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('session:save', async (_event, nextSessionState: Partial<SessionState>) => {
     sessionState = mergeSessionState(sessionState, nextSessionState)
+    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
+    if (sourceWindow && sessionState.repositoryPath) {
+      windowRepositoryPaths.set(sourceWindow, sessionState.repositoryPath)
+    }
+    if (sessionState.repositoryPath) {
+      sessionState = {
+        ...sessionState,
+        recentRepositories: recordRecentRepository(sessionState.recentRepositories, {
+          repoPath: sessionState.repositoryPath,
+          rootPath: sessionState.rootPath,
+          name: basename(sessionState.repositoryPath),
+          openedAt: new Date().toISOString(),
+          activeRef: sessionState.activeRef,
+          source: sessionState.source
+        })
+      }
+    }
     const activeFilePath = sessionState.activeFilePath
 
     if (sessionState.repositoryPath && activeFilePath) {
@@ -862,9 +969,12 @@ app.whenReady().then(async () => {
         ...sessionState,
         recentFiles: recordRecentFile(sessionState.recentFiles, {
           repoPath: sessionState.repositoryPath,
+          rootPath: sessionState.rootPath,
           filePath: activeFilePath,
           name: basename(activeFilePath),
-          openedAt: new Date().toISOString()
+          openedAt: new Date().toISOString(),
+          activeRef: sessionState.activeRef,
+          source: sessionState.source
         })
       }
     }

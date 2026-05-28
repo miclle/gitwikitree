@@ -1,4 +1,5 @@
 export const maxRecentFiles = 12
+export const maxRecentRepositories = 12
 export const maxOpenFileTabs = 30
 
 export type OpenFileTabState = {
@@ -8,9 +9,21 @@ export type OpenFileTabState = {
 
 export type RecentFileState = {
   repoPath: string
+  rootPath?: string
   filePath: string
   name: string
   openedAt: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
+}
+
+export type RecentRepositoryState = {
+  repoPath: string
+  rootPath?: string
+  name: string
+  openedAt: string
+  activeRef?: string
+  source?: 'working-tree' | 'git-ref' | 'worktree'
 }
 
 export type SessionState = {
@@ -22,6 +35,7 @@ export type SessionState = {
   activeFilePath?: string
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
+  recentRepositories: RecentRepositoryState[]
   recentFiles: RecentFileState[]
 }
 
@@ -29,6 +43,7 @@ const emptySessionState: SessionState = {
   selectedPath: '',
   openFileTabs: [],
   expandedPaths: [''],
+  recentRepositories: [],
   recentFiles: []
 }
 
@@ -96,6 +111,13 @@ function normalizeRecentFiles(value: unknown): RecentFileState[] {
     const filePath = normalizeOptionalRelativePath(record.filePath)
     const name = asString(record.name)
     const openedAt = asString(record.openedAt)
+    const rootPath = asString(record.rootPath)
+    const activeRef = asString(record.activeRef)
+    const source = record.source
+    const normalizedSource =
+      source === 'git-ref' || source === 'worktree' || source === 'working-tree'
+        ? source
+        : undefined
 
     if (!repoPath || !filePath || !name || !openedAt) continue
 
@@ -103,11 +125,82 @@ function normalizeRecentFiles(value: unknown): RecentFileState[] {
     if (seen.has(key)) continue
 
     seen.add(key)
-    files.push({ repoPath, filePath, name, openedAt })
+    files.push({
+      repoPath,
+      filePath,
+      name,
+      openedAt,
+      ...(rootPath ? { rootPath } : {}),
+      ...(activeRef ? { activeRef } : {}),
+      ...(normalizedSource ? { source: normalizedSource } : {})
+    })
     if (files.length >= maxRecentFiles) break
   }
 
   return files
+}
+
+function nameFromPath(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  return parts.at(-1) ?? path
+}
+
+function normalizeRecentRepositories(value: unknown): RecentRepositoryState[] {
+  if (!Array.isArray(value)) return []
+
+  const seen = new Set<string>()
+  const repositories: RecentRepositoryState[] = []
+
+  for (const item of value) {
+    const record = asRecord(item)
+    const repoPath = asString(record.repoPath)
+    const rootPath = asString(record.rootPath)
+    const name = asString(record.name)
+    const openedAt = asString(record.openedAt)
+    const activeRef = asString(record.activeRef)
+    const source = record.source
+    const normalizedSource =
+      source === 'git-ref' || source === 'worktree' || source === 'working-tree'
+        ? source
+        : undefined
+
+    if (!repoPath || !name || !openedAt || seen.has(repoPath)) continue
+
+    seen.add(repoPath)
+    repositories.push({
+      repoPath,
+      name,
+      openedAt,
+      ...(rootPath ? { rootPath } : {}),
+      ...(activeRef ? { activeRef } : {}),
+      ...(normalizedSource ? { source: normalizedSource } : {})
+    })
+    if (repositories.length >= maxRecentRepositories) break
+  }
+
+  return repositories
+}
+
+function getRecentRepositoriesFromFiles(recentFiles: RecentFileState[]): RecentRepositoryState[] {
+  const seen = new Set<string>()
+  const repositories: RecentRepositoryState[] = []
+
+  for (const file of recentFiles) {
+    if (seen.has(file.repoPath)) continue
+
+    seen.add(file.repoPath)
+    repositories.push({
+      repoPath: file.repoPath,
+      rootPath: file.rootPath,
+      name: nameFromPath(file.repoPath),
+      openedAt: file.openedAt,
+      activeRef: file.activeRef,
+      source: file.source
+    })
+    if (repositories.length >= maxRecentRepositories) break
+  }
+
+  return repositories
 }
 
 export function normalizeSessionState(value: unknown): SessionState {
@@ -115,6 +208,8 @@ export function normalizeSessionState(value: unknown): SessionState {
   const source = record.source
   const openFileTabs = normalizeOpenFileTabs(record.openFileTabs)
   const activeFilePath = normalizeOptionalRelativePath(record.activeFilePath)
+  const recentFiles = normalizeRecentFiles(record.recentFiles)
+  const recentRepositories = normalizeRecentRepositories(record.recentRepositories)
 
   return {
     repositoryPath: asString(record.repositoryPath),
@@ -128,7 +223,10 @@ export function normalizeSessionState(value: unknown): SessionState {
     activeFilePath,
     openFileTabs,
     expandedPaths: normalizeExpandedPaths(record.expandedPaths),
-    recentFiles: normalizeRecentFiles(record.recentFiles)
+    recentRepositories: recentRepositories.length
+      ? recentRepositories
+      : getRecentRepositoriesFromFiles(recentFiles),
+    recentFiles
   }
 }
 
@@ -142,6 +240,52 @@ export function recordRecentFile(
       (item) => item.repoPath !== nextFile.repoPath || item.filePath !== nextFile.filePath
     )
   ])
+}
+
+export function getRecentFileOpenPayload(file: RecentFileState): RecentFileState {
+  return normalizeRecentFiles([file])[0]
+}
+
+export function recordRecentRepository(
+  current: RecentRepositoryState[],
+  nextRepository: RecentRepositoryState
+): RecentRepositoryState[] {
+  return normalizeRecentRepositories([
+    nextRepository,
+    ...current.filter((item) => item.repoPath !== nextRepository.repoPath)
+  ])
+}
+
+export function getRecentRepositories(
+  recentRepositories: Array<RecentRepositoryState | RecentFileState>,
+  recentFiles: RecentFileState[] = []
+): string[] {
+  const seen = new Set<string>()
+  const repositories: string[] = []
+
+  for (const item of [...recentRepositories, ...recentFiles]) {
+    if (seen.has(item.repoPath)) continue
+
+    seen.add(item.repoPath)
+    repositories.push(item.repoPath)
+  }
+
+  return repositories
+}
+
+export function findRepositoryWindowIndex(
+  repoPath: string,
+  windowRepositoryPaths: Array<string | undefined>
+): number {
+  return windowRepositoryPaths.findIndex((windowRepoPath) => windowRepoPath === repoPath)
+}
+
+export function clearRecentFiles(sessionState: SessionState): SessionState {
+  return normalizeSessionState({
+    ...sessionState,
+    recentRepositories: [],
+    recentFiles: []
+  })
 }
 
 export function getOpenFileTabsForRecentFile({
@@ -168,10 +312,17 @@ export function mergeSessionState(
     ...emptySessionState,
     ...current,
     ...next,
+    recentRepositories: next.recentRepositories ?? current.recentRepositories,
     recentFiles: next.recentFiles ?? current.recentFiles
   })
 }
 
 export function createEmptySessionState(): SessionState {
-  return { ...emptySessionState, openFileTabs: [], expandedPaths: [''], recentFiles: [] }
+  return {
+    ...emptySessionState,
+    openFileTabs: [],
+    expandedPaths: [''],
+    recentRepositories: [],
+    recentFiles: []
+  }
 }
