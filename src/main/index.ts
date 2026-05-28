@@ -2,9 +2,11 @@ import {
   app,
   shell,
   BrowserWindow,
+  clipboard,
   ipcMain,
   dialog,
   Menu,
+  type ContextMenuParams,
   type OpenDialogOptions,
   type MenuItemConstructorOptions
 } from 'electron'
@@ -85,6 +87,91 @@ function closeFocusedFileTabOrWindow(): void {
   targetWindow.webContents.send('tab:close-current-or-window')
 }
 
+function canOpenExternalUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url)
+    return ['http:', 'https:', 'mailto:'].includes(parsedUrl.protocol)
+  } catch {
+    return false
+  }
+}
+
+function showContextMenu(targetWindow: BrowserWindow, params: ContextMenuParams): void {
+  const items: MenuItemConstructorOptions[] = []
+  const addSeparator = (): void => {
+    if (items.length > 0 && items.at(-1)?.type !== 'separator') {
+      items.push({ type: 'separator' })
+    }
+  }
+  const addEditItems = (editItems: MenuItemConstructorOptions[]): void => {
+    for (const item of editItems) items.push(item)
+  }
+
+  if (params.linkURL) {
+    addEditItems([
+      {
+        label: 'Open Link',
+        enabled: canOpenExternalUrl(params.linkURL),
+        click: () => void shell.openExternal(params.linkURL)
+      },
+      {
+        label: 'Copy Link Address',
+        click: () => clipboard.writeText(params.linkURL)
+      }
+    ])
+    addSeparator()
+  }
+
+  if (params.mediaType === 'image' && params.hasImageContents) {
+    items.push({
+      label: 'Copy Image',
+      click: () => targetWindow.webContents.copyImageAt(params.x, params.y)
+    })
+
+    if (params.srcURL) {
+      items.push({
+        label: 'Copy Image Address',
+        click: () => clipboard.writeText(params.srcURL)
+      })
+    }
+
+    addSeparator()
+  }
+
+  if (params.isEditable) {
+    addEditItems([
+      { role: 'undo', enabled: params.editFlags.canUndo },
+      { role: 'redo', enabled: params.editFlags.canRedo },
+      { type: 'separator' },
+      { role: 'cut', enabled: params.editFlags.canCut },
+      { role: 'copy', enabled: params.editFlags.canCopy },
+      { role: 'paste', enabled: params.editFlags.canPaste },
+      { role: 'pasteAndMatchStyle', enabled: params.editFlags.canPaste },
+      { role: 'delete', enabled: params.editFlags.canDelete },
+      { type: 'separator' },
+      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+    ])
+  } else {
+    addEditItems([
+      { role: 'copy', enabled: params.editFlags.canCopy || params.selectionText.length > 0 },
+      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+    ])
+  }
+
+  if (is.dev) {
+    addSeparator()
+    items.push({
+      label: 'Inspect Element',
+      click: () => targetWindow.webContents.inspectElement(params.x, params.y)
+    })
+  }
+
+  while (items.at(-1)?.type === 'separator') items.pop()
+
+  if (items.length === 0) return
+  Menu.buildFromTemplate(items).popup({ window: targetWindow })
+}
+
 function createWindow(repoPath?: string, file?: RecentFileState): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
@@ -116,6 +203,10 @@ function createWindow(repoPath?: string, file?: RecentFileState): void {
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    showContextMenu(mainWindow, params)
   })
 
   // HMR for renderer base on electron-vite cli.
