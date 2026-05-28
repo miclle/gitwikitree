@@ -44,6 +44,67 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     canNavigateForward
   } = workspace
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
+  const fileTabsNav = (
+    <nav
+      className="main-tabs"
+      aria-label="Open tabs"
+      ref={titlebarTabsRef}
+      onPointerLeave={handleTitlebarTabsPointerLeave}
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget)) return
+        hideTabPopover()
+      }}
+    >
+      {openFileTabs.map((tab) => {
+        const active = tab.id === activeFileTabId
+
+        return (
+          <div
+            className={active ? 'main-tab active' : 'main-tab'}
+            role="tab"
+            tabIndex={0}
+            aria-selected={active}
+            key={tab.id}
+            aria-label={`${tab.name} ${tab.path}`}
+            onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
+            onFocus={(event) => showTabPopover(tab, event.currentTarget)}
+            onClick={() => void selectFileTab(tab)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
+              void selectFileTab(tab)
+            }}
+          >
+            <span className="main-tab-corner" aria-hidden="true" />
+            {iconForNode({ type: tab.type ?? 'file', name: tab.name })}
+            <span className="main-tab-name">{tab.name}</span>
+            <button
+              className="main-tab-close"
+              type="button"
+              aria-label={`Close ${tab.name}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                hideTabPopover()
+                closeFileTab(tab.id)
+              }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )
+      })}
+      {tabPopover && (
+        <span
+          className={tabPopover.visible ? 'main-tab-popover visible' : 'main-tab-popover'}
+          style={tabPopoverStyle}
+          aria-hidden="true"
+        >
+          <span className="main-tab-popover-name">{tabPopover.tab.name}</span>
+          <span className="main-tab-popover-path">{tabPopover.tab.path}</span>
+        </span>
+      )}
+    </nav>
+  )
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
@@ -80,20 +141,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <div className="titlebar-repository" title={repositoryLabel}>
                     {repositoryLabel}
                   </div>
-                  <button
-                    className="titlebar-icon-button"
-                    type="button"
-                    aria-label="Hide files"
-                    aria-expanded={isSidebarOpen}
-                    onClick={() => setIsSidebarOpen(false)}
-                  >
-                    <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
-                  </button>
-                  <HistoryButtons
-                    canNavigateBack={canNavigateBack}
-                    canNavigateForward={canNavigateForward}
-                    onNavigate={navigateActiveTabHistory}
-                  />
                 </div>
 
                 <div className="sidebar-controls">
@@ -150,20 +197,21 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
           )}
 
           <section className="preview-panel">
-            {!isSidebarOpen && (
-              <div className="main-titlebar">
-                <TitlebarWindowControls />
-                <div className="titlebar-repository" title={repositoryLabel}>
-                  {repositoryLabel}
-                </div>
+            <div className="main-titlebar">
+              {!isSidebarOpen && <TitlebarWindowControls />}
+              <div className="main-titlebar-actions">
                 <button
                   className="titlebar-icon-button"
                   type="button"
-                  aria-label="Show files"
+                  aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
                   aria-expanded={isSidebarOpen}
-                  onClick={() => setIsSidebarOpen(true)}
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 >
-                  <IconLayoutSidebarLeftExpand size={20} stroke={2} />
+                  {isSidebarOpen ? (
+                    <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
+                  ) : (
+                    <IconLayoutSidebarLeftExpand size={20} stroke={2} />
+                  )}
                 </button>
                 <HistoryButtons
                   canNavigateBack={canNavigateBack}
@@ -171,66 +219,8 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   onNavigate={navigateActiveTabHistory}
                 />
               </div>
-            )}
-            <nav
-              className="main-tabs"
-              aria-label="Open tabs"
-              ref={titlebarTabsRef}
-              onPointerLeave={handleTitlebarTabsPointerLeave}
-              onBlur={(event) => {
-                if (event.currentTarget.contains(event.relatedTarget)) return
-                hideTabPopover()
-              }}
-            >
-              {openFileTabs.map((tab) => {
-                const active = tab.id === activeFileTabId
-
-                return (
-                  <div
-                    className={active ? 'main-tab active' : 'main-tab'}
-                    role="tab"
-                    tabIndex={0}
-                    aria-selected={active}
-                    key={tab.id}
-                    aria-label={`${tab.name} ${tab.path}`}
-                    onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
-                    onFocus={(event) => showTabPopover(tab, event.currentTarget)}
-                    onClick={() => void selectFileTab(tab)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      void selectFileTab(tab)
-                    }}
-                  >
-                    <span className="main-tab-corner" aria-hidden="true" />
-                    {iconForNode({ type: tab.type ?? 'file', name: tab.name })}
-                    <span className="main-tab-name">{tab.name}</span>
-                    <button
-                      className="main-tab-close"
-                      type="button"
-                      aria-label={`Close ${tab.name}`}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        hideTabPopover()
-                        closeFileTab(tab.id)
-                      }}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                )
-              })}
-              {tabPopover && (
-                <span
-                  className={tabPopover.visible ? 'main-tab-popover visible' : 'main-tab-popover'}
-                  style={tabPopoverStyle}
-                  aria-hidden="true"
-                >
-                  <span className="main-tab-popover-name">{tabPopover.tab.name}</span>
-                  <span className="main-tab-popover-path">{tabPopover.tab.path}</span>
-                </span>
-              )}
-            </nav>
+              {fileTabsNav}
+            </div>
             <div className="repo-pathbar">
               <div className="breadcrumb">
                 <button type="button" onClick={openRepositoryPreview}>

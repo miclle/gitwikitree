@@ -78,6 +78,7 @@ button:disabled {
 .titlebar-left,
 .titlebar-window-controls,
 .titlebar-repository,
+.main-titlebar-actions,
 .sidebar-titlebar,
 .main-titlebar,
 .main-tabs,
@@ -564,6 +565,19 @@ kbd {
 
 .main-titlebar {
   flex: 0 0 var(--top-bar-height);
+}
+
+.main-titlebar .main-tabs {
+  align-self: stretch;
+  flex: 1 1 auto;
+  padding: 0 12px 0 4px;
+  background: transparent;
+}
+
+.main-titlebar-actions {
+  flex: 0 0 auto;
+  gap: 0;
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-controls {
