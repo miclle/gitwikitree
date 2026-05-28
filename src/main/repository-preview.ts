@@ -3,7 +3,7 @@ import { basename, extname, resolve } from 'path'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
 import { assertRepositoryPath, getRefFileSize, readRefFile } from './git-service'
 import { loadRepository } from './repository-loader'
-import { findReadme, getNodeAtPath } from './repository-tree'
+import { findDirectoryIndex, getNodeAtPath } from './repository-tree'
 import { safeJoin, toPosixPath } from './repository-paths'
 import type { PreviewPayload, RepositoryLoadOptions } from '../shared/types'
 
@@ -52,7 +52,7 @@ export async function getPreview(
 
   if ((isRefSource && (!relativePath || node?.type === 'directory')) || stats?.isDirectory()) {
     const children = relativePath ? (node?.children ?? []) : repository.tree
-    const readme = findReadme(children)
+    const readme = (relativePath ? node?.index : repository.index) ?? findDirectoryIndex(children)
 
     if (readme) {
       const content = isRefSource

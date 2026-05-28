@@ -165,16 +165,6 @@ button:disabled {
   opacity: 1;
 }
 
-.sidebar-toggle-button {
-  color: #7a8694;
-}
-
-.sidebar-toggle-button:hover,
-.sidebar-toggle-button[aria-pressed='true'] {
-  color: #667281;
-  background: transparent;
-}
-
 .main-tabs {
   position: relative;
   flex: 0 0 var(--top-bar-height);

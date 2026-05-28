@@ -9,14 +9,10 @@ import {
 import { usePanelResize } from './usePanelResize'
 import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
-import {
-  fileNameFromPath,
-  findTreeNode,
-  getRepositoryLabel,
-  hydrateOpenFileTab,
-  parentPaths
-} from '../app-utils'
+import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
+import { resolveRepositoryNavigationTarget } from '../repository-navigation'
 import type {
+  NavigationTarget,
   PreviewPayload,
   RecentFileState,
   RepositoryPayload,
@@ -25,6 +21,15 @@ import type {
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
+
+function resolveHistoryTargets(
+  repository: RepositoryPayload,
+  history: NavigationTarget[] | undefined
+): NavigationTarget[] | undefined {
+  return history?.map((target) => {
+    return resolveRepositoryNavigationTarget(repository, target.path)?.target ?? target
+  })
+}
 
 export type RepositoryWorkspace = ReturnType<typeof useRepositoryWorkspace>
 
@@ -185,24 +190,29 @@ export function useRepositoryWorkspace(): {
               )
             : await window.api.loadRepository(session.repositoryPath)
         const restoredTabs = session.openFileTabs
-          .filter((tab) => {
-            const node = findTreeNode(nextRepository.tree, tab.path)
-            return node?.type === 'file'
+          .map((tab) => {
+            const resolved = resolveRepositoryNavigationTarget(nextRepository, tab.path)
+            if (!resolved) return undefined
+
+            return {
+              ...tab,
+              ...resolved.target,
+              history: resolveHistoryTargets(nextRepository, tab.history)
+            }
           })
+          .filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))
           .map((tab, index) => hydrateOpenFileTab(tab, index))
-        const restoredActiveFile =
-          session.activeFilePath && restoredTabs.some((tab) => tab.path === session.activeFilePath)
-            ? session.activeFilePath
-            : restoredTabs[0]?.path
+        const restoredActiveTab =
+          restoredTabs.find((tab) => tab.id === session.activeFileTabId) ?? restoredTabs[0]
         const restoredActiveTabId =
-          restoredTabs.find((tab) => tab.id === session.activeFileTabId)?.id ??
-          restoredTabs.find((tab) => tab.path === restoredActiveFile)?.id ??
+          restoredActiveTab?.id ??
+          restoredTabs.find((tab) => tab.path === session.activeFilePath)?.id ??
           restoredTabs[0]?.id
-        const selectedPath = restoredActiveFile ?? session.selectedPath ?? ''
-        const selectedNode = selectedPath
-          ? findTreeNode(nextRepository.tree, selectedPath)
-          : undefined
-        const nextSelectedPath = selectedNode ? selectedPath : ''
+        const restoredActiveFile =
+          restoredActiveTab?.type === 'directory' ? undefined : restoredActiveTab?.path
+        const selectedPath = restoredActiveTab?.path ?? session.selectedPath ?? ''
+        const selectedTarget = resolveRepositoryNavigationTarget(nextRepository, selectedPath)
+        const nextSelectedPath = selectedTarget?.target.path ?? ''
 
         setRepository(nextRepository)
         setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
@@ -235,22 +245,23 @@ export function useRepositoryWorkspace(): {
               )
             : await window.api.loadRepository(file.repoPath)
         const filePath = file.filePath
-        const node = findTreeNode(nextRepository.tree, filePath)
+        const resolved = resolveRepositoryNavigationTarget(nextRepository, filePath)
 
         setRepository(nextRepository)
         setExpandedPaths(new Set(['', ...parentPaths(filePath)]))
 
-        if (node?.type === 'file') {
-          setSelectedPath(filePath)
-          setActiveFilePath(filePath)
-          const tab = createFileTab({ path: filePath, name: node.name }, createNextTabId())
+        if (resolved) {
+          const { target } = resolved
+          setSelectedPath(target.path)
+          setActiveFilePath(target.type === 'directory' ? undefined : target.path)
+          const tab = createFileTab(target, createNextTabId())
           setActiveFileTabId(tab.id)
           setOpenFileTabs((current) =>
             repository?.path === nextRepository.path
-              ? [...current.filter((item) => item.path !== filePath), tab]
+              ? [...current.filter((item) => item.path !== target.path), tab]
               : [tab]
           )
-          await loadPreview(filePath, nextRepository)
+          await loadPreview(target.path, nextRepository)
         } else {
           setSelectedPath('')
           setActiveFilePath(undefined)
@@ -310,7 +321,15 @@ export function useRepositoryWorkspace(): {
 
       if (node.type === 'directory') {
         setActiveFilePath(undefined)
-        setActiveFileTabId(undefined)
+        const result = navigateFileTabs({
+          tabs: openFileTabs,
+          activeTabId: activeFileTabId,
+          target: { path: node.path, name: node.name, type: 'directory' },
+          openInNewTab: Boolean(options.openInNewTab),
+          nextTabId: createNextTabId()
+        })
+        setOpenFileTabs(result.tabs)
+        setActiveFileTabId(result.activeTabId)
         if (node.children?.length) {
           setExpandedPaths((current) => {
             if (current.has(node.path)) return current
@@ -325,7 +344,7 @@ export function useRepositoryWorkspace(): {
         const result = navigateFileTabs({
           tabs: openFileTabs,
           activeTabId: activeFileTabId,
-          target: { path: node.path, name: node.name },
+          target: { path: node.path, name: node.name, type: 'file' },
           openInNewTab: Boolean(options.openInNewTab),
           nextTabId: createNextTabId()
         })
@@ -349,7 +368,7 @@ export function useRepositoryWorkspace(): {
   const selectFileTab = useCallback(
     async (tab: OpenFileTab): Promise<void> => {
       setActiveFileTabId(tab.id)
-      setActiveFilePath(tab.path)
+      setActiveFilePath(tab.type === 'directory' ? undefined : tab.path)
       setSelectedPath(tab.path)
       await loadPreview(tab.path)
     },
@@ -368,7 +387,7 @@ export function useRepositoryWorkspace(): {
       const nextTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)]
       if (nextTab) {
         setActiveFileTabId(nextTab.id)
-        setActiveFilePath(nextTab.path)
+        setActiveFilePath(nextTab.type === 'directory' ? undefined : nextTab.path)
         setSelectedPath(nextTab.path)
         void loadPreview(nextTab.path)
       } else {
@@ -401,7 +420,7 @@ export function useRepositoryWorkspace(): {
       if (!result.target) return
 
       setOpenFileTabs(result.tabs)
-      setActiveFilePath(result.target.path)
+      setActiveFilePath(result.target.type === 'directory' ? undefined : result.target.path)
       setSelectedPath(result.target.path)
       await loadPreview(result.target.path)
     },
@@ -442,34 +461,81 @@ export function useRepositoryWorkspace(): {
   )
 
   const openRepositoryPreview = useCallback((): void => {
-    setSelectedPath('')
+    if (!repository) return
+
+    const resolved = resolveRepositoryNavigationTarget(repository, '')
+    if (!resolved) return
+
+    setSelectedPath(resolved.target.path)
     setActiveFilePath(undefined)
-    setActiveFileTabId(undefined)
-    void loadPreview('')
-  }, [loadPreview])
+    const result = navigateFileTabs({
+      tabs: openFileTabs,
+      activeTabId: activeFileTabId,
+      target: resolved.target,
+      openInNewTab: false,
+      nextTabId: createNextTabId()
+    })
+    setOpenFileTabs(result.tabs)
+    setActiveFileTabId(result.activeTabId)
+    void loadPreview(resolved.target.path)
+  }, [activeFileTabId, createNextTabId, loadPreview, openFileTabs, repository])
 
   const openBreadcrumbPath = useCallback(
     (path: string): void => {
-      setSelectedPath(path)
+      if (!repository) return
+
+      const resolved = resolveRepositoryNavigationTarget(repository, path)
+      if (resolved?.node) {
+        void handleSelect(resolved.node)
+        return
+      }
+
+      if (!resolved) return
+
+      setSelectedPath(resolved.target.path)
       setActiveFilePath(undefined)
-      setActiveFileTabId(undefined)
-      void loadPreview(path)
+      const result = navigateFileTabs({
+        tabs: openFileTabs,
+        activeTabId: activeFileTabId,
+        target: resolved.target,
+        openInNewTab: false,
+        nextTabId: createNextTabId()
+      })
+      setOpenFileTabs(result.tabs)
+      setActiveFileTabId(result.activeTabId)
+      void loadPreview(resolved.target.path)
     },
-    [loadPreview]
+    [activeFileTabId, createNextTabId, handleSelect, loadPreview, openFileTabs, repository]
   )
 
   const selectPreviewPath = useCallback(
     (path: string, openInNewTab = false): boolean => {
-      const node = repository ? findTreeNode(repository.tree, path) : undefined
-      if (node) {
-        void handleSelect(node, { openInNewTab })
+      const resolved = repository ? resolveRepositoryNavigationTarget(repository, path) : undefined
+      if (resolved?.node) {
+        void handleSelect(resolved.node, { openInNewTab })
+        return true
+      }
+
+      if (resolved) {
+        setSelectedPath(resolved.target.path)
+        setActiveFilePath(undefined)
+        const result = navigateFileTabs({
+          tabs: openFileTabs,
+          activeTabId: activeFileTabId,
+          target: resolved.target,
+          openInNewTab,
+          nextTabId: createNextTabId()
+        })
+        setOpenFileTabs(result.tabs)
+        setActiveFileTabId(result.activeTabId)
+        void loadPreview(resolved.target.path)
         return true
       }
 
       setError(`${fileNameFromPath(path)} is no longer available in this repository.`)
       return false
     },
-    [handleSelect, repository]
+    [activeFileTabId, createNextTabId, handleSelect, loadPreview, openFileTabs, repository]
   )
 
   return {

@@ -7,7 +7,7 @@ import {
   getRefs,
   getRepositoryRoot
 } from './git-service'
-import { buildTree } from './repository-tree'
+import { buildRepositoryTree } from './repository-tree'
 import type { RepositoryLoadOptions, RepositoryPayload } from '../shared/types'
 
 export async function loadRepository(
@@ -30,6 +30,8 @@ export async function loadRepository(
       ? await getRefFiles(resolvedPath, activeRef)
       : await getGitVisibleFiles(resolvedPath)
 
+  const repositoryTree = buildRepositoryTree(files)
+
   return {
     name: basename(resolvedPath),
     path: resolvedPath,
@@ -39,6 +41,7 @@ export async function loadRepository(
     source,
     editable: source !== 'git-ref',
     refs: refs.map((ref) => ({ ...ref, current: ref.name === activeRef })),
-    tree: buildTree(files)
+    tree: repositoryTree.tree,
+    index: repositoryTree.index
   }
 }

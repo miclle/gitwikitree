@@ -79,10 +79,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     {repositoryLabel}
                   </div>
                   <button
-                    className="titlebar-icon-button sidebar-toggle-button"
+                    className="titlebar-icon-button"
                     type="button"
                     aria-label="Hide files"
-                    aria-pressed={isSidebarOpen}
+                    aria-expanded={isSidebarOpen}
                     onClick={() => setIsSidebarOpen(false)}
                   >
                     <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
@@ -155,10 +155,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   {repositoryLabel}
                 </div>
                 <button
-                  className="titlebar-icon-button sidebar-toggle-button"
+                  className="titlebar-icon-button"
                   type="button"
                   aria-label="Show files"
-                  aria-pressed={isSidebarOpen}
+                  aria-expanded={isSidebarOpen}
                   onClick={() => setIsSidebarOpen(true)}
                 >
                   <IconLayoutSidebarLeftExpand size={20} stroke={2} />
@@ -189,7 +189,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     role="tab"
                     tabIndex={0}
                     aria-selected={active}
-                    key={tab.path}
+                    key={tab.id}
                     aria-label={`${tab.name} ${tab.path}`}
                     onPointerEnter={(event) => showTabPopover(tab, event.currentTarget)}
                     onFocus={(event) => showTabPopover(tab, event.currentTarget)}
@@ -201,7 +201,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     }}
                   >
                     <span className="main-tab-corner" aria-hidden="true" />
-                    {iconForNode({ type: 'file', name: tab.name })}
+                    {iconForNode({ type: tab.type ?? 'file', name: tab.name })}
                     <span className="main-tab-name">{tab.name}</span>
                     <button
                       className="main-tab-close"

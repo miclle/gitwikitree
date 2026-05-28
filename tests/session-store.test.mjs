@@ -274,6 +274,72 @@ test('normalizeSessionState preserves per-tab history and duplicate file tabs', 
   ])
 })
 
+test('normalizeSessionState preserves directory tabs and history targets', async () => {
+  const { normalizeSessionState } = await loadSessionStore()
+  const state = normalizeSessionState({
+    repositoryPath: '/repo',
+    selectedPath: 'docs',
+    activeFileTabId: 'tab-docs',
+    openFileTabs: [
+      {
+        id: 'tab-docs',
+        path: 'docs',
+        name: 'docs',
+        type: 'directory',
+        history: [
+          { path: 'README.md', name: 'README.md', type: 'file' },
+          { path: 'docs', name: 'docs', type: 'directory' }
+        ],
+        historyIndex: 1
+      }
+    ]
+  })
+
+  assert.deepEqual(state.openFileTabs, [
+    {
+      id: 'tab-docs',
+      path: 'docs',
+      name: 'docs',
+      type: 'directory',
+      history: [
+        { path: 'README.md', name: 'README.md', type: 'file' },
+        { path: 'docs', name: 'docs', type: 'directory' }
+      ],
+      historyIndex: 1
+    }
+  ])
+})
+
+test('normalizeSessionState preserves root directory tabs', async () => {
+  const { normalizeSessionState } = await loadSessionStore()
+  const state = normalizeSessionState({
+    repositoryPath: '/repo',
+    selectedPath: '',
+    activeFileTabId: 'tab-root',
+    openFileTabs: [
+      {
+        id: 'tab-root',
+        path: '',
+        name: 'repo',
+        type: 'directory',
+        history: [{ path: '', name: 'repo', type: 'directory' }],
+        historyIndex: 0
+      }
+    ]
+  })
+
+  assert.deepEqual(state.openFileTabs, [
+    {
+      id: 'tab-root',
+      path: '',
+      name: 'repo',
+      type: 'directory',
+      history: [{ path: '', name: 'repo', type: 'directory' }],
+      historyIndex: 0
+    }
+  ])
+})
+
 test('getOpenFileTabsForRecentFile resets tabs when switching repositories', async () => {
   const { getOpenFileTabsForRecentFile } = await loadSessionStore()
   const tabs = getOpenFileTabsForRecentFile({

@@ -35,9 +35,12 @@ async function createRepository() {
 
   await execFileAsync('git', ['init', '-b', 'main'], { cwd: repoPath })
   await mkdir(join(repoPath, 'docs'), { recursive: true })
+  await mkdir(join(repoPath, 'section'), { recursive: true })
   await mkdir(join(repoPath, '.worktrees', 'scratch'), { recursive: true })
   await writeFile(join(repoPath, 'README.md'), '# Root\n\nHello')
+  await writeFile(join(repoPath, 'docs', 'index.md'), '# Docs\n\nWelcome')
   await writeFile(join(repoPath, 'docs', 'guide.md'), '# Guide\n\nContent')
+  await writeFile(join(repoPath, 'section', '_index.md'), '# Section\n\nOverview')
   await writeFile(join(repoPath, '.worktrees', 'scratch', 'hidden.md'), 'hidden')
   await execFileAsync('git', ['add', 'README.md'], { cwd: repoPath })
   await execFileAsync('git', ['commit', '-m', 'initial'], {
@@ -67,12 +70,13 @@ test('loadRepository builds a working tree from tracked and untracked files', as
     assert.equal(repository.editable, true)
     assert.deepEqual(
       repository.tree.map((node) => node.path),
-      ['docs', 'README.md']
+      ['docs', 'section']
     )
     assert.deepEqual(
       repository.tree[0].children.map((node) => node.path),
       ['docs/guide.md']
     )
+    assert.deepEqual(repository.tree[1].children, [])
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
@@ -89,6 +93,20 @@ test('getPreview returns directory readme content and rejects escaping paths', a
     assert.deepEqual(rootPreview.readme, {
       path: 'README.md',
       content: '# Root\n\nHello'
+    })
+
+    const docsPreview = await service.getPreview(repoPath, 'docs')
+    assert.equal(docsPreview.kind, 'directory')
+    assert.deepEqual(docsPreview.readme, {
+      path: 'docs/index.md',
+      content: '# Docs\n\nWelcome'
+    })
+
+    const sectionPreview = await service.getPreview(repoPath, 'section')
+    assert.equal(sectionPreview.kind, 'directory')
+    assert.deepEqual(sectionPreview.readme, {
+      path: 'section/_index.md',
+      content: '# Section\n\nOverview'
     })
 
     await assert.rejects(

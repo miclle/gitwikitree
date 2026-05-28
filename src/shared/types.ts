@@ -7,6 +7,7 @@ export type TreeNode = {
   path: string
   type: 'file' | 'directory'
   children?: TreeNode[]
+  index?: { name: string; path: string }
 }
 
 export type RepositoryRef = {
@@ -25,6 +26,7 @@ export type RepositoryPayload = {
   editable: boolean
   refs: RepositoryRef[]
   tree: TreeNode[]
+  index?: { name: string; path: string }
 }
 
 export type DirectoryPreview = {
@@ -51,6 +53,7 @@ export type PreviewPayload = DirectoryPreview | FilePreview
 export type NavigationTarget = {
   path: string
   name: string
+  type?: 'file' | 'directory'
 }
 
 export type OpenFileTabState = NavigationTarget & {

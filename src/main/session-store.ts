@@ -3,6 +3,7 @@ export const maxRecentRepositories = 12
 export const maxOpenFileTabs = 30
 
 import type {
+  NavigationTarget,
   OpenFileTabState,
   RecentFileState,
   RecentRepositoryState,
@@ -39,6 +40,10 @@ function normalizeOptionalRelativePath(value: unknown): string | undefined {
   return path || undefined
 }
 
+function normalizeNavigationTargetType(value: unknown): NavigationTarget['type'] {
+  return value === 'directory' || value === 'file' ? value : undefined
+}
+
 function normalizeOpenFileTabs(value: unknown): OpenFileTabState[] {
   if (!Array.isArray(value)) return []
 
@@ -47,23 +52,27 @@ function normalizeOpenFileTabs(value: unknown): OpenFileTabState[] {
 
   for (const item of value) {
     const record = asRecord(item)
-    const path = normalizeOptionalRelativePath(record.path)
+    const path = normalizeRelativePath(record.path)
     const name = asString(record.name)
     const id = asString(record.id)
+    const type = normalizeNavigationTargetType(record.type)
 
-    if (!path || !name || (id && seenIds.has(id))) continue
+    if ((!path && type !== 'directory') || !name || (id && seenIds.has(id))) continue
 
-    const fallbackTarget = { path, name }
+    const fallbackTarget = { path, name, ...(type ? { type } : {}) }
     const rawHistory = Array.isArray(record.history) ? record.history : []
     const history = rawHistory
       .map((historyItem) => {
         const historyRecord = asRecord(historyItem)
         const historyPath = normalizeOptionalRelativePath(historyRecord.path)
         const historyName = asString(historyRecord.name)
+        const historyType = normalizeNavigationTargetType(historyRecord.type)
 
-        return historyPath && historyName ? { path: historyPath, name: historyName } : undefined
+        return historyPath && historyName
+          ? { path: historyPath, name: historyName, ...(historyType ? { type: historyType } : {}) }
+          : undefined
       })
-      .filter((historyItem): historyItem is { path: string; name: string } => Boolean(historyItem))
+      .filter((historyItem): historyItem is NavigationTarget => Boolean(historyItem))
     const normalizedHistory = history.length ? history : [fallbackTarget]
     const rawHistoryIndex = record.historyIndex
     const historyIndex =
@@ -75,6 +84,7 @@ function normalizeOpenFileTabs(value: unknown): OpenFileTabState[] {
     tabs.push({
       path,
       name,
+      ...(type ? { type } : {}),
       ...(id ? { id } : {}),
       history: normalizedHistory,
       historyIndex: historyIndex >= 0 ? historyIndex : normalizedHistory.length - 1

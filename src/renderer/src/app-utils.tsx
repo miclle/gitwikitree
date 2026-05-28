@@ -9,19 +9,6 @@ export function getRepositoryLabel(repository: RepositoryPayload): string {
   return owner ? `${owner}/${repository.name}` : repository.name
 }
 
-export function findTreeNode(nodes: TreeNode[], path: string): TreeNode | undefined {
-  for (const node of nodes) {
-    if (node.path === path) return node
-
-    if (node.children) {
-      const match = findTreeNode(node.children, path)
-      if (match) return match
-    }
-  }
-
-  return undefined
-}
-
 export function fileNameFromPath(path: string): string {
   return path.split('/').filter(Boolean).at(-1) ?? path
 }
@@ -34,13 +21,14 @@ export function hydrateOpenFileTab(
   tab: {
     path: string
     name: string
+    type?: NavigationTarget['type']
     id?: string
     history?: NavigationTarget[]
     historyIndex?: number
   },
   index: number
 ): OpenFileTab {
-  const target = { path: tab.path, name: tab.name }
+  const target = { path: tab.path, name: tab.name, ...(tab.type ? { type: tab.type } : {}) }
   const history = tab.history?.length ? tab.history : [target]
   const historyIndex =
     typeof tab.historyIndex === 'number'
