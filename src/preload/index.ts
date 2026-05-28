@@ -45,6 +45,12 @@ const api = {
     ipcRenderer.on('repository:open-file', listener)
 
     return () => ipcRenderer.removeListener('repository:open-file', listener)
+  },
+  onCloseCurrentTabOrWindow: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('tab:close-current-or-window', listener)
+
+    return () => ipcRenderer.removeListener('tab:close-current-or-window', listener)
   }
 }
 

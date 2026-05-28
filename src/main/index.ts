@@ -585,6 +585,13 @@ function sendOpenFile(targetWindow: BrowserWindow, file: RecentFileState): void 
   })
 }
 
+function closeFocusedFileTabOrWindow(): void {
+  const targetWindow = BrowserWindow.getFocusedWindow()
+  if (!targetWindow) return
+
+  targetWindow.webContents.send('tab:close-current-or-window')
+}
+
 function createWindow(repoPath?: string, filePath?: string): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
@@ -690,7 +697,16 @@ function createAppMenu(): void {
           submenu: recentFileItems
         },
         { type: 'separator' },
-        { role: process.platform === 'darwin' ? 'close' : 'quit' }
+        {
+          label: 'Close Tab',
+          accelerator: 'CommandOrControl+W',
+          click: closeFocusedFileTabOrWindow
+        },
+        {
+          label: 'Close Window',
+          accelerator: 'Shift+CommandOrControl+W',
+          click: () => BrowserWindow.getFocusedWindow()?.close()
+        }
       ]
     },
     {

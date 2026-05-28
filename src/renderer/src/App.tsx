@@ -444,6 +444,24 @@ function App(): React.JSX.Element {
     [activeFilePath, loadPreview, openFileTabs]
   )
 
+  const closeCurrentTabOrWindow = useCallback((): void => {
+    const activeTab = activeFilePath
+      ? openFileTabs.find((tab) => tab.path === activeFilePath)
+      : undefined
+    const tabToClose = activeTab ?? openFileTabs.at(-1)
+
+    if (!tabToClose) {
+      void window.api.controlWindow('close')
+      return
+    }
+
+    closeFileTab(tabToClose.path)
+  }, [activeFilePath, closeFileTab, openFileTabs])
+
+  useEffect(() => {
+    return window.api.onCloseCurrentTabOrWindow(closeCurrentTabOrWindow)
+  }, [closeCurrentTabOrWindow])
+
   const clearTabPopoverTimer = useCallback((): void => {
     if (tabPopoverTimer.current === undefined) return
     window.clearTimeout(tabPopoverTimer.current)

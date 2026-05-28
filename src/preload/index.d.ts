@@ -88,6 +88,7 @@ export type GitWikitreeAPI = {
   onOpenFilePath: (
     callback: (payload: { repoPath: string; filePath: string }) => void
   ) => () => void
+  onCloseCurrentTabOrWindow: (callback: () => void) => () => void
 }
 
 declare global {
