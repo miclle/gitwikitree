@@ -36,6 +36,7 @@ import type {
 } from '../shared/types'
 
 const appName = 'Git Wikitree'
+type MenuClickEvent = Parameters<NonNullable<MenuItemConstructorOptions['click']>>[2]
 
 app.setName(appName)
 
@@ -246,6 +247,29 @@ function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: Tree
   })
 }
 
+async function openRepositoryInNewWindow(): Promise<void> {
+  const browserWindow = BrowserWindow.getFocusedWindow()
+  const options: OpenDialogOptions = {
+    title: 'Open Git Repository',
+    properties: ['openDirectory']
+  }
+  const result = browserWindow
+    ? await dialog.showOpenDialog(browserWindow, options)
+    : await dialog.showOpenDialog(options)
+
+  if (result.canceled || result.filePaths.length === 0) return
+
+  try {
+    const repository = await loadRepository(result.filePaths[0])
+    createWindow(repository.path)
+  } catch (reason) {
+    dialog.showErrorBox(
+      'Open Repository Failed',
+      reason instanceof Error ? reason.message : String(reason)
+    )
+  }
+}
+
 function openRecentFile(file: RecentFileState): void {
   const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 
@@ -255,6 +279,10 @@ function openRecentFile(file: RecentFileState): void {
   }
 
   createWindow(file.repoPath, file)
+}
+
+function shouldOpenInNewWindow(event: MenuClickEvent): boolean {
+  return Boolean(event.metaKey || event.altKey)
 }
 
 function openRecentRepository(repoPath: string): void {
@@ -280,6 +308,24 @@ function openRecentRepository(repoPath: string): void {
   }
 
   createWindow(repoPath)
+}
+
+function openRecentRepositoryMenuItem(repoPath: string, event: MenuClickEvent): void {
+  if (shouldOpenInNewWindow(event)) {
+    createWindow(repoPath)
+    return
+  }
+
+  openRecentRepository(repoPath)
+}
+
+function openRecentFileMenuItem(file: RecentFileState, event: MenuClickEvent): void {
+  if (shouldOpenInNewWindow(event)) {
+    createWindow(file.repoPath, file)
+    return
+  }
+
+  openRecentFile(file)
 }
 
 async function clearRecentMenuItems(): Promise<void> {
@@ -315,7 +361,7 @@ function createAppMenu(): void {
       ? getRecentRepositories(sessionState.recentRepositories, sessionState.recentFiles).map(
           (repoPath) => ({
             label: `${basename(repoPath)} - ${repoPath}`,
-            click: () => openRecentRepository(repoPath)
+            click: (_menuItem, _window, event) => openRecentRepositoryMenuItem(repoPath, event)
           })
         )
       : [{ label: 'No Recent Projects', enabled: false }]
@@ -324,7 +370,7 @@ function createAppMenu(): void {
     sessionState.recentFiles.length > 0
       ? sessionState.recentFiles.map((file) => ({
           label: `${file.name} - ${file.repoPath}`,
-          click: () => openRecentFile(file)
+          click: (_menuItem, _window, event) => openRecentFileMenuItem(file, event)
         }))
       : [{ label: 'No Recent Files', enabled: false }]
 
@@ -332,7 +378,7 @@ function createAppMenu(): void {
     { label: '最近打开的项目', enabled: false },
     ...recentRepositoryItems,
     { type: 'separator' },
-    { label: '最近打开的文件', enabled: false },
+    { label: 'Recent Files', enabled: false },
     ...recentFileItems,
     { type: 'separator' },
     {
@@ -361,17 +407,14 @@ function createAppMenu(): void {
       label: 'File',
       submenu: [
         {
-          label: 'New Window',
-          accelerator: 'CommandOrControl+N',
-          click: () => createWindow()
-        },
-        {
           label: 'Open Repository...',
           accelerator: 'CommandOrControl+O',
-          click: () => BrowserWindow.getFocusedWindow()?.webContents.send('repository:open-request')
+          click: () => {
+            void openRepositoryInNewWindow()
+          }
         },
         {
-          label: '最近打开的文件',
+          label: 'Recent Files',
           submenu: recentItems
         },
         { type: 'separator' },
