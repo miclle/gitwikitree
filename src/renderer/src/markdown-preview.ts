@@ -39,6 +39,27 @@ function renderInlineMarkdown(value: string): string {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" data-markdown-link="true">$1</a>')
 }
 
+function plainInlineMarkdown(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/[_*~]/g, '')
+    .trim()
+}
+
+export function markdownHeadingId(value: string): string {
+  const slug = plainInlineMarkdown(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+
+  return slug || 'section'
+}
+
 function splitTableRow(row: string): string[] {
   const trimmed = row.trim().replace(/^\|/, '').replace(/\|$/, '')
   const cells: string[] = []
@@ -132,6 +153,7 @@ function normalizeRepositoryPath(path: string): string | undefined {
 export function markdownToHtml(markdown: string): string {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
   const html: string[] = []
+  const headingIds = new Map<string, number>()
   let inCode = false
   let inList = false
 
@@ -192,7 +214,11 @@ export function markdownToHtml(markdown: string): string {
         inList = false
       }
       const level = heading[1].length
-      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`)
+      const baseId = markdownHeadingId(heading[2])
+      const idCount = headingIds.get(baseId) ?? 0
+      headingIds.set(baseId, idCount + 1)
+      const id = idCount === 0 ? baseId : `${baseId}-${idCount}`
+      html.push(`<h${level} id="${escapeHtml(id)}">${renderInlineMarkdown(heading[2])}</h${level}>`)
       continue
     }
 

@@ -13,6 +13,7 @@ import {
   escapeHtml,
   getMarkdownPreview,
   isExternalLink,
+  markdownHeadingId,
   markdownToHtml,
   resolveMarkdownLinkPath
 } from './markdown-preview'
@@ -1007,6 +1008,24 @@ function PreviewContent({
   preview: Preview
   onSelectPath: (path: string) => boolean
 }): React.JSX.Element {
+  const scrollToMarkdownAnchor = (href: string, container: HTMLElement): void => {
+    const hash = href.trim().slice(1)
+    if (!hash) return
+
+    let anchor = hash
+    try {
+      anchor = decodeURIComponent(hash)
+    } catch {
+      anchor = hash
+    }
+
+    const escapedAnchor = CSS.escape(anchor)
+    const target = container.querySelector<HTMLElement>(
+      `[id="${escapedAnchor}"], [name="${escapedAnchor}"]`
+    )
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return
 
@@ -1015,6 +1034,11 @@ function PreviewContent({
 
     const href = link.getAttribute('href') ?? ''
     event.preventDefault()
+
+    if (href.trim().startsWith('#')) {
+      scrollToMarkdownAnchor(href, event.currentTarget)
+      return
+    }
 
     if (isExternalLink(href)) {
       window.open(href, '_blank', 'noopener,noreferrer')
@@ -1031,7 +1055,9 @@ function PreviewContent({
 
       return (
         <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.readme.path)}>
-          {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
+          {markdownPreview.title && (
+            <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
+          )}
           <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
         </article>
       )
@@ -1054,7 +1080,9 @@ function PreviewContent({
 
     return (
       <article className="markdown-body" onClick={handleMarkdownLinkClick(preview.path)}>
-        {markdownPreview.title && <h1>{markdownPreview.title}</h1>}
+        {markdownPreview.title && (
+          <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
+        )}
         <div dangerouslySetInnerHTML={{ __html: markdownToHtml(markdownPreview.content) }} />
       </article>
     )

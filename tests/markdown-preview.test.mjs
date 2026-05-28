@@ -60,6 +60,23 @@ test('markdownToHtml marks links so the preview can intercept clicks', async () 
   assert.equal(html, '<p><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>')
 })
 
+test('markdownToHtml adds stable heading ids for anchor links', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('# Getting Started\n\n## Getting Started\n\n## API `Reference`')
+
+  assert.equal(
+    html,
+    '<h1 id="getting-started">Getting Started</h1>\n\n<h2 id="getting-started-1">Getting Started</h2>\n\n<h2 id="api-reference">API <code>Reference</code></h2>'
+  )
+})
+
+test('markdownHeadingId preserves non-Latin heading text', async () => {
+  const { markdownHeadingId } = await loadMarkdownPreview()
+
+  assert.equal(markdownHeadingId('模块功能及状态'), '模块功能及状态')
+  assert.equal(markdownHeadingId('API `Reference`'), 'api-reference')
+})
+
 test('resolveMarkdownLinkPath resolves repository-relative markdown links', async () => {
   const { resolveMarkdownLinkPath } = await loadMarkdownPreview()
 
