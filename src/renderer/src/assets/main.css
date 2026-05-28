@@ -817,6 +817,17 @@ kbd {
   color: #59636e;
 }
 
+.breadcrumb-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-left: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .breadcrumb-current {
   min-width: 0;
   overflow: hidden;

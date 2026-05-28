@@ -1,6 +1,7 @@
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { ChevronLeft, ChevronRight, Code2, GitBranch, Loader2, Plus, Search, X } from 'lucide-react'
 import { iconForNode } from '../app-utils'
+import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
 import { PreviewContent } from './PreviewContent'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
@@ -42,6 +43,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     canNavigateBack,
     canNavigateForward
   } = workspace
+  const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
@@ -234,6 +236,16 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 <button type="button" onClick={openRepositoryPreview}>
                   {repository.name}
                 </button>
+                {!breadcrumbParts.length && directoryReadmeSource && (
+                  <span
+                    className="breadcrumb-source"
+                    title={directoryReadmeSource.path}
+                    aria-label={`Showing ${directoryReadmeSource.path}`}
+                  >
+                    <span aria-hidden="true">·</span>
+                    {directoryReadmeSource.name}
+                  </span>
+                )}
                 {breadcrumbParts.map((part, index) => {
                   const path = breadcrumbParts.slice(0, index + 1).join('/')
                   const isLast = index === breadcrumbParts.length - 1
@@ -242,7 +254,19 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     <span className={isLast ? 'breadcrumb-current' : undefined} key={path}>
                       <span className="slash">/</span>
                       {isLast ? (
-                        <strong>{part}</strong>
+                        <>
+                          <strong>{part}</strong>
+                          {directoryReadmeSource && (
+                            <span
+                              className="breadcrumb-source"
+                              title={directoryReadmeSource.path}
+                              aria-label={`Showing ${directoryReadmeSource.path}`}
+                            >
+                              <span aria-hidden="true">·</span>
+                              {directoryReadmeSource.name}
+                            </span>
+                          )}
+                        </>
                       ) : (
                         <button type="button" onClick={() => openBreadcrumbPath(path)}>
                           {part}
