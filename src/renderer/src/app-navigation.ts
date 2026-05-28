@@ -1,7 +1,6 @@
-export type NavigationTarget = {
-  path: string
-  name: string
-}
+import type { NavigationTarget } from '../../shared/types'
+
+export type { NavigationTarget }
 
 export type OpenFileTab = NavigationTarget & {
   id: string

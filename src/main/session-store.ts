@@ -2,46 +2,12 @@ export const maxRecentFiles = 12
 export const maxRecentRepositories = 12
 export const maxOpenFileTabs = 30
 
-export type OpenFileTabState = {
-  path: string
-  name: string
-  id?: string
-  history?: Array<{ path: string; name: string }>
-  historyIndex?: number
-}
-
-export type RecentFileState = {
-  repoPath: string
-  rootPath?: string
-  filePath: string
-  name: string
-  openedAt: string
-  activeRef?: string
-  source?: 'working-tree' | 'git-ref' | 'worktree'
-}
-
-export type RecentRepositoryState = {
-  repoPath: string
-  rootPath?: string
-  name: string
-  openedAt: string
-  activeRef?: string
-  source?: 'working-tree' | 'git-ref' | 'worktree'
-}
-
-export type SessionState = {
-  repositoryPath?: string
-  rootPath?: string
-  activeRef?: string
-  source?: 'working-tree' | 'git-ref' | 'worktree'
-  selectedPath: string
-  activeFilePath?: string
-  activeFileTabId?: string
-  openFileTabs: OpenFileTabState[]
-  expandedPaths: string[]
-  recentRepositories: RecentRepositoryState[]
-  recentFiles: RecentFileState[]
-}
+import type {
+  OpenFileTabState,
+  RecentFileState,
+  RecentRepositoryState,
+  SessionState
+} from '../shared/types'
 
 const emptySessionState: SessionState = {
   selectedPath: '',

@@ -1,4 +1,4 @@
-export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+import type { PreviewType } from '../shared/types'
 
 export const textPreviewProbeBytes = 32 * 1024
 

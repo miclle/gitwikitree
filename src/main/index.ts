@@ -15,7 +15,7 @@ import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'pat
 import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { detectPreviewType, textPreviewProbeBytes, type PreviewType } from './preview-detection'
+import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
 import {
   clearRecentFiles,
   createEmptySessionState,
@@ -25,53 +25,21 @@ import {
   mergeSessionState,
   normalizeSessionState,
   recordRecentRepository,
-  recordRecentFile,
-  type RecentFileState,
-  type RecentRepositoryState,
-  type SessionState
+  recordRecentFile
 } from './session-store'
+import type {
+  PreviewPayload,
+  RecentFileState,
+  RecentRepositoryState,
+  RepositoryLoadOptions,
+  RepositoryPayload,
+  SessionState,
+  TreeNode
+} from '../shared/types'
 
 const appName = 'Git Wikitree'
 const execFileAsync = promisify(execFile)
 const maxTextPreviewBytes = 1024 * 1024
-
-type TreeNode = {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: TreeNode[]
-}
-
-type RepositoryPayload = {
-  name: string
-  path: string
-  rootPath: string
-  branch: string
-  activeRef: string
-  source: 'working-tree' | 'git-ref' | 'worktree'
-  editable: boolean
-  refs: Array<{ name: string; type: 'local' | 'remote'; current: boolean }>
-  tree: TreeNode[]
-}
-
-type PreviewPayload =
-  | {
-      kind: 'directory'
-      path: string
-      readme?: { path: string; content: string }
-      entries?: Array<{ name: string; path: string; type: 'file' | 'directory' }>
-    }
-  | {
-      kind: 'file'
-      path: string
-      name: string
-      extension: string
-      previewType: PreviewType
-      editable: boolean
-      content?: string
-      dataUrl?: string
-      size: number
-    }
 
 app.setName(appName)
 
@@ -242,11 +210,7 @@ async function assertValidRef(repoPath: string, ref: string): Promise<void> {
 
 async function loadRepository(
   repoPath: string,
-  options: {
-    ref?: string
-    source?: 'working-tree' | 'git-ref' | 'worktree'
-    rootPath?: string
-  } = {}
+  options: RepositoryLoadOptions = {}
 ): Promise<RepositoryPayload> {
   const resolvedPath = await assertRepositoryPath(repoPath)
   const rootPath = options.rootPath
@@ -388,11 +352,7 @@ async function readFileSample(path: string, bytes: number): Promise<Buffer> {
 async function getPreview(
   repoPath: string,
   relativePath = '',
-  options: {
-    ref?: string
-    source?: 'working-tree' | 'git-ref' | 'worktree'
-    rootPath?: string
-  } = {}
+  options: RepositoryLoadOptions = {}
 ): Promise<PreviewPayload> {
   const repository = await loadRepository(repoPath, options)
   const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined

@@ -24,4 +24,8 @@ serving another local app by mistake.
 
 ## Current Scope
 
-The app is initialized with a Git file management oriented shell: repository list, file tree, diff preview, and action toolbar. The next implementation step is to connect those surfaces to local filesystem and Git IPC APIs.
+The app currently opens local Git repositories, builds a tracked/untracked file
+tree, previews directories and common file types, supports branch/ref browsing,
+persists session state, restores recent repositories/files, and manages file
+tabs with per-tab history. IPC payload types are shared across the main,
+preload, and renderer layers to keep the Electron contract explicit.
