@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -92,7 +92,7 @@ test('searchRepository searches git refs without including untracked files', asy
   }
 })
 
-test('searchRepository skips oversized git ref files before reading content', async () => {
+test('searchRepository does not fail when git refs include oversized files', async () => {
   const { search, tempDir } = await loadRepositorySearch()
   const repoPath = await createRepository()
 
@@ -117,6 +117,92 @@ test('searchRepository skips oversized git ref files before reading content', as
       }),
       []
     )
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('searchRepository uses one git grep call for git ref content searches', async () => {
+  const source = await readFile(
+    new URL('../src/main/repository-search.ts', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(
+    source,
+    /'grep'[\s\S]*spawn\('git', args/,
+    'git-ref content search should use one streaming git grep process instead of per-file git show calls'
+  )
+  assert.doesNotMatch(
+    source,
+    /readRefFile|getRefFileSize/,
+    'git-ref content search should not spawn per-file read or size commands'
+  )
+})
+
+test('searchRepository limits git ref grep output without buffering every match', async () => {
+  const { search, tempDir } = await loadRepositorySearch()
+  const repoPath = await createRepository()
+
+  try {
+    await mkdir(join(repoPath, 'many'), { recursive: true })
+    const longLine = `${'x'.repeat(120 * 1024)} common-token\n`
+    await Promise.all(
+      Array.from({ length: 105 }, (_, index) =>
+        writeFile(join(repoPath, 'many', `${String(index).padStart(3, '0')}.txt`), longLine)
+      )
+    )
+    await execFileAsync('git', ['add', 'many'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add many long matches'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+
+    const results = await search.searchRepository(repoPath, 'common-token', {
+      ref: 'main',
+      source: 'git-ref'
+    })
+
+    assert.equal(results.length, 100)
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('searchRepository keeps git ref snippets centered on long-line matches', async () => {
+  const { search, tempDir } = await loadRepositorySearch()
+  const repoPath = await createRepository()
+
+  try {
+    await writeFile(join(repoPath, 'long-line.txt'), `${'a'.repeat(220)} rare-token after prefix\n`)
+    await execFileAsync('git', ['add', 'long-line.txt'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add long line'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+
+    const results = await search.searchRepository(repoPath, 'rare-token', {
+      ref: 'main',
+      source: 'git-ref'
+    })
+
+    assert.equal(results[0].path, 'long-line.txt')
+    assert.match(results[0].snippet, /rare-token/)
+    assert.match(results[0].snippet, /^\.\.\./)
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

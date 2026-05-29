@@ -34,8 +34,8 @@ test('global search modal debounces repository searches through a named delay', 
 
   assert.match(
     source,
-    /export const GLOBAL_SEARCH_DEBOUNCE_MS = 800/,
-    'search debounce delay should be named and exported for regression coverage'
+    /export const GLOBAL_SEARCH_DEBOUNCE_MS = 300/,
+    'search debounce delay should stay responsive while still avoiding per-keystroke searches'
   )
   assert.match(
     source,

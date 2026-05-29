@@ -9,7 +9,7 @@ type GlobalSearchModalProps = {
   onOpenResult: (result: RepositorySearchResult) => void
 }
 
-export const GLOBAL_SEARCH_DEBOUNCE_MS = 800
+export const GLOBAL_SEARCH_DEBOUNCE_MS = 300
 
 function HighlightText({ text, query }: { text: string; query: string }): React.JSX.Element {
   const trimmed = query.trim()
