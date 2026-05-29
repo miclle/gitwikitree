@@ -1,0 +1,142 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
+
+async function loadBrowserContextMenu() {
+  const { module } = await loadTranspiledModule({
+    entry: 'src/main/browser-context-menu.ts',
+    modules: ['src/main/browser-context-menu.ts']
+  })
+  return module
+}
+
+function createParams(overrides = {}) {
+  return {
+    x: 12,
+    y: 24,
+    linkURL: '',
+    mediaType: 'none',
+    hasImageContents: false,
+    srcURL: '',
+    isEditable: false,
+    selectionText: '',
+    editFlags: {
+      canUndo: false,
+      canRedo: false,
+      canCut: false,
+      canCopy: false,
+      canPaste: false,
+      canDelete: false,
+      canSelectAll: true
+    },
+    ...overrides
+  }
+}
+
+function createActions() {
+  const calls = []
+
+  return {
+    calls,
+    actions: {
+      openExternal: (url) => calls.push(['openExternal', url]),
+      writeClipboardText: (text) => calls.push(['writeClipboardText', text]),
+      copyImageAt: (x, y) => calls.push(['copyImageAt', x, y]),
+      inspectElement: (x, y) => calls.push(['inspectElement', x, y])
+    }
+  }
+}
+
+test('canOpenExternalUrl allows only safe external protocols', async () => {
+  const { canOpenExternalUrl } = await loadBrowserContextMenu()
+
+  assert.equal(canOpenExternalUrl('https://example.com'), true)
+  assert.equal(canOpenExternalUrl('http://example.com'), true)
+  assert.equal(canOpenExternalUrl('mailto:test@example.com'), true)
+  assert.equal(canOpenExternalUrl('file:///tmp/a'), false)
+  assert.equal(canOpenExternalUrl('not a url'), false)
+})
+
+test('createBrowserContextMenuItems builds link and image actions', async () => {
+  const { createBrowserContextMenuItems } = await loadBrowserContextMenu()
+  const { actions, calls } = createActions()
+  const items = createBrowserContextMenuItems({
+    params: createParams({
+      linkURL: 'https://example.com',
+      mediaType: 'image',
+      hasImageContents: true,
+      srcURL: 'https://example.com/image.png'
+    }),
+    isDev: false,
+    ...actions
+  })
+
+  assert.deepEqual(
+    items.map((item) => item.label ?? item.role ?? item.type),
+    [
+      'Open Link',
+      'Copy Link Address',
+      'separator',
+      'Copy Image',
+      'Copy Image Address',
+      'separator',
+      'copy',
+      'selectAll'
+    ]
+  )
+
+  items[0].click()
+  items[1].click()
+  items[3].click()
+  items[4].click()
+
+  assert.deepEqual(calls, [
+    ['openExternal', 'https://example.com'],
+    ['writeClipboardText', 'https://example.com'],
+    ['copyImageAt', 12, 24],
+    ['writeClipboardText', 'https://example.com/image.png']
+  ])
+})
+
+test('createBrowserContextMenuItems includes editable and inspect actions', async () => {
+  const { createBrowserContextMenuItems } = await loadBrowserContextMenu()
+  const { actions, calls } = createActions()
+  const items = createBrowserContextMenuItems({
+    params: createParams({
+      isEditable: true,
+      editFlags: {
+        canUndo: true,
+        canRedo: false,
+        canCut: true,
+        canCopy: true,
+        canPaste: true,
+        canDelete: true,
+        canSelectAll: true
+      }
+    }),
+    isDev: true,
+    ...actions
+  })
+
+  assert.deepEqual(
+    items.map((item) => item.role ?? item.label ?? item.type),
+    [
+      'undo',
+      'redo',
+      'separator',
+      'cut',
+      'copy',
+      'paste',
+      'pasteAndMatchStyle',
+      'delete',
+      'separator',
+      'selectAll',
+      'separator',
+      'Inspect Element'
+    ]
+  )
+
+  items.at(-1).click()
+  assert.deepEqual(calls, [['inspectElement', 12, 24]])
+})

@@ -15,10 +15,7 @@ async function readMainCss() {
 }
 
 async function readPanelResizeHook() {
-  return readFile(
-    new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url),
-    'utf8'
-  )
+  return readFile(new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url), 'utf8')
 }
 
 test('preview titlebar places file tabs in the titlebar row', async () => {

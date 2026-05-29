@@ -6,39 +6,45 @@ import {
   ipcMain,
   dialog,
   Menu,
-  type ContextMenuParams,
-  type OpenDialogOptions,
-  type MenuItemConstructorOptions
+  type ContextMenuParams
 } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { promises as fs } from 'fs'
-import { basename, isAbsolute, join } from 'path'
+import { isAbsolute, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { createTreeItemContextMenuItems, type TreeItemContext } from './context-menu'
+import { createAppMenuTemplate, type MenuClickEvent } from './app-menu'
+import { createBrowserContextMenuItems } from './browser-context-menu'
+import { type TreeItemContext } from './context-menu'
+import { registerContextMenuIpcHandlers } from './context-menu-ipc'
+import { getInitialRepositoryPath } from './initial-repository-path'
 import {
   clearRecentFiles,
   createEmptySessionState,
-  findRepositoryWindowIndex,
-  getProjectSessionState,
   getRecentFileOpenPayload,
-  getRecentRepositories,
   mergeSessionState,
   normalizeSessionState,
-  recordRecentRepository,
-  recordRecentFile
+  recordRecentRepository
 } from './session-store'
+import {
+  openRecentFileMenuItem as openRecentFileMenuItemWithDependencies,
+  openRecentRepositoryMenuItem as openRecentRepositoryMenuItemWithDependencies
+} from './recent-navigation'
+import { openRepositoryInNewWindow } from './open-repository-dialog'
 import { getPreview, loadRepository, openWorktree, saveFile } from './repository-service'
-import type {
-  RecentFileState,
-  RecentRepositoryState,
-  RepositoryPayload,
-  SessionState,
-  WindowState
-} from '../shared/types'
+import { registerRepositoryIpcHandlers } from './repository-ipc'
+import { createRecentRepositoryState, createRepositorySessionReset } from './repository-session'
+import { registerSessionIpcHandlers } from './session-ipc'
+import { registerWindowIpcHandlers } from './window-ipc'
+import {
+  getBrowserWindowBounds,
+  getSavedWindowState,
+  mergeWindowStateIntoSession,
+  readWindowState
+} from './window-state'
+import type { RecentFileState, RepositoryPayload, SessionState } from '../shared/types'
 
 const appName = 'Git Wikitree'
-type MenuClickEvent = Parameters<NonNullable<MenuItemConstructorOptions['click']>>[2]
 
 app.setName(appName)
 
@@ -46,21 +52,6 @@ const windows = new Set<BrowserWindow>()
 const windowRepositoryPaths = new Map<BrowserWindow, string>()
 const windowStateSaveTimers = new Map<BrowserWindow, ReturnType<typeof setTimeout>>()
 let sessionState = createEmptySessionState()
-
-function getInitialRepositoryPath(): string | undefined {
-  const envPath = process.env['GITWIKITREE_OPEN_PATH']
-  if (envPath) return envPath
-
-  return process.argv.slice(1).find((argument) => {
-    if (!isAbsolute(argument) || !existsSync(argument)) return false
-
-    try {
-      return statSync(argument).isDirectory()
-    } catch {
-      return false
-    }
-  })
-}
 
 function getSessionFilePath(): string {
   return join(app.getPath('userData'), 'session.json')
@@ -81,61 +72,13 @@ async function writeStoredSession(nextSessionState = sessionState): Promise<void
   await fs.writeFile(getSessionFilePath(), `${JSON.stringify(sessionState, null, 2)}\n`, 'utf8')
 }
 
-function getSavedWindowState(repoPath?: string): WindowState | undefined {
-  return repoPath
-    ? getProjectSessionState(sessionState, repoPath)?.windowState
-    : sessionState.windowState
-}
-
-function getBrowserWindowBounds(repoPath?: string): Partial<WindowState> {
-  const windowState = getSavedWindowState(repoPath)
-  if (!windowState) return {}
-
-  return {
-    ...(typeof windowState.x === 'number' ? { x: windowState.x } : {}),
-    ...(typeof windowState.y === 'number' ? { y: windowState.y } : {}),
-    width: windowState.width,
-    height: windowState.height
-  }
-}
-
-function readWindowState(browserWindow: BrowserWindow): WindowState {
-  const bounds = browserWindow.isMaximized()
-    ? browserWindow.getNormalBounds()
-    : browserWindow.getBounds()
-
-  return {
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    isMaximized: browserWindow.isMaximized()
-  }
-}
-
 async function saveWindowState(browserWindow: BrowserWindow): Promise<void> {
   if (browserWindow.isDestroyed()) return
 
   const repoPath = windowRepositoryPaths.get(browserWindow)
   const windowState = readWindowState(browserWindow)
 
-  if (!repoPath) {
-    await writeStoredSession({ ...sessionState, windowState })
-    return
-  }
-
-  sessionState = mergeSessionState(sessionState, {
-    projectSessions: {
-      [repoPath]: {
-        repositoryPath: repoPath,
-        selectedPath: '',
-        openFileTabs: [],
-        expandedPaths: [''],
-        ...getProjectSessionState(sessionState, repoPath),
-        windowState
-      }
-    }
-  })
+  sessionState = mergeWindowStateIntoSession(sessionState, repoPath, windowState)
   await writeStoredSession()
 }
 
@@ -170,15 +113,6 @@ function closeFocusedFileTabOrWindow(): void {
   targetWindow.webContents.send('tab:close-current-or-window')
 }
 
-function canOpenExternalUrl(url: string): boolean {
-  try {
-    const parsedUrl = new URL(url)
-    return ['http:', 'https:', 'mailto:'].includes(parsedUrl.protocol)
-  } catch {
-    return false
-  }
-}
-
 async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean> {
   try {
     return (
@@ -197,87 +131,25 @@ async function showContextMenu(
 ): Promise<void> {
   if (await isTreeItemContextMenu(params)) return
 
-  const items: MenuItemConstructorOptions[] = []
-  const addSeparator = (): void => {
-    if (items.length > 0 && items.at(-1)?.type !== 'separator') {
-      items.push({ type: 'separator' })
-    }
-  }
-  const addEditItems = (editItems: MenuItemConstructorOptions[]): void => {
-    for (const item of editItems) items.push(item)
-  }
-
-  if (params.linkURL) {
-    addEditItems([
-      {
-        label: 'Open Link',
-        enabled: canOpenExternalUrl(params.linkURL),
-        click: () => void shell.openExternal(params.linkURL)
-      },
-      {
-        label: 'Copy Link Address',
-        click: () => clipboard.writeText(params.linkURL)
-      }
-    ])
-    addSeparator()
-  }
-
-  if (params.mediaType === 'image' && params.hasImageContents) {
-    items.push({
-      label: 'Copy Image',
-      click: () => targetWindow.webContents.copyImageAt(params.x, params.y)
-    })
-
-    if (params.srcURL) {
-      items.push({
-        label: 'Copy Image Address',
-        click: () => clipboard.writeText(params.srcURL)
-      })
-    }
-
-    addSeparator()
-  }
-
-  if (params.isEditable) {
-    addEditItems([
-      { role: 'undo', enabled: params.editFlags.canUndo },
-      { role: 'redo', enabled: params.editFlags.canRedo },
-      { type: 'separator' },
-      { role: 'cut', enabled: params.editFlags.canCut },
-      { role: 'copy', enabled: params.editFlags.canCopy },
-      { role: 'paste', enabled: params.editFlags.canPaste },
-      { role: 'pasteAndMatchStyle', enabled: params.editFlags.canPaste },
-      { role: 'delete', enabled: params.editFlags.canDelete },
-      { type: 'separator' },
-      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
-    ])
-  } else {
-    addEditItems([
-      { role: 'copy', enabled: params.editFlags.canCopy || params.selectionText.length > 0 },
-      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
-    ])
-  }
-
-  if (is.dev) {
-    addSeparator()
-    items.push({
-      label: 'Inspect Element',
-      click: () => targetWindow.webContents.inspectElement(params.x, params.y)
-    })
-  }
-
-  while (items.at(-1)?.type === 'separator') items.pop()
+  const items = createBrowserContextMenuItems({
+    params,
+    isDev: is.dev,
+    openExternal: (url) => void shell.openExternal(url),
+    writeClipboardText: (text) => clipboard.writeText(text),
+    copyImageAt: (x, y) => targetWindow.webContents.copyImageAt(x, y),
+    inspectElement: (x, y) => targetWindow.webContents.inspectElement(x, y)
+  })
 
   if (items.length === 0) return
   Menu.buildFromTemplate(items).popup({ window: targetWindow })
 }
 
 function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: TreeItemContext): void {
-  const savedWindowState = getSavedWindowState(repoPath)
+  const savedWindowState = getSavedWindowState(sessionState, repoPath)
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
-    ...getBrowserWindowBounds(repoPath),
+    ...getBrowserWindowBounds(sessionState, repoPath),
     minWidth: 1024,
     minHeight: 720,
     title: appName,
@@ -351,85 +223,23 @@ function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: Tree
   })
 }
 
-async function openRepositoryInNewWindow(): Promise<void> {
-  const browserWindow = BrowserWindow.getFocusedWindow()
-  const options: OpenDialogOptions = {
-    title: 'Open Git Repository',
-    properties: ['openDirectory']
-  }
-  const result = browserWindow
-    ? await dialog.showOpenDialog(browserWindow, options)
-    : await dialog.showOpenDialog(options)
-
-  if (result.canceled || result.filePaths.length === 0) return
-
-  try {
-    const repository = await loadRepository(result.filePaths[0])
-    createWindow(repository.path)
-  } catch (reason) {
-    dialog.showErrorBox(
-      'Open Repository Failed',
-      reason instanceof Error ? reason.message : String(reason)
-    )
-  }
-}
-
-function openRecentFile(file: RecentFileState): void {
-  const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-
-  if (targetWindow) {
-    sendOpenFile(targetWindow, file)
-    return
-  }
-
-  createWindow(file.repoPath, file)
-}
-
-function shouldOpenInNewWindow(event: MenuClickEvent): boolean {
-  return Boolean(event.metaKey || event.altKey)
-}
-
-function openRecentRepository(repoPath: string): void {
-  const openWindows = BrowserWindow.getAllWindows()
-  const windowIndex = findRepositoryWindowIndex(
-    repoPath,
-    openWindows.map((window) => windowRepositoryPaths.get(window))
-  )
-  const repositoryWindow = windowIndex >= 0 ? openWindows[windowIndex] : undefined
-
-  if (repositoryWindow) {
-    if (repositoryWindow.isMinimized()) repositoryWindow.restore()
-    repositoryWindow.show()
-    repositoryWindow.focus()
-    return
-  }
-
-  const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-
-  if (targetWindow) {
-    targetWindow.webContents.send('repository:open-path', repoPath)
-    return
-  }
-
-  createWindow(repoPath)
-}
-
 function openRecentRepositoryMenuItem(repoPath: string, event: MenuClickEvent): void {
-  if (shouldOpenInNewWindow(event)) {
-    createWindow(repoPath)
-    return
-  }
-
-  openRecentRepository(repoPath)
+  openRecentRepositoryMenuItemWithDependencies(repoPath, event, {
+    getAllWindows: () => BrowserWindow.getAllWindows(),
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
+    getWindowRepositoryPath: (window) => windowRepositoryPaths.get(window),
+    createWindow
+  })
 }
 
 function openRecentFileMenuItem(file: RecentFileState, event: MenuClickEvent): void {
-  if (shouldOpenInNewWindow(event)) {
-    createWindow(file.repoPath, file)
-    return
-  }
-
-  openRecentFile(file)
+  openRecentFileMenuItemWithDependencies(file, event, {
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
+    getAllWindows: () => BrowserWindow.getAllWindows(),
+    getWindowRepositoryPath: (window) => windowRepositoryPaths.get(window),
+    sendOpenFile,
+    createWindow
+  })
 }
 
 async function clearRecentMenuItems(): Promise<void> {
@@ -438,129 +248,55 @@ async function clearRecentMenuItems(): Promise<void> {
   createAppMenu()
 }
 
-function getRecentRepositoryState(repository: RepositoryPayload): RecentRepositoryState {
-  return {
-    repoPath: repository.path,
-    rootPath: repository.rootPath,
-    name: basename(repository.path),
-    openedAt: new Date().toISOString(),
-    activeRef: repository.activeRef,
-    source: repository.source
-  }
-}
-
 function recordLoadedRepository(repository: RepositoryPayload): void {
   sessionState = {
     ...sessionState,
     recentRepositories: recordRecentRepository(
       sessionState.recentRepositories,
-      getRecentRepositoryState(repository)
+      createRecentRepositoryState(repository)
     )
   }
 }
 
+async function activateRepositoryInWindow(
+  sourceWindow: BrowserWindow | null | undefined,
+  repository: RepositoryPayload
+): Promise<void> {
+  if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
+  recordLoadedRepository(repository)
+  sessionState = mergeSessionState(sessionState, createRepositorySessionReset(repository), {
+    syncProjectSession: false
+  })
+  await writeStoredSession()
+}
+
 function createAppMenu(): void {
-  const recentRepositoryItems: MenuItemConstructorOptions[] =
-    sessionState.recentRepositories.length > 0 || sessionState.recentFiles.length > 0
-      ? getRecentRepositories(sessionState.recentRepositories, sessionState.recentFiles).map(
-          (repoPath) => ({
-            label: `${basename(repoPath)} - ${repoPath}`,
-            click: (_menuItem, _window, event) => openRecentRepositoryMenuItem(repoPath, event)
-          })
-        )
-      : [{ label: 'No Recent Projects', enabled: false }]
-
-  const recentFileItems: MenuItemConstructorOptions[] =
-    sessionState.recentFiles.length > 0
-      ? sessionState.recentFiles.map((file) => ({
-          label: `${file.name} - ${file.repoPath}`,
-          click: (_menuItem, _window, event) => openRecentFileMenuItem(file, event)
-        }))
-      : [{ label: 'No Recent Files', enabled: false }]
-
-  const recentItems: MenuItemConstructorOptions[] = [
-    { label: '最近打开的项目', enabled: false },
-    ...recentRepositoryItems,
-    { type: 'separator' },
-    { label: 'Recent Files', enabled: false },
-    ...recentFileItems,
-    { type: 'separator' },
-    {
-      label: '清除最近打开...',
-      enabled: sessionState.recentRepositories.length > 0 || sessionState.recentFiles.length > 0,
-      click: () => {
-        void clearRecentMenuItems()
-      }
-    }
-  ]
-
-  const template: MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin'
-      ? [
-          {
-            label: appName,
-            submenu: [
-              { role: 'about' as const },
-              { type: 'separator' as const },
-              { role: 'quit' as const }
-            ]
-          }
-        ]
-      : []),
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Open Repository...',
-          accelerator: 'CommandOrControl+O',
-          click: () => {
-            void openRepositoryInNewWindow()
-          }
-        },
-        {
-          label: 'Recent Files',
-          submenu: recentItems
-        },
-        { type: 'separator' },
-        {
-          label: 'Close Tab',
-          accelerator: 'CommandOrControl+W',
-          click: closeFocusedFileTabOrWindow
-        },
-        {
-          label: 'Close Window',
-          accelerator: 'Shift+CommandOrControl+W',
-          click: () => BrowserWindow.getFocusedWindow()?.close()
-        }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
-        { role: 'delete' },
-        { type: 'separator' },
-        { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' }
-      ]
-    }
-  ]
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      createAppMenuTemplate({
+        appName,
+        platform: process.platform,
+        recentRepositories: sessionState.recentRepositories,
+        recentFiles: sessionState.recentFiles,
+        openRepository: () =>
+          void openRepositoryInNewWindow({
+            getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
+            showOpenDialog: (browserWindowOrOptions, options) =>
+              options
+                ? dialog.showOpenDialog(browserWindowOrOptions as BrowserWindow, options)
+                : dialog.showOpenDialog(browserWindowOrOptions),
+            loadRepository,
+            createWindow,
+            showErrorBox: (title, content) => dialog.showErrorBox(title, content)
+          }),
+        openRecentRepository: openRecentRepositoryMenuItem,
+        openRecentFile: openRecentFileMenuItem,
+        clearRecent: () => void clearRecentMenuItems(),
+        closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
+        closeWindow: () => BrowserWindow.getFocusedWindow()?.close()
+      })
+    )
+  )
 }
 
 // This method will be called when Electron has finished
@@ -580,219 +316,56 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('window:new', () => createWindow())
+  registerWindowIpcHandlers({
+    ipcMain,
+    createWindow,
+    getWindowFromWebContents: (webContents) => BrowserWindow.fromWebContents(webContents)
+  })
 
-  ipcMain.handle('context-menu:tree-item', (event, item: TreeItemContext) => {
-    const targetWindow = BrowserWindow.fromWebContents(event.sender)
-    if (!targetWindow) return
+  registerContextMenuIpcHandlers({
+    ipcMain,
+    getWindowFromWebContents: (webContents) => BrowserWindow.fromWebContents(webContents),
+    buildMenuFromTemplate: (items) => Menu.buildFromTemplate(items),
+    openTreeItemInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem)
+  })
 
-    const menuItems = createTreeItemContextMenuItems({
-      item,
-      sender: event.sender,
-      openInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem)
+  registerRepositoryIpcHandlers({
+    ipcMain,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
+    getWindowFromWebContents: (webContents) => BrowserWindow.fromWebContents(webContents),
+    showOpenDialog: (browserWindowOrOptions, options) =>
+      options
+        ? dialog.showOpenDialog(browserWindowOrOptions as BrowserWindow, options)
+        : dialog.showOpenDialog(browserWindowOrOptions),
+    loadRepository,
+    openWorktree,
+    getPreview,
+    saveFile,
+    activateRepositoryInWindow
+  })
+
+  registerSessionIpcHandlers({
+    ipcMain,
+    getWindowFromWebContents: (webContents) => BrowserWindow.fromWebContents(webContents),
+    getSessionState: () => sessionState,
+    setSessionState: (nextSessionState) => {
+      sessionState = nextSessionState
+    },
+    setWindowRepositoryPath: (sourceWindow, repoPath) => {
+      windowRepositoryPaths.set(sourceWindow, repoPath)
+    },
+    writeStoredSession,
+    createAppMenu
+  })
+
+  createWindow(
+    getInitialRepositoryPath({
+      envPath: process.env['GITWIKITREE_OPEN_PATH'],
+      argv: process.argv,
+      isAbsolutePath: isAbsolute,
+      isDirectory: (path) => existsSync(path) && statSync(path).isDirectory()
     })
-
-    Menu.buildFromTemplate(menuItems).popup({ window: targetWindow })
-  })
-
-  ipcMain.handle('window:control', (event, action: 'close' | 'minimize' | 'toggle-maximize') => {
-    const browserWindow = BrowserWindow.fromWebContents(event.sender)
-    if (!browserWindow) return
-
-    if (action === 'close') {
-      browserWindow.close()
-      return
-    }
-
-    if (action === 'minimize') {
-      browserWindow.minimize()
-      return
-    }
-
-    if (browserWindow.isMaximized()) {
-      browserWindow.unmaximize()
-    } else {
-      browserWindow.maximize()
-    }
-  })
-
-  ipcMain.handle('repository:pick', async () => {
-    const browserWindow = BrowserWindow.getFocusedWindow()
-    const options: OpenDialogOptions = {
-      title: 'Open Git Repository',
-      properties: ['openDirectory']
-    }
-    const result = browserWindow
-      ? await dialog.showOpenDialog(browserWindow, options)
-      : await dialog.showOpenDialog(options)
-
-    if (result.canceled || result.filePaths.length === 0) return undefined
-    const repository = await loadRepository(result.filePaths[0])
-    const sourceWindow = browserWindow ?? BrowserWindow.getFocusedWindow()
-    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
-    recordLoadedRepository(repository)
-    sessionState = mergeSessionState(
-      sessionState,
-      {
-        repositoryPath: repository.path,
-        rootPath: repository.rootPath,
-        activeRef: repository.activeRef,
-        source: repository.source,
-        selectedPath: '',
-        activeFilePath: undefined,
-        openFileTabs: [],
-        expandedPaths: ['']
-      },
-      { syncProjectSession: false }
-    )
-    await writeStoredSession()
-    return repository
-  })
-
-  ipcMain.handle('repository:load', async (_event, repoPath: string) => {
-    const repository = await loadRepository(repoPath)
-    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
-    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
-    recordLoadedRepository(repository)
-    sessionState = mergeSessionState(
-      sessionState,
-      {
-        repositoryPath: repository.path,
-        rootPath: repository.rootPath,
-        activeRef: repository.activeRef,
-        source: repository.source,
-        selectedPath: '',
-        activeFilePath: undefined,
-        activeFileTabId: undefined,
-        openFileTabs: [],
-        expandedPaths: ['']
-      },
-      { syncProjectSession: false }
-    )
-    await writeStoredSession()
-    return repository
-  })
-
-  ipcMain.handle(
-    'repository:load-ref',
-    async (_event, repoPath: string, ref: string, rootPath?: string) => {
-      const repository = await loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
-      const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
-      if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
-      recordLoadedRepository(repository)
-      sessionState = mergeSessionState(
-        sessionState,
-        {
-          repositoryPath: repository.path,
-          rootPath: repository.rootPath,
-          activeRef: repository.activeRef,
-          source: repository.source,
-          selectedPath: '',
-          activeFilePath: undefined,
-          openFileTabs: [],
-          expandedPaths: ['']
-        },
-        { syncProjectSession: false }
-      )
-      await writeStoredSession()
-      return repository
-    }
   )
-
-  ipcMain.handle('repository:open-worktree', async (_event, repoPath: string, ref: string) => {
-    const repository = await openWorktree(repoPath, ref)
-    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
-    if (sourceWindow) windowRepositoryPaths.set(sourceWindow, repository.path)
-    recordLoadedRepository(repository)
-    sessionState = mergeSessionState(
-      sessionState,
-      {
-        repositoryPath: repository.path,
-        rootPath: repository.rootPath,
-        activeRef: repository.activeRef,
-        source: repository.source,
-        selectedPath: '',
-        activeFilePath: undefined,
-        openFileTabs: [],
-        expandedPaths: ['']
-      },
-      { syncProjectSession: false }
-    )
-    await writeStoredSession()
-    return repository
-  })
-
-  ipcMain.handle('session:get', () => sessionState)
-
-  ipcMain.handle('session:get-project', (_event, repoPath: string) => {
-    return getProjectSessionState(sessionState, repoPath)
-  })
-
-  ipcMain.handle('session:save', async (_event, nextSessionState: Partial<SessionState>) => {
-    sessionState = mergeSessionState(sessionState, nextSessionState)
-    const sourceWindow = BrowserWindow.fromWebContents(_event.sender)
-    if (sourceWindow && sessionState.repositoryPath) {
-      windowRepositoryPaths.set(sourceWindow, sessionState.repositoryPath)
-    }
-    if (sessionState.repositoryPath) {
-      sessionState = {
-        ...sessionState,
-        recentRepositories: recordRecentRepository(sessionState.recentRepositories, {
-          repoPath: sessionState.repositoryPath,
-          rootPath: sessionState.rootPath,
-          name: basename(sessionState.repositoryPath),
-          openedAt: new Date().toISOString(),
-          activeRef: sessionState.activeRef,
-          source: sessionState.source
-        })
-      }
-    }
-    const activeFilePath = sessionState.activeFilePath
-
-    if (sessionState.repositoryPath && activeFilePath) {
-      sessionState = {
-        ...sessionState,
-        recentFiles: recordRecentFile(sessionState.recentFiles, {
-          repoPath: sessionState.repositoryPath,
-          rootPath: sessionState.rootPath,
-          filePath: activeFilePath,
-          name: basename(activeFilePath),
-          openedAt: new Date().toISOString(),
-          activeRef: sessionState.activeRef,
-          source: sessionState.source
-        })
-      }
-    }
-
-    await writeStoredSession()
-    createAppMenu()
-    return sessionState
-  })
-
-  ipcMain.handle(
-    'repository:preview',
-    async (
-      _event,
-      repoPath: string,
-      relativePath = '',
-      options?: {
-        ref?: string
-        source?: 'working-tree' | 'git-ref' | 'worktree'
-        rootPath?: string
-      }
-    ) => {
-      return getPreview(repoPath, relativePath, options)
-    }
-  )
-
-  ipcMain.handle(
-    'repository:save-file',
-    async (_event, repoPath: string, relativePath: string, content: string) => {
-      return saveFile(repoPath, relativePath, content)
-    }
-  )
-
-  createWindow(getInitialRepositoryPath())
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
