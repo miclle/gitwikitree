@@ -337,6 +337,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               <div className="breadcrumb">
                 <button
                   type="button"
+                  title={repository.name}
                   onClick={openRepositoryPreview}
                   onContextMenu={(event) => showBreadcrumbContextMenu(event, '')}
                 >
@@ -361,7 +362,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       <span className="slash">/</span>
                       {isLast ? (
                         <>
-                          <strong>{part}</strong>
+                          <strong title={part}>{part}</strong>
                           {directoryReadmeSource && (
                             <span
                               className="breadcrumb-source"
@@ -376,6 +377,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       ) : (
                         <button
                           type="button"
+                          title={part}
                           onClick={() => openBreadcrumbPath(path)}
                           onContextMenu={(event) => showBreadcrumbContextMenu(event, path)}
                         >

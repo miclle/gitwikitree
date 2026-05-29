@@ -99,6 +99,46 @@ test('workspace passes breadcrumb context menu handler from the hook', async () 
   )
 })
 
+test('breadcrumb labels expose full text as hover titles', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /<button[\s\S]*?title=\{repository\.name\}[\s\S]*?onClick=\{openRepositoryPreview\}/,
+    'repository breadcrumb should expose its full name as a title'
+  )
+  assert.match(
+    source,
+    /<strong title=\{part\}>\{part\}<\/strong>/,
+    'current breadcrumb should expose the full segment as a title'
+  )
+  assert.match(
+    source,
+    /<button[\s\S]*?title=\{part\}[\s\S]*?onClick=\{\(\) => openBreadcrumbPath\(path\)\}/,
+    'ancestor breadcrumb links should expose the full segment as a title'
+  )
+})
+
+test('breadcrumb items stay on one line in narrow windows', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /\.breadcrumb\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?white-space:\s*nowrap;/,
+    'breadcrumb row should clip instead of wrapping when the path is wider than the window'
+  )
+  assert.match(
+    css,
+    /\.breadcrumb button,\s*\.breadcrumb strong\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;[\s\S]*?white-space:\s*nowrap;/,
+    'breadcrumb labels should truncate on a single line'
+  )
+  assert.match(
+    css,
+    /\.breadcrumb > span\s*\{[\s\S]*?white-space:\s*nowrap;/,
+    'breadcrumb item containers should not let labels wrap internally'
+  )
+})
+
 test('current tab search command refocuses the find input even when already open', async () => {
   const source = await readWorkspaceView()
 

@@ -804,11 +804,23 @@ kbd {
 }
 
 .breadcrumb {
+  flex: 1 1 auto;
   min-width: 0;
   gap: 0;
+  overflow: hidden;
   color: var(--accent);
   font-size: 14px;
   line-height: 20px;
+  white-space: nowrap;
+}
+
+.breadcrumb button,
+.breadcrumb strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb button {
@@ -828,9 +840,13 @@ kbd {
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  max-width: 28%;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .breadcrumb .slash {
+  flex: 0 0 auto;
   margin: 0 8px;
   color: #59636e;
 }
@@ -838,16 +854,22 @@ kbd {
 .breadcrumb-source {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
   margin-left: 8px;
   color: #6b7280;
   font-size: 13px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-current {
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
