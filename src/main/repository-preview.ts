@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs'
 import { basename, extname, resolve } from 'path'
+import { Marked, type Token } from 'marked'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
 import { assertRepositoryPath, getRefFileSize, readRefFile } from './git-service'
 import { loadRepository } from './repository-loader'
@@ -22,9 +23,156 @@ function mimeForExtension(extension: string): string {
       return 'image/webp'
     case '.ico':
       return 'image/x-icon'
+    case '.svg':
+      return 'image/svg+xml'
     default:
       return 'application/octet-stream'
   }
+}
+
+function isExternalResourceUrl(href: string): boolean {
+  return /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith('//')
+}
+
+function decodeMarkdownPath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+function normalizeRepositoryPath(path: string): string | undefined {
+  const segments: string[] = []
+
+  for (const segment of path.split('/')) {
+    if (!segment || segment === '.') continue
+
+    if (segment === '..') {
+      if (segments.length === 0) return undefined
+      segments.pop()
+      continue
+    }
+
+    segments.push(segment)
+  }
+
+  return segments.join('/')
+}
+
+function resolveMarkdownAssetPaths(href: string, sourcePath: string): string[] {
+  const trimmedHref = href.trim()
+  if (!trimmedHref || trimmedHref.startsWith('#') || isExternalResourceUrl(trimmedHref)) {
+    return []
+  }
+
+  const pathOnly = trimmedHref.split(/[?#]/, 1)[0]
+  const decodedPath = decodeMarkdownPath(pathOnly)
+  const sourceDirectory = sourcePath.split('/').filter(Boolean).slice(0, -1).join('/')
+  const paths: string[] = []
+  const addPath = (path: string | undefined): void => {
+    if (path && !paths.includes(path)) paths.push(path)
+  }
+
+  if (decodedPath.startsWith('/')) {
+    addPath(normalizeRepositoryPath(decodedPath.slice(1)))
+    return paths
+  }
+
+  addPath(normalizeRepositoryPath([sourceDirectory, decodedPath].filter(Boolean).join('/')))
+
+  if (decodedPath.startsWith('../assets/')) {
+    addPath(
+      normalizeRepositoryPath(
+        [sourceDirectory, decodedPath.slice('../'.length)].filter(Boolean).join('/')
+      )
+    )
+  }
+
+  return paths
+}
+
+function collectMarkdownImageHrefs(markdown: string): string[] {
+  const parser = new Marked({ async: false, gfm: true })
+  const hrefs = new Set<string>()
+  const collectRawHtmlImageSrcs = (html: string): void => {
+    for (const match of html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(["'])([^"']+)\1[^>]*>/gi)) {
+      hrefs.add(match[2])
+    }
+  }
+  const visitTableCellTokens = (cells: Array<{ tokens?: Token[] }>): void => {
+    for (const cell of cells) {
+      if (Array.isArray(cell.tokens)) visit(cell.tokens)
+    }
+  }
+  const visit = (tokens: Token[]): void => {
+    for (const token of tokens) {
+      if (token.type === 'image') {
+        hrefs.add(token.href)
+      }
+
+      if (token.type === 'html') {
+        collectRawHtmlImageSrcs(token.text)
+      }
+
+      if ('tokens' in token && Array.isArray(token.tokens)) {
+        visit(token.tokens)
+      }
+
+      if ('items' in token && Array.isArray(token.items)) {
+        visit(token.items as Token[])
+      }
+
+      if (token.type === 'table') {
+        visitTableCellTokens(token.header)
+
+        for (const row of token.rows) {
+          visitTableCellTokens(row)
+        }
+      }
+    }
+  }
+
+  visit(parser.lexer(markdown) as Token[])
+  return [...hrefs]
+}
+
+async function getMarkdownAssetDataUrls({
+  repositoryPath,
+  activeRef,
+  sourcePath,
+  markdown,
+  isRefSource
+}: {
+  repositoryPath: string
+  activeRef: string
+  sourcePath: string
+  markdown: string
+  isRefSource: boolean
+}): Promise<Record<string, string> | undefined> {
+  const dataUrls: Record<string, string> = {}
+
+  for (const href of collectMarkdownImageHrefs(markdown)) {
+    const assetPaths = resolveMarkdownAssetPaths(href, sourcePath)
+    if (assetPaths.length === 0) continue
+
+    for (const assetPath of assetPaths) {
+      const extension = extname(assetPath).toLowerCase()
+      if (!['image', 'svg'].includes(detectPreviewType(extension))) continue
+
+      try {
+        const buffer = isRefSource
+          ? await readRefFile(repositoryPath, activeRef, assetPath)
+          : await fs.readFile(safeJoin(repositoryPath, assetPath))
+        dataUrls[href] = `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
+        break
+      } catch {
+        // Missing or unreadable Markdown images should leave the original alt text visible.
+      }
+    }
+  }
+
+  return Object.keys(dataUrls).length > 0 ? dataUrls : undefined
 }
 
 async function readFileSample(path: string, bytes: number): Promise<Buffer> {
@@ -58,10 +206,21 @@ export async function getPreview(
       const content = isRefSource
         ? (await readRefFile(repository.path, repository.activeRef, readme.path)).toString('utf8')
         : await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
+      const markdownAssetDataUrls = await getMarkdownAssetDataUrls({
+        repositoryPath: repository.path,
+        activeRef: repository.activeRef,
+        sourcePath: readme.path,
+        markdown: content,
+        isRefSource
+      })
       return {
         kind: 'directory',
         path: toPosixPath(relativePath),
-        readme: { path: readme.path, content }
+        readme: {
+          path: readme.path,
+          content,
+          ...(markdownAssetDataUrls ? { markdownAssetDataUrls } : {})
+        }
       }
     }
 
@@ -125,14 +284,26 @@ export async function getPreview(
   }
 
   if (previewType !== 'unsupported' && size <= maxTextPreviewBytes) {
+    const content = isRefSource
+      ? (
+          previewBuffer ?? (await readRefFile(repository.path, repository.activeRef, relativePath))
+        ).toString('utf8')
+      : await fs.readFile(target, 'utf8')
+    const markdownAssetDataUrls =
+      previewType === 'markdown'
+        ? await getMarkdownAssetDataUrls({
+            repositoryPath: repository.path,
+            activeRef: repository.activeRef,
+            sourcePath: toPosixPath(relativePath),
+            markdown: content,
+            isRefSource
+          })
+        : undefined
+
     return {
       ...payload,
-      content: isRefSource
-        ? (
-            previewBuffer ??
-            (await readRefFile(repository.path, repository.activeRef, relativePath))
-          ).toString('utf8')
-        : await fs.readFile(target, 'utf8')
+      content,
+      ...(markdownAssetDataUrls ? { markdownAssetDataUrls } : {})
     }
   }
 

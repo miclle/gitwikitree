@@ -70,7 +70,7 @@ export type RepositorySearchResult = {
 export type DirectoryPreview = {
   kind: 'directory'
   path: string
-  readme?: { path: string; content: string }
+  readme?: { path: string; content: string; markdownAssetDataUrls?: Record<string, string> }
   entries?: Array<{ name: string; path: string; type: 'file' | 'directory' }>
 }
 
@@ -83,6 +83,7 @@ export type FilePreview = {
   editable: boolean
   content?: string
   dataUrl?: string
+  markdownAssetDataUrls?: Record<string, string>
   size: number
 }
 

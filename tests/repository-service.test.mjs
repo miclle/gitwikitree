@@ -119,3 +119,104 @@ test('getPreview returns directory readme content and rejects escaping paths', a
     await rm(tempDir, { recursive: true, force: true })
   }
 })
+
+test('getPreview includes data URLs for markdown image assets', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    await mkdir(join(repoPath, 'assets'), { recursive: true })
+    await writeFile(join(repoPath, 'assets', 'diagram.png'), imageBytes)
+    await writeFile(join(repoPath, 'docs', 'with-image.md'), '![Diagram](../assets/diagram.png)')
+
+    const preview = await service.getPreview(repoPath, 'docs/with-image.md')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'markdown')
+    assert.deepEqual(preview.markdownAssetDataUrls, {
+      '../assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview includes data URLs for raw HTML image assets in markdown', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    await mkdir(join(repoPath, 'docs', 'assets'), { recursive: true })
+    await writeFile(join(repoPath, 'docs', 'assets', 'diagram.png'), imageBytes)
+    await writeFile(
+      join(repoPath, 'docs', 'raw-image.md'),
+      '<img width="120" alt="Diagram" src="assets/diagram.png" />'
+    )
+
+    const preview = await service.getPreview(repoPath, 'docs/raw-image.md')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'markdown')
+    assert.deepEqual(preview.markdownAssetDataUrls, {
+      'assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview tolerates exported markdown assets kept beside the source file', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    await mkdir(join(repoPath, 'docs', 'assets'), { recursive: true })
+    await writeFile(join(repoPath, 'docs', 'assets', 'diagram.png'), imageBytes)
+    await writeFile(
+      join(repoPath, 'docs', 'exported-image.md'),
+      '<img alt="Diagram" src="../assets/diagram.png" />'
+    )
+
+    const preview = await service.getPreview(repoPath, 'docs/exported-image.md')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'markdown')
+    assert.deepEqual(preview.markdownAssetDataUrls, {
+      '../assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview includes data URLs for markdown images inside tables', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    await mkdir(join(repoPath, 'docs', 'assets'), { recursive: true })
+    await writeFile(join(repoPath, 'docs', 'assets', 'diagram.png'), imageBytes)
+    await writeFile(
+      join(repoPath, 'docs', 'table-image.md'),
+      '| Screenshot |\n| - |\n| ![Diagram](assets/diagram.png) |'
+    )
+
+    const preview = await service.getPreview(repoPath, 'docs/table-image.md')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'markdown')
+    assert.deepEqual(preview.markdownAssetDataUrls, {
+      'assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})

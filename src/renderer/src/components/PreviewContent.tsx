@@ -21,6 +21,17 @@ function sanitizeMarkdownHtml(html: string): string {
   })
 }
 
+function renderMarkdownHtml(
+  content: string,
+  markdownAssetDataUrls?: Record<string, string>
+): string {
+  return sanitizeMarkdownHtml(
+    markdownToHtml(content, {
+      resolveImageSrc: (href) => markdownAssetDataUrls?.[href]
+    })
+  )
+}
+
 function CodePreview({
   content,
   extension,
@@ -223,7 +234,10 @@ export function PreviewContent({
           )}
           <div
             dangerouslySetInnerHTML={{
-              __html: sanitizeMarkdownHtml(markdownToHtml(markdownPreview.content))
+              __html: renderMarkdownHtml(
+                markdownPreview.content,
+                preview.readme.markdownAssetDataUrls
+              )
             }}
           />
         </article>
@@ -267,7 +281,7 @@ export function PreviewContent({
         )}
         <div
           dangerouslySetInnerHTML={{
-            __html: sanitizeMarkdownHtml(markdownToHtml(markdownPreview.content))
+            __html: renderMarkdownHtml(markdownPreview.content, preview.markdownAssetDataUrls)
           }}
         />
       </article>

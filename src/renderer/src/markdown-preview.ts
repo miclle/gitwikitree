@@ -6,6 +6,10 @@ export type MarkdownPreview = {
   content: string
 }
 
+export type MarkdownRenderOptions = {
+  resolveImageSrc?: (href: string) => string | undefined
+}
+
 function unquoteYamlValue(value: string): string {
   const trimmed = value.trim()
   const quote = trimmed[0]
@@ -87,7 +91,22 @@ function renderMarkdownLink(href: string, title: string | null, html: string): s
   return `<a href="${escapeHtml(href)}"${titleAttribute} data-markdown-link="true">${html}</a>`
 }
 
-function createMarkdownRenderer(): Renderer {
+function rewriteRawHtmlImageSources(
+  html: string,
+  resolveImageSrc: (href: string) => string | undefined
+): string {
+  return html.replace(
+    /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)(\2)([^>]*>)/gi,
+    (match, prefix: string, quote: string, href: string, closingQuote: string, suffix: string) => {
+      const src = resolveImageSrc(href)
+      if (!src) return match
+
+      return `${prefix}${quote}${escapeHtml(src)}${closingQuote}${suffix}`
+    }
+  )
+}
+
+function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
   const renderer = new Renderer()
   const headingIds = new Map<string, number>()
 
@@ -103,6 +122,20 @@ function createMarkdownRenderer(): Renderer {
     return renderMarkdownLink(href, title ?? null, this.parser.parseInline(tokens))
   }
 
+  renderer.html = function ({ text }: Tokens.HTML): string {
+    return options.resolveImageSrc
+      ? rewriteRawHtmlImageSources(text, options.resolveImageSrc)
+      : text
+  }
+
+  renderer.image = function ({ href, title, text, tokens }: Tokens.Image): string {
+    const alt = tokens ? this.parser.parseInline(tokens, this.parser.textRenderer) : text
+    const src = options.resolveImageSrc?.(href) ?? href
+    const titleAttribute = title ? ` title="${escapeHtml(title)}"` : ''
+
+    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttribute}>`
+  }
+
   renderer.code = function ({ text, lang }: Tokens.Code): string {
     const language = lang?.match(/^\S+/)?.[0]
     return `<div class="markdown-code-block"><button type="button" class="markdown-code-copy" data-copy-code="true" aria-label="Copy code" title="Copy code">Copy</button><pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlightCodeBlock(
@@ -114,12 +147,12 @@ function createMarkdownRenderer(): Renderer {
   return renderer
 }
 
-export function markdownToHtml(markdown: string): string {
+export function markdownToHtml(markdown: string, options: MarkdownRenderOptions = {}): string {
   const parser = new Marked({
     async: false,
     breaks: false,
     gfm: true,
-    renderer: createMarkdownRenderer()
+    renderer: createMarkdownRenderer(options)
   })
 
   return parser.parse(markdown) as string

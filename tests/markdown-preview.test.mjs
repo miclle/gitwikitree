@@ -52,6 +52,29 @@ test('markdownToHtml marks links so the preview can intercept clicks', async () 
   assert.equal(html, '<p><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>\n')
 })
 
+test('markdownToHtml resolves image sources for embedded previews', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('![Diagram](../assets/diagram.png "Overview")', {
+    resolveImageSrc: (href) =>
+      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined
+  })
+
+  assert.equal(
+    html,
+    '<p><img src="data:image/png;base64,ZmFrZQ==" alt="Diagram" title="Overview"></p>\n'
+  )
+})
+
+test('markdownToHtml resolves raw HTML image sources for embedded previews', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('<img width="120" alt="Diagram" src="../assets/diagram.png" />', {
+    resolveImageSrc: (href) =>
+      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined
+  })
+
+  assert.equal(html, '<img width="120" alt="Diagram" src="data:image/png;base64,ZmFrZQ==" />')
+})
+
 test('markdownToHtml adds stable heading ids for anchor links', async () => {
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('# Getting Started\n\n## Getting Started\n\n## API `Reference`')
