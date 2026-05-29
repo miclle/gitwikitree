@@ -10,6 +10,8 @@ type BrowserContextMenuActions = {
 type BrowserContextMenuOptions = BrowserContextMenuActions & {
   params: ContextMenuParams
   isDev: boolean
+  imageSourceURL?: string
+  imageAbsoluteSourceURL?: string
 }
 
 export function canOpenExternalUrl(url: string): boolean {
@@ -24,6 +26,8 @@ export function canOpenExternalUrl(url: string): boolean {
 export function createBrowserContextMenuItems({
   params,
   isDev,
+  imageSourceURL,
+  imageAbsoluteSourceURL,
   openExternal,
   writeClipboardText,
   copyImageAt,
@@ -55,15 +59,24 @@ export function createBrowserContextMenuItems({
   }
 
   if (params.mediaType === 'image' && params.hasImageContents) {
+    const copyableImageSourceURL = imageSourceURL ?? params.srcURL
+
     items.push({
       label: 'Copy Image',
       click: () => copyImageAt(params.x, params.y)
     })
 
-    if (params.srcURL) {
+    if (copyableImageSourceURL) {
       items.push({
-        label: 'Copy Image Address',
-        click: () => writeClipboardText(params.srcURL)
+        label: 'Copy Image Path',
+        click: () => writeClipboardText(copyableImageSourceURL)
+      })
+    }
+
+    if (imageAbsoluteSourceURL) {
+      items.push({
+        label: 'Copy Absolute Image Path',
+        click: () => writeClipboardText(imageAbsoluteSourceURL)
       })
     }
 

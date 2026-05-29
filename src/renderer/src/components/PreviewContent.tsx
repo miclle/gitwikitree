@@ -24,18 +24,27 @@ import type { MarkdownLinkContext, PreviewPayload } from '../../../shared/types'
 
 function sanitizeMarkdownHtml(html: string): string {
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-copy-code', 'data-markdown-link'],
+    ADD_ATTR: [
+      'data-copy-code',
+      'data-markdown-link',
+      'data-preview-image-src',
+      'data-preview-image-absolute-src'
+    ],
     ALLOW_DATA_ATTR: true
   })
 }
 
 function renderMarkdownHtml(
   content: string,
-  markdownAssetDataUrls?: Record<string, string>
+  markdownAssetDataUrls?: Record<string, string>,
+  markdownAssetPaths?: Record<string, string>,
+  markdownAssetAbsolutePaths?: Record<string, string>
 ): string {
   return sanitizeMarkdownHtml(
     markdownToHtml(content, {
-      resolveImageSrc: (href) => markdownAssetDataUrls?.[href]
+      resolveImageSrc: (href) => markdownAssetDataUrls?.[href],
+      resolveImagePath: (href) => markdownAssetPaths?.[href],
+      resolveImageAbsolutePath: (href) => markdownAssetAbsolutePaths?.[href]
     })
   )
 }
@@ -311,6 +320,7 @@ export function PreviewContent({
   const handleMarkdownLinkContextMenu =
     (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
       if (!(event.target instanceof Element)) return
+      if (event.target.closest('img')) return
 
       const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
       if (!link || !event.currentTarget.contains(link)) return
@@ -453,7 +463,9 @@ export function PreviewContent({
             dangerouslySetInnerHTML={{
               __html: renderMarkdownHtml(
                 markdownPreview.content,
-                preview.readme.markdownAssetDataUrls
+                preview.readme.markdownAssetDataUrls,
+                preview.readme.markdownAssetPaths,
+                preview.readme.markdownAssetAbsolutePaths
               )
             }}
           />
@@ -498,7 +510,12 @@ export function PreviewContent({
         )}
         <div
           dangerouslySetInnerHTML={{
-            __html: renderMarkdownHtml(markdownPreview.content, preview.markdownAssetDataUrls)
+            __html: renderMarkdownHtml(
+              markdownPreview.content,
+              preview.markdownAssetDataUrls,
+              preview.markdownAssetPaths,
+              preview.markdownAssetAbsolutePaths
+            )
           }}
         />
       </article>

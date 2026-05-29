@@ -8,6 +8,8 @@ export type MarkdownPreview = {
 
 export type MarkdownRenderOptions = {
   resolveImageSrc?: (href: string) => string | undefined
+  resolveImagePath?: (href: string) => string | undefined
+  resolveImageAbsolutePath?: (href: string) => string | undefined
 }
 
 function unquoteYamlValue(value: string): string {
@@ -91,17 +93,20 @@ function renderMarkdownLink(href: string, title: string | null, html: string): s
   return `<a href="${escapeHtml(href)}"${titleAttribute} data-markdown-link="true">${html}</a>`
 }
 
-function rewriteRawHtmlImageSources(
-  html: string,
-  resolveImageSrc: (href: string) => string | undefined
-): string {
+function rewriteRawHtmlImageSources(html: string, options: MarkdownRenderOptions): string {
   return html.replace(
     /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)(\2)([^>]*>)/gi,
     (match, prefix: string, quote: string, href: string, closingQuote: string, suffix: string) => {
-      const src = resolveImageSrc(href)
+      const src = options.resolveImageSrc?.(href)
       if (!src) return match
 
-      return `${prefix}${quote}${escapeHtml(src)}${closingQuote}${suffix}`
+      const imagePath = options.resolveImagePath?.(href) ?? href
+      const absolutePath = options.resolveImageAbsolutePath?.(href)
+      const absolutePathAttribute = absolutePath
+        ? ` data-preview-image-absolute-src="${escapeHtml(absolutePath)}"`
+        : ''
+
+      return `${prefix}${quote}${escapeHtml(src)}${closingQuote} data-preview-image-src="${escapeHtml(imagePath)}"${absolutePathAttribute}${suffix}`
     }
   )
 }
@@ -123,17 +128,20 @@ function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
   }
 
   renderer.html = function ({ text }: Tokens.HTML): string {
-    return options.resolveImageSrc
-      ? rewriteRawHtmlImageSources(text, options.resolveImageSrc)
-      : text
+    return options.resolveImageSrc ? rewriteRawHtmlImageSources(text, options) : text
   }
 
   renderer.image = function ({ href, title, text, tokens }: Tokens.Image): string {
     const alt = tokens ? this.parser.parseInline(tokens, this.parser.textRenderer) : text
     const src = options.resolveImageSrc?.(href) ?? href
+    const imagePath = options.resolveImagePath?.(href) ?? href
+    const absolutePath = options.resolveImageAbsolutePath?.(href)
     const titleAttribute = title ? ` title="${escapeHtml(title)}"` : ''
+    const absolutePathAttribute = absolutePath
+      ? ` data-preview-image-absolute-src="${escapeHtml(absolutePath)}"`
+      : ''
 
-    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttribute}>`
+    return `<img src="${escapeHtml(src)}" data-preview-image-src="${escapeHtml(imagePath)}"${absolutePathAttribute} alt="${escapeHtml(alt)}"${titleAttribute}>`
   }
 
   renderer.code = function ({ text, lang }: Tokens.Code): string {

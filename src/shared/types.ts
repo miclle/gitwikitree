@@ -70,7 +70,13 @@ export type RepositorySearchResult = {
 export type DirectoryPreview = {
   kind: 'directory'
   path: string
-  readme?: { path: string; content: string; markdownAssetDataUrls?: Record<string, string> }
+  readme?: {
+    path: string
+    content: string
+    markdownAssetDataUrls?: Record<string, string>
+    markdownAssetPaths?: Record<string, string>
+    markdownAssetAbsolutePaths?: Record<string, string>
+  }
   entries?: Array<{ name: string; path: string; type: 'file' | 'directory' }>
 }
 
@@ -84,6 +90,8 @@ export type FilePreview = {
   content?: string
   dataUrl?: string
   markdownAssetDataUrls?: Record<string, string>
+  markdownAssetPaths?: Record<string, string>
+  markdownAssetAbsolutePaths?: Record<string, string>
   size: number
 }
 

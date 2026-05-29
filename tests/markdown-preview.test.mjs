@@ -56,12 +56,16 @@ test('markdownToHtml resolves image sources for embedded previews', async () => 
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('![Diagram](../assets/diagram.png "Overview")', {
     resolveImageSrc: (href) =>
-      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined
+      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined,
+    resolveImagePath: (href) =>
+      href === '../assets/diagram.png' ? 'content/assets/diagram.png' : undefined,
+    resolveImageAbsolutePath: (href) =>
+      href === '../assets/diagram.png' ? '/Users/test/repo/content/assets/diagram.png' : undefined
   })
 
   assert.equal(
     html,
-    '<p><img src="data:image/png;base64,ZmFrZQ==" alt="Diagram" title="Overview"></p>\n'
+    '<p><img src="data:image/png;base64,ZmFrZQ==" data-preview-image-src="content/assets/diagram.png" data-preview-image-absolute-src="/Users/test/repo/content/assets/diagram.png" alt="Diagram" title="Overview"></p>\n'
   )
 })
 
@@ -69,10 +73,17 @@ test('markdownToHtml resolves raw HTML image sources for embedded previews', asy
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('<img width="120" alt="Diagram" src="../assets/diagram.png" />', {
     resolveImageSrc: (href) =>
-      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined
+      href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined,
+    resolveImagePath: (href) =>
+      href === '../assets/diagram.png' ? 'content/assets/diagram.png' : undefined,
+    resolveImageAbsolutePath: (href) =>
+      href === '../assets/diagram.png' ? '/Users/test/repo/content/assets/diagram.png' : undefined
   })
 
-  assert.equal(html, '<img width="120" alt="Diagram" src="data:image/png;base64,ZmFrZQ==" />')
+  assert.equal(
+    html,
+    '<img width="120" alt="Diagram" src="data:image/png;base64,ZmFrZQ==" data-preview-image-src="content/assets/diagram.png" data-preview-image-absolute-src="/Users/test/repo/content/assets/diagram.png" />'
+  )
 })
 
 test('markdownToHtml adds stable heading ids for anchor links', async () => {

@@ -10,6 +10,12 @@ import type { PreviewPayload, RepositoryLoadOptions } from '../shared/types'
 
 const maxTextPreviewBytes = 1024 * 1024
 
+type MarkdownAssetPreviewData = {
+  dataUrls: Record<string, string>
+  paths: Record<string, string>
+  absolutePaths?: Record<string, string>
+}
+
 function mimeForExtension(extension: string): string {
   switch (extension) {
     case '.png':
@@ -137,7 +143,7 @@ function collectMarkdownImageHrefs(markdown: string): string[] {
   return [...hrefs]
 }
 
-async function getMarkdownAssetDataUrls({
+async function getMarkdownAssetPreviewData({
   repositoryPath,
   activeRef,
   sourcePath,
@@ -149,8 +155,10 @@ async function getMarkdownAssetDataUrls({
   sourcePath: string
   markdown: string
   isRefSource: boolean
-}): Promise<Record<string, string> | undefined> {
+}): Promise<MarkdownAssetPreviewData | undefined> {
   const dataUrls: Record<string, string> = {}
+  const paths: Record<string, string> = {}
+  const absolutePaths: Record<string, string> = {}
 
   for (const href of collectMarkdownImageHrefs(markdown)) {
     const assetPaths = resolveMarkdownAssetPaths(href, sourcePath)
@@ -165,6 +173,10 @@ async function getMarkdownAssetDataUrls({
           ? await readRefFile(repositoryPath, activeRef, assetPath)
           : await fs.readFile(safeJoin(repositoryPath, assetPath))
         dataUrls[href] = `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
+        paths[href] = assetPath
+        if (!isRefSource) {
+          absolutePaths[href] = safeJoin(repositoryPath, assetPath)
+        }
         break
       } catch {
         // Missing or unreadable Markdown images should leave the original alt text visible.
@@ -172,7 +184,13 @@ async function getMarkdownAssetDataUrls({
     }
   }
 
-  return Object.keys(dataUrls).length > 0 ? dataUrls : undefined
+  return Object.keys(dataUrls).length > 0
+    ? {
+        dataUrls,
+        paths,
+        ...(Object.keys(absolutePaths).length > 0 ? { absolutePaths } : {})
+      }
+    : undefined
 }
 
 async function readFileSample(path: string, bytes: number): Promise<Buffer> {
@@ -206,7 +224,7 @@ export async function getPreview(
       const content = isRefSource
         ? (await readRefFile(repository.path, repository.activeRef, readme.path)).toString('utf8')
         : await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
-      const markdownAssetDataUrls = await getMarkdownAssetDataUrls({
+      const markdownAssetPreviewData = await getMarkdownAssetPreviewData({
         repositoryPath: repository.path,
         activeRef: repository.activeRef,
         sourcePath: readme.path,
@@ -219,7 +237,15 @@ export async function getPreview(
         readme: {
           path: readme.path,
           content,
-          ...(markdownAssetDataUrls ? { markdownAssetDataUrls } : {})
+          ...(markdownAssetPreviewData
+            ? {
+                markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,
+                markdownAssetPaths: markdownAssetPreviewData.paths,
+                ...(markdownAssetPreviewData.absolutePaths
+                  ? { markdownAssetAbsolutePaths: markdownAssetPreviewData.absolutePaths }
+                  : {})
+              }
+            : {})
         }
       }
     }
@@ -289,9 +315,9 @@ export async function getPreview(
           previewBuffer ?? (await readRefFile(repository.path, repository.activeRef, relativePath))
         ).toString('utf8')
       : await fs.readFile(target, 'utf8')
-    const markdownAssetDataUrls =
+    const markdownAssetPreviewData =
       previewType === 'markdown'
-        ? await getMarkdownAssetDataUrls({
+        ? await getMarkdownAssetPreviewData({
             repositoryPath: repository.path,
             activeRef: repository.activeRef,
             sourcePath: toPosixPath(relativePath),
@@ -303,7 +329,15 @@ export async function getPreview(
     return {
       ...payload,
       content,
-      ...(markdownAssetDataUrls ? { markdownAssetDataUrls } : {})
+      ...(markdownAssetPreviewData
+        ? {
+            markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,
+            markdownAssetPaths: markdownAssetPreviewData.paths,
+            ...(markdownAssetPreviewData.absolutePaths
+              ? { markdownAssetAbsolutePaths: markdownAssetPreviewData.absolutePaths }
+              : {})
+          }
+        : {})
     }
   }
 

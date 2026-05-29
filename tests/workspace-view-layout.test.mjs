@@ -250,6 +250,11 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
   )
   assert.match(
     source,
+    /if \(event\.target\.closest\('img'\)\) return[\s\S]*const link = event\.target\.closest<HTMLAnchorElement>\('a\[data-markdown-link\]'\)/,
+    'linked image context menus should fall through to the browser image menu'
+  )
+  assert.match(
+    source,
     /event\.key === 'Escape'[\s\S]*closeImageLightbox\(\)/,
     'image lightbox should close from the keyboard'
   )

@@ -79,7 +79,7 @@ test('createBrowserContextMenuItems builds link and image actions', async () => 
       'Copy Link Address',
       'separator',
       'Copy Image',
-      'Copy Image Address',
+      'Copy Image Path',
       'separator',
       'copy',
       'selectAll'
@@ -96,6 +96,30 @@ test('createBrowserContextMenuItems builds link and image actions', async () => 
     ['writeClipboardText', 'https://example.com'],
     ['copyImageAt', 12, 24],
     ['writeClipboardText', 'https://example.com/image.png']
+  ])
+})
+
+test('createBrowserContextMenuItems copies renderer-provided image paths', async () => {
+  const { createBrowserContextMenuItems } = await loadBrowserContextMenu()
+  const { actions, calls } = createActions()
+  const items = createBrowserContextMenuItems({
+    params: createParams({
+      mediaType: 'image',
+      hasImageContents: true,
+      srcURL: 'data:image/png;base64,ZmFrZQ=='
+    }),
+    imageSourceURL: 'content/docs/assets/diagram.png',
+    imageAbsoluteSourceURL: '/Users/test/repo/content/docs/assets/diagram.png',
+    isDev: false,
+    ...actions
+  })
+
+  items[1].click()
+  items[2].click()
+
+  assert.deepEqual(calls, [
+    ['writeClipboardText', 'content/docs/assets/diagram.png'],
+    ['writeClipboardText', '/Users/test/repo/content/docs/assets/diagram.png']
   ])
 })
 

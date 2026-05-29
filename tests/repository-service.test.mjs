@@ -137,6 +137,55 @@ test('getPreview includes data URLs for markdown image assets', async () => {
     assert.deepEqual(preview.markdownAssetDataUrls, {
       '../assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
     })
+    assert.deepEqual(preview.markdownAssetPaths, {
+      '../assets/diagram.png': 'assets/diagram.png'
+    })
+    assert.deepEqual(preview.markdownAssetAbsolutePaths, {
+      '../assets/diagram.png': join(repoPath, 'assets', 'diagram.png')
+    })
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview omits absolute paths for markdown image assets from git refs', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const imageBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])
+    await mkdir(join(repoPath, 'assets'), { recursive: true })
+    await writeFile(join(repoPath, 'assets', 'diagram.png'), imageBytes)
+    await writeFile(join(repoPath, 'docs', 'ref-image.md'), '![Diagram](../assets/diagram.png)')
+    await execFileAsync('git', ['add', 'assets/diagram.png', 'docs/ref-image.md'], {
+      cwd: repoPath
+    })
+    await execFileAsync('git', ['commit', '-m', 'add ref image'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+
+    const preview = await service.getPreview(repoPath, 'docs/ref-image.md', {
+      ref: 'HEAD',
+      source: 'git-ref'
+    })
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'markdown')
+    assert.deepEqual(preview.markdownAssetDataUrls, {
+      '../assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+    assert.deepEqual(preview.markdownAssetPaths, {
+      '../assets/diagram.png': 'assets/diagram.png'
+    })
+    assert.equal(preview.markdownAssetAbsolutePaths, undefined)
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
@@ -163,6 +212,9 @@ test('getPreview includes data URLs for raw HTML image assets in markdown', asyn
     assert.deepEqual(preview.markdownAssetDataUrls, {
       'assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
     })
+    assert.deepEqual(preview.markdownAssetPaths, {
+      'assets/diagram.png': 'docs/assets/diagram.png'
+    })
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
@@ -188,6 +240,9 @@ test('getPreview tolerates exported markdown assets kept beside the source file'
     assert.equal(preview.previewType, 'markdown')
     assert.deepEqual(preview.markdownAssetDataUrls, {
       '../assets/diagram.png': `data:image/png;base64,${imageBytes.toString('base64')}`
+    })
+    assert.deepEqual(preview.markdownAssetPaths, {
+      '../assets/diagram.png': 'docs/assets/diagram.png'
     })
   } finally {
     await rm(repoPath, { recursive: true, force: true })
