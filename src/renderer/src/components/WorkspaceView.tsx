@@ -31,6 +31,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     handleSelect,
     toggleDirectory,
     showTreeItemContextMenu,
+    showBreadcrumbContextMenu: openBreadcrumbContextMenu,
     selectFileTab,
     closeFileTab,
     navigateActiveTabHistory,
@@ -38,6 +39,9 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openRepositoryPreview,
     openBreadcrumbPath,
     selectPreviewPath,
+    pendingMarkdownAnchor,
+    clearPendingMarkdownAnchor,
+    showMarkdownLinkContextMenu,
     selectedPath,
     breadcrumbParts,
     repositoryLabel,
@@ -45,6 +49,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     canNavigateForward
   } = workspace
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
+  const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
+    event.preventDefault()
+    void openBreadcrumbContextMenu(path)
+  }
   const fileTabsNav = (
     <nav
       className="main-tabs"
@@ -225,7 +233,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             </div>
             <div className="repo-pathbar">
               <div className="breadcrumb">
-                <button type="button" onClick={openRepositoryPreview}>
+                <button
+                  type="button"
+                  onClick={openRepositoryPreview}
+                  onContextMenu={(event) => showBreadcrumbContextMenu(event, '')}
+                >
                   {repository.name}
                 </button>
                 {!breadcrumbParts.length && directoryReadmeSource && (
@@ -260,7 +272,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                           )}
                         </>
                       ) : (
-                        <button type="button" onClick={() => openBreadcrumbPath(path)}>
+                        <button
+                          type="button"
+                          onClick={() => openBreadcrumbPath(path)}
+                          onContextMenu={(event) => showBreadcrumbContextMenu(event, path)}
+                        >
                           {part}
                         </button>
                       )}
@@ -277,7 +293,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 </div>
               )}
               {!previewLoading && preview && (
-                <PreviewContent preview={preview} onSelectPath={selectPreviewPath} />
+                <PreviewContent
+                  pendingAnchor={pendingMarkdownAnchor}
+                  preview={preview}
+                  onSelectPath={selectPreviewPath}
+                  onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
+                  onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                />
               )}
             </div>
           </section>

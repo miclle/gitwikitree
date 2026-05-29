@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { TreeItemOpenPayload } from '../shared/types'
+import type {
+  MarkdownLinkContext,
+  MarkdownLinkOpenPayload,
+  TreeItemOpenPayload
+} from '../shared/types'
 
 let pendingOpenTreeItem: TreeItemOpenPayload | undefined
 const openTreeItemCallbacks = new Set<(payload: TreeItemOpenPayload) => void>()
@@ -21,6 +25,8 @@ const api = {
     ipcRenderer.invoke('window:control', action),
   showTreeItemContextMenu: (item: TreeItemOpenPayload): Promise<void> =>
     ipcRenderer.invoke('context-menu:tree-item', item),
+  showMarkdownLinkContextMenu: (item: MarkdownLinkContext): Promise<void> =>
+    ipcRenderer.invoke('context-menu:markdown-link', item),
   pickRepository: () => ipcRenderer.invoke('repository:pick'),
   loadRepository: (repoPath: string) => ipcRenderer.invoke('repository:load', repoPath),
   loadRef: (repoPath: string, ref: string, rootPath?: string) =>
@@ -98,6 +104,13 @@ const api = {
     ipcRenderer.on('tree-item:open-in-new-tab', listener)
 
     return () => ipcRenderer.removeListener('tree-item:open-in-new-tab', listener)
+  },
+  onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => {
+    const listener = (_event: IpcRendererEvent, payload: MarkdownLinkOpenPayload): void =>
+      callback(payload)
+    ipcRenderer.on('markdown-link:open', listener)
+
+    return () => ipcRenderer.removeListener('markdown-link:open', listener)
   },
   onCloseCurrentTabOrWindow: (callback: () => void) => {
     const listener = (): void => callback()

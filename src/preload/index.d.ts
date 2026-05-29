@@ -1,5 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  MarkdownLinkContext,
+  MarkdownLinkOpenPayload,
   PreviewPayload,
   ProjectSessionState,
   RecentFileState,
@@ -12,6 +14,7 @@ export type GitWikitreeAPI = {
   newWindow: () => Promise<void>
   controlWindow: (action: 'close' | 'minimize' | 'toggle-maximize') => Promise<void>
   showTreeItemContextMenu: (item: TreeItemOpenPayload) => Promise<void>
+  showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   pickRepository: () => Promise<RepositoryPayload | undefined>
   loadRepository: (repoPath: string) => Promise<RepositoryPayload>
   loadRef: (repoPath: string, ref: string, rootPath?: string) => Promise<RepositoryPayload>
@@ -34,6 +37,7 @@ export type GitWikitreeAPI = {
   onOpenFilePath: (callback: (payload: RecentFileState) => void) => () => void
   onOpenTreeItem: (callback: (payload: TreeItemOpenPayload) => void) => () => void
   onOpenTreeItemInNewTab: (callback: (path: string) => void) => () => void
+  onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
 }
 

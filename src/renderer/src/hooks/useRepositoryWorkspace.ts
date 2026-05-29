@@ -13,6 +13,8 @@ import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths }
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
 import type {
   NavigationTarget,
+  MarkdownLinkContext,
+  MarkdownLinkOpenPayload,
   PreviewPayload,
   ProjectSessionState,
   RecentFileState,
@@ -66,13 +68,17 @@ export function useRepositoryWorkspace(): {
   handleSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   toggleDirectory: (path: string) => void
   showTreeItemContextMenu: (node: TreeNode) => Promise<void>
+  showBreadcrumbContextMenu: (path: string) => Promise<void>
   selectFileTab: (tab: OpenFileTab) => Promise<void>
   closeFileTab: (id: string) => void
   navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
   switchRef: (ref: string) => Promise<void>
   openRepositoryPreview: () => void
   openBreadcrumbPath: (path: string) => void
-  selectPreviewPath: (path: string, openInNewTab?: boolean) => boolean
+  selectPreviewPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
+  pendingMarkdownAnchor: { path: string; hash: string; token: number } | undefined
+  clearPendingMarkdownAnchor: (token: number) => void
+  showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   breadcrumbParts: string[]
   repositoryLabel: string
   canNavigateBack: boolean
@@ -81,6 +87,7 @@ export function useRepositoryWorkspace(): {
   const didRestoreSession = useRef(false)
   const didReceiveOpenIntent = useRef(false)
   const nextTabId = useRef(0)
+  const nextAnchorToken = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -92,6 +99,9 @@ export function useRepositoryWorkspace(): {
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [activeFileTabId, setActiveFileTabId] = useState<string | undefined>()
+  const [pendingMarkdownAnchor, setPendingMarkdownAnchor] = useState<
+    { path: string; hash: string; token: number } | undefined
+  >()
   const { sidebarWidth, isResizing, startResizing } = usePanelResize()
   const {
     titlebarTabsRef,
@@ -331,6 +341,14 @@ export function useRepositoryWorkspace(): {
         }
 
         const { target } = resolved
+        if (item.anchor) {
+          nextAnchorToken.current += 1
+          setPendingMarkdownAnchor({
+            path: target.path,
+            hash: item.anchor,
+            token: nextAnchorToken.current
+          })
+        }
         setSelectedPath(target.path)
         setActiveFilePath(target.type === 'directory' ? undefined : target.path)
         const tab = createFileTab(target, createNextTabId())
@@ -445,6 +463,26 @@ export function useRepositoryWorkspace(): {
         path: node.path,
         name: node.name,
         type: node.type
+      })
+    },
+    [repository]
+  )
+
+  const showBreadcrumbContextMenu = useCallback(
+    async (path: string): Promise<void> => {
+      if (!repository) return
+
+      const resolved = resolveRepositoryNavigationTarget(repository, path)
+      if (!resolved) return
+
+      await window.api.showTreeItemContextMenu({
+        repoPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        path: resolved.target.path,
+        name: resolved.target.name,
+        type: resolved.target.type ?? 'directory'
       })
     },
     [repository]
@@ -602,14 +640,30 @@ export function useRepositoryWorkspace(): {
   )
 
   const selectPreviewPath = useCallback(
-    (path: string, openInNewTab = false): boolean => {
+    (path: string, openInNewTab = false, hash?: string): boolean => {
       const resolved = repository ? resolveRepositoryNavigationTarget(repository, path) : undefined
       if (resolved?.node) {
+        if (hash) {
+          nextAnchorToken.current += 1
+          setPendingMarkdownAnchor({
+            path: resolved.target.path,
+            hash,
+            token: nextAnchorToken.current
+          })
+        }
         void handleSelect(resolved.node, { openInNewTab })
         return true
       }
 
       if (resolved) {
+        if (hash) {
+          nextAnchorToken.current += 1
+          setPendingMarkdownAnchor({
+            path: resolved.target.path,
+            hash,
+            token: nextAnchorToken.current
+          })
+        }
         setSelectedPath(resolved.target.path)
         setActiveFilePath(undefined)
         const result = navigateFileTabs({
@@ -631,11 +685,53 @@ export function useRepositoryWorkspace(): {
     [activeFileTabId, createNextTabId, handleSelect, loadPreview, openFileTabs, repository]
   )
 
+  const clearPendingMarkdownAnchor = useCallback((token: number): void => {
+    setPendingMarkdownAnchor((current) => (current?.token === token ? undefined : current))
+  }, [])
+
+  const showMarkdownLinkContextMenu = useCallback(
+    async (item: MarkdownLinkContext): Promise<void> => {
+      if (item.kind === 'external') {
+        await window.api.showMarkdownLinkContextMenu(item)
+        return
+      }
+
+      if (!repository || item.targetPath === undefined) return
+
+      const resolved = resolveRepositoryNavigationTarget(repository, item.targetPath)
+      const target = resolved?.target
+
+      await window.api.showMarkdownLinkContextMenu({
+        ...item,
+        repoPath: repository.path,
+        rootPath: repository.rootPath,
+        activeRef: repository.activeRef,
+        source: repository.source,
+        targetName: target?.name ?? fileNameFromPath(item.targetPath),
+        targetType: target?.type ?? 'file'
+      })
+    },
+    [repository]
+  )
+
+  const openMarkdownLink = useCallback(
+    (payload: MarkdownLinkOpenPayload): void => {
+      if (payload.targetPath === undefined) return
+
+      selectPreviewPath(payload.targetPath, payload.action === 'open-new-tab', payload.hash)
+    },
+    [selectPreviewPath]
+  )
+
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {
       selectPreviewPath(path, true)
     })
   }, [selectPreviewPath])
+
+  useEffect(() => {
+    return window.api.onOpenMarkdownLink(openMarkdownLink)
+  }, [openMarkdownLink])
 
   return {
     repository,
@@ -662,6 +758,7 @@ export function useRepositoryWorkspace(): {
     handleSelect,
     toggleDirectory,
     showTreeItemContextMenu,
+    showBreadcrumbContextMenu,
     selectFileTab,
     closeFileTab,
     navigateActiveTabHistory,
@@ -669,6 +766,9 @@ export function useRepositoryWorkspace(): {
     openRepositoryPreview,
     openBreadcrumbPath,
     selectPreviewPath,
+    pendingMarkdownAnchor,
+    clearPendingMarkdownAnchor,
+    showMarkdownLinkContextMenu,
     breadcrumbParts: selectedPath ? selectedPath.split('/').filter(Boolean) : [],
     repositoryLabel: repository ? getRepositoryLabel(repository) : '',
     canNavigateBack: canMoveTabHistory(openFileTabs, activeFileTabId, -1),

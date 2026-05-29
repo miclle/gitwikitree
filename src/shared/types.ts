@@ -15,6 +15,28 @@ export type TreeItemOpenPayload = Pick<TreeNode, 'name' | 'path' | 'type'> & {
   rootPath?: string
   activeRef?: string
   source?: RepositorySource
+  anchor?: string
+}
+
+export type MarkdownLinkKind = 'external' | 'internal' | 'anchor' | 'unresolved'
+
+export type MarkdownLinkContext = {
+  kind: MarkdownLinkKind
+  href: string
+  targetPath?: string
+  targetName?: string
+  targetType?: 'file' | 'directory'
+  hash?: string
+  repoPath?: string
+  rootPath?: string
+  activeRef?: string
+  source?: RepositorySource
+}
+
+export type MarkdownLinkOpenAction = 'open' | 'open-new-tab'
+
+export type MarkdownLinkOpenPayload = MarkdownLinkContext & {
+  action: MarkdownLinkOpenAction
 }
 
 export type RepositoryRef = {

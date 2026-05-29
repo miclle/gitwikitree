@@ -60,6 +60,31 @@ test('preview titlebar keeps preview controls tight before tabs', async () => {
   )
 })
 
+test('breadcrumb links expose project context menus', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /onContextMenu=\{\(event\) => showBreadcrumbContextMenu\(event, ''\)\}/,
+    'repository breadcrumb should expose the app path context menu'
+  )
+  assert.match(
+    source,
+    /onContextMenu=\{\(event\) => showBreadcrumbContextMenu\(event, path\)\}/,
+    'ancestor breadcrumb links should expose the app path context menu'
+  )
+})
+
+test('workspace passes breadcrumb context menu handler from the hook', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /showBreadcrumbContextMenu: openBreadcrumbContextMenu,/,
+    'workspace should read the breadcrumb context menu handler from workspace state'
+  )
+})
+
 test('expanded sidebar keeps sidebar and history controls out of the sidebar titlebar', async () => {
   const source = await readWorkspaceView()
   const sidebarTitlebar = source.match(

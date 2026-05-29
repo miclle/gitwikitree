@@ -6,7 +6,12 @@ import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 async function loadContextMenuIpc() {
   const { module } = await loadTranspiledModule({
     entry: 'src/main/context-menu-ipc.ts',
-    modules: ['src/main/context-menu-ipc.ts', 'src/main/context-menu.ts', 'src/shared/types.ts']
+    modules: [
+      'src/main/context-menu-ipc.ts',
+      'src/main/context-menu.ts',
+      'src/main/browser-context-menu.ts',
+      'src/shared/types.ts'
+    ]
   })
   return module
 }
@@ -40,7 +45,9 @@ function createHarness(targetWindow = { id: 'target-window' }) {
       buildMenuFromTemplate: (items) => ({
         popup: (options) => popups.push({ items, options })
       }),
-      openTreeItemInNewWindow: (targetItem) => openedWindows.push(targetItem)
+      openTreeItemInNewWindow: (targetItem) => openedWindows.push(targetItem),
+      openExternal: () => undefined,
+      writeClipboardText: () => undefined
     }
   }
 }
@@ -51,7 +58,7 @@ test('registerContextMenuIpcHandlers registers the tree item context menu channe
 
   registerContextMenuIpcHandlers(dependencies)
 
-  assert.deepEqual([...handlers.keys()], ['context-menu:tree-item'])
+  assert.deepEqual([...handlers.keys()], ['context-menu:tree-item', 'context-menu:markdown-link'])
 })
 
 test('context-menu:tree-item builds and opens a menu for the sender window', async () => {

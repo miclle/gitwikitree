@@ -1,16 +1,17 @@
-import { type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import DOMPurify from 'dompurify'
 import { FileText } from 'lucide-react'
 import {
   getMarkdownPreview,
   isExternalLink,
   markdownHeadingId,
-  markdownToHtml,
-  resolveMarkdownLinkPath
+  markdownToHtml
 } from '../markdown-preview'
 import { highlightCodeBlock, languageForExtension } from '../code-highlight'
+import { createMarkdownLinkTarget } from '../markdown-link-context'
+import { isPrimaryClick, shouldHandleNavigationClick } from '../mouse-events'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
-import type { PreviewPayload } from '../../../shared/types'
+import type { MarkdownLinkContext, PreviewPayload } from '../../../shared/types'
 
 function sanitizeMarkdownHtml(html: string): string {
   return DOMPurify.sanitize(html, {
@@ -46,11 +47,18 @@ function CodePreview({
 
 export function PreviewContent({
   preview,
-  onSelectPath
+  pendingAnchor,
+  onSelectPath,
+  onOpenMarkdownLinkContextMenu,
+  onMarkdownAnchorHandled
 }: {
   preview: PreviewPayload
-  onSelectPath: (path: string, openInNewTab?: boolean) => boolean
+  pendingAnchor?: { path: string; hash: string; token: number }
+  onSelectPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
+  onOpenMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
+  onMarkdownAnchorHandled: (token: number) => void
 }): React.JSX.Element {
+  const markdownBodyRef = useRef<HTMLElement | null>(null)
   const setCopyButtonState = (
     button: HTMLButtonElement,
     state: 'copied' | 'failed',
@@ -83,29 +91,29 @@ export function PreviewContent({
     }
   }
 
-  const scrollToMarkdownAnchor = (href: string, container: HTMLElement): void => {
-    const hash = href.trim().slice(1)
+  const scrollToMarkdownAnchor = (hash: string, container: HTMLElement): void => {
     if (!hash) return
 
-    let anchor = hash
-    try {
-      anchor = decodeURIComponent(hash)
-    } catch {
-      anchor = hash
-    }
-
-    const escapedAnchor = CSS.escape(anchor)
+    const escapedAnchor = CSS.escape(hash)
     const target = container.querySelector<HTMLElement>(
       `[id="${escapedAnchor}"], [name="${escapedAnchor}"]`
     )
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  useEffect(() => {
+    if (!pendingAnchor || pendingAnchor.path !== preview.path || !markdownBodyRef.current) return
+
+    scrollToMarkdownAnchor(pendingAnchor.hash, markdownBodyRef.current)
+    onMarkdownAnchorHandled(pendingAnchor.token)
+  }, [onMarkdownAnchorHandled, pendingAnchor, preview.path])
+
   const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return
 
     const copyButton = event.target.closest<HTMLButtonElement>('button[data-copy-code]')
     if (copyButton && event.currentTarget.contains(copyButton)) {
+      if (!isPrimaryClick(event)) return
       event.preventDefault()
       void handleMarkdownCodeCopy(copyButton)
       return
@@ -113,12 +121,20 @@ export function PreviewContent({
 
     const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
     if (!link || !event.currentTarget.contains(link)) return
+    if (!shouldHandleNavigationClick(event)) return
 
     const href = link.getAttribute('href') ?? ''
     event.preventDefault()
 
-    if (href.trim().startsWith('#')) {
-      scrollToMarkdownAnchor(href, event.currentTarget)
+    const target = createMarkdownLinkTarget({
+      href,
+      sourcePath,
+      previewPath: preview.path
+    })
+    if (!target) return
+
+    if (target.kind === 'anchor' && target.hash) {
+      scrollToMarkdownAnchor(target.hash, event.currentTarget)
       return
     }
 
@@ -127,9 +143,28 @@ export function PreviewContent({
       return
     }
 
-    const nextPath = resolveMarkdownLinkPath(href, sourcePath)
-    if (nextPath) onSelectPath(nextPath, shouldOpenInNewTab(event))
+    if (target.targetPath !== undefined) {
+      onSelectPath(target.targetPath, shouldOpenInNewTab(event), target.hash)
+    }
   }
+
+  const handleMarkdownLinkContextMenu =
+    (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
+      if (!(event.target instanceof Element)) return
+
+      const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
+      if (!link || !event.currentTarget.contains(link)) return
+
+      const target = createMarkdownLinkTarget({
+        href: link.getAttribute('href') ?? '',
+        sourcePath,
+        previewPath: preview.path
+      })
+      if (!target) return
+
+      event.preventDefault()
+      void onOpenMarkdownLinkContextMenu(target)
+    }
 
   if (preview.kind === 'directory') {
     if (preview.readme) {
@@ -137,9 +172,11 @@ export function PreviewContent({
 
       return (
         <article
+          ref={markdownBodyRef}
           className="markdown-body"
           onAuxClick={handleMarkdownLinkClick(preview.readme.path)}
           onClick={handleMarkdownLinkClick(preview.readme.path)}
+          onContextMenu={handleMarkdownLinkContextMenu(preview.readme.path)}
         >
           {markdownPreview.title && (
             <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
@@ -179,9 +216,11 @@ export function PreviewContent({
 
     return (
       <article
+        ref={markdownBodyRef}
         className="markdown-body"
         onAuxClick={handleMarkdownLinkClick(preview.path)}
         onClick={handleMarkdownLinkClick(preview.path)}
+        onContextMenu={handleMarkdownLinkContextMenu(preview.path)}
       >
         {markdownPreview.title && (
           <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>

@@ -125,11 +125,24 @@ async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean
   }
 }
 
+async function isMarkdownLinkContextMenu(params: ContextMenuParams): Promise<boolean> {
+  try {
+    return (
+      (await params.frame?.executeJavaScript(
+        `Boolean(document.elementFromPoint(${params.x}, ${params.y})?.closest('a[data-markdown-link="true"]'))`
+      )) === true
+    )
+  } catch {
+    return false
+  }
+}
+
 async function showContextMenu(
   targetWindow: BrowserWindow,
   params: ContextMenuParams
 ): Promise<void> {
   if (await isTreeItemContextMenu(params)) return
+  if (await isMarkdownLinkContextMenu(params)) return
 
   const items = createBrowserContextMenuItems({
     params,
@@ -326,7 +339,9 @@ app.whenReady().then(async () => {
     ipcMain,
     getWindowFromWebContents: (webContents) => BrowserWindow.fromWebContents(webContents),
     buildMenuFromTemplate: (items) => Menu.buildFromTemplate(items),
-    openTreeItemInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem)
+    openTreeItemInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem),
+    openExternal: (url) => void shell.openExternal(url),
+    writeClipboardText: (text) => clipboard.writeText(text)
   })
 
   registerRepositoryIpcHandlers({
