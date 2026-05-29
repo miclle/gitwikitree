@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref } from 'react'
 import DOMPurify from 'dompurify'
 import { FileText } from 'lucide-react'
 import {
@@ -11,6 +11,7 @@ import { highlightCodeBlock, languageForExtension } from '../code-highlight'
 import { createMarkdownLinkTarget } from '../markdown-link-context'
 import { isPrimaryClick, shouldHandleNavigationClick } from '../mouse-events'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
+import { applyPreviewSearchHighlights } from '../preview-search'
 import type { MarkdownLinkContext, PreviewPayload } from '../../../shared/types'
 
 function sanitizeMarkdownHtml(html: string): string {
@@ -22,16 +23,18 @@ function sanitizeMarkdownHtml(html: string): string {
 
 function CodePreview({
   content,
-  extension
+  extension,
+  rootRef
 }: {
   content: string
   extension: string
+  rootRef: Ref<HTMLDivElement>
 }): React.JSX.Element {
   const lineCount = Math.max(1, content.split('\n').length)
   const language = languageForExtension(extension)
 
   return (
-    <div className="code-preview-shell" aria-label="Source code">
+    <div ref={rootRef} className="code-preview-shell" aria-label="Source code">
       <pre className="code-line-gutter" aria-hidden="true">
         {Array.from({ length: lineCount }, (_, index) => index + 1).join('\n')}
       </pre>
@@ -48,17 +51,35 @@ function CodePreview({
 export function PreviewContent({
   preview,
   pendingAnchor,
+  searchQuery,
+  activeSearchIndex,
+  onSearchMatchCountChange,
   onSelectPath,
   onOpenMarkdownLinkContextMenu,
   onMarkdownAnchorHandled
 }: {
   preview: PreviewPayload
   pendingAnchor?: { path: string; hash: string; token: number }
+  searchQuery: string
+  activeSearchIndex: number
+  onSearchMatchCountChange: (count: number) => void
   onSelectPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
   onOpenMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   onMarkdownAnchorHandled: (token: number) => void
 }): React.JSX.Element {
   const markdownBodyRef = useRef<HTMLElement | null>(null)
+  const previewSearchRootRef = useRef<HTMLElement | null>(null)
+  const [searchRootVersion, setSearchRootVersion] = useState(0)
+  const setPreviewSearchRoot = (element: HTMLElement | null): void => {
+    previewSearchRootRef.current = element
+  }
+  const setMarkdownPreviewRoot = (element: HTMLElement | null): void => {
+    markdownBodyRef.current = element
+    previewSearchRootRef.current = element
+  }
+  const setHtmlPreviewRoot = (element: HTMLIFrameElement | null): void => {
+    previewSearchRootRef.current = element?.contentDocument?.body ?? null
+  }
   const setCopyButtonState = (
     button: HTMLButtonElement,
     state: 'copied' | 'failed',
@@ -107,6 +128,25 @@ export function PreviewContent({
     scrollToMarkdownAnchor(pendingAnchor.hash, markdownBodyRef.current)
     onMarkdownAnchorHandled(pendingAnchor.token)
   }, [onMarkdownAnchorHandled, pendingAnchor, preview.path])
+
+  useEffect(() => {
+    const container = previewSearchRootRef.current
+    if (!container) {
+      onSearchMatchCountChange(0)
+      return
+    }
+
+    const matchCount = applyPreviewSearchHighlights({
+      container,
+      query: searchQuery,
+      activeIndex: activeSearchIndex
+    })
+    onSearchMatchCountChange(matchCount)
+
+    return () => {
+      applyPreviewSearchHighlights({ container, query: '', activeIndex: -1 })
+    }
+  }, [activeSearchIndex, onSearchMatchCountChange, preview, searchQuery, searchRootVersion])
 
   const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return
@@ -172,7 +212,7 @@ export function PreviewContent({
 
       return (
         <article
-          ref={markdownBodyRef}
+          ref={setMarkdownPreviewRoot}
           className="markdown-body"
           onAuxClick={handleMarkdownLinkClick(preview.readme.path)}
           onClick={handleMarkdownLinkClick(preview.readme.path)}
@@ -191,7 +231,7 @@ export function PreviewContent({
     }
 
     return (
-      <div className="directory-list">
+      <div ref={setPreviewSearchRoot} className="directory-list">
         {(preview.entries ?? []).map((entry) => (
           <button
             key={entry.path}
@@ -216,7 +256,7 @@ export function PreviewContent({
 
     return (
       <article
-        ref={markdownBodyRef}
+        ref={setMarkdownPreviewRoot}
         className="markdown-body"
         onAuxClick={handleMarkdownLinkClick(preview.path)}
         onClick={handleMarkdownLinkClick(preview.path)}
@@ -236,7 +276,17 @@ export function PreviewContent({
 
   if (preview.previewType === 'html' && preview.content !== undefined) {
     return (
-      <iframe className="html-preview" title={preview.path} sandbox="" srcDoc={preview.content} />
+      <iframe
+        ref={setHtmlPreviewRoot}
+        className="html-preview"
+        title={preview.path}
+        sandbox="allow-same-origin"
+        srcDoc={preview.content}
+        onLoad={(event) => {
+          setHtmlPreviewRoot(event.currentTarget)
+          setSearchRootVersion((version) => version + 1)
+        }}
+      />
     )
   }
 
@@ -253,18 +303,24 @@ export function PreviewContent({
 
   if (preview.previewType === 'image' && preview.dataUrl) {
     return (
-      <div className="image-preview">
+      <div ref={setPreviewSearchRoot} className="image-preview">
         <img alt={preview.name} src={preview.dataUrl} />
       </div>
     )
   }
 
   if (preview.content !== undefined) {
-    return <CodePreview content={preview.content} extension={preview.extension} />
+    return (
+      <CodePreview
+        content={preview.content}
+        extension={preview.extension}
+        rootRef={setPreviewSearchRoot}
+      />
+    )
   }
 
   return (
-    <div className="unsupported-preview">
+    <div ref={setPreviewSearchRoot} className="unsupported-preview">
       <FileText size={32} />
       <strong>Preview unavailable</strong>
       <span>This file type is not rendered yet.</span>

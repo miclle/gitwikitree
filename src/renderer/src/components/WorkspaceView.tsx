@@ -1,7 +1,20 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
-import { ChevronLeft, ChevronRight, Code2, GitBranch, Loader2, Plus, Search, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Code2,
+  GitBranch,
+  Loader2,
+  Plus,
+  Search,
+  X
+} from 'lucide-react'
 import { iconForNode } from '../app-utils'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
+import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-search'
 import { PreviewContent } from './PreviewContent'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
@@ -49,10 +62,77 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     canNavigateForward
   } = workspace
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const previewBodyRef = useRef<HTMLDivElement | null>(null)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchMatchCount, setSearchMatchCount] = useState(0)
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+  const appliedSearchQuery = isSearchOpen ? searchQuery : ''
+  const openPreviewSearch = useCallback(() => {
+    const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
+    if (selectedText) {
+      setSearchQuery(selectedText)
+      setActiveSearchIndex(-1)
+    }
+
+    setIsSearchOpen(true)
+    setSearchFocusRequest((request) => request + 1)
+  }, [])
+  const closePreviewSearch = useCallback(() => {
+    setIsSearchOpen(false)
+    setActiveSearchIndex(-1)
+  }, [])
+  const stepSearchMatch = useCallback(
+    (direction: -1 | 1): void => {
+      setActiveSearchIndex((currentIndex) =>
+        getSteppedSearchIndex({
+          currentIndex,
+          matchCount: searchMatchCount,
+          direction
+        })
+      )
+    },
+    [searchMatchCount]
+  )
+  const handleSearchMatchCountChange = useCallback((count: number): void => {
+    setSearchMatchCount(count)
+    setActiveSearchIndex((currentIndex) => {
+      if (count <= 0) return -1
+      if (currentIndex < 0) return 0
+      return Math.min(currentIndex, count - 1)
+    })
+  }, [])
   const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
     void openBreadcrumbContextMenu(path)
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && isSearchOpen) {
+        event.preventDefault()
+        closePreviewSearch()
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'f') {
+        event.preventDefault()
+        openPreviewSearch()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [closePreviewSearch, isSearchOpen, openPreviewSearch])
+
+  useEffect(() => {
+    if (!isSearchOpen) return
+
+    searchInputRef.current?.focus()
+    searchInputRef.current?.select()
+  }, [isSearchOpen, searchFocusRequest])
   const fileTabsNav = (
     <nav
       className="main-tabs"
@@ -284,9 +364,18 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   )
                 })}
               </div>
+              <button
+                className="path-search-button"
+                type="button"
+                aria-label="Find in current tab"
+                aria-expanded={isSearchOpen}
+                onClick={openPreviewSearch}
+              >
+                <Search size={15} />
+              </button>
             </div>
 
-            <div className="preview-body">
+            <div className="preview-body" ref={previewBodyRef}>
               {previewLoading && (
                 <div className="loading-state">
                   <Loader2 className="spin" size={26} />
@@ -296,12 +385,83 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 <PreviewContent
                   pendingAnchor={pendingMarkdownAnchor}
                   preview={preview}
+                  searchQuery={appliedSearchQuery}
+                  activeSearchIndex={activeSearchIndex}
+                  onSearchMatchCountChange={handleSearchMatchCountChange}
                   onSelectPath={selectPreviewPath}
                   onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
                   onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
                 />
               )}
             </div>
+            {isSearchOpen && (
+              <form
+                className="preview-search-popover"
+                role="search"
+                aria-label="Find in current tab"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  stepSearchMatch(1)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    closePreviewSearch()
+                    return
+                  }
+
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    stepSearchMatch(event.shiftKey ? -1 : 1)
+                  }
+                }}
+              >
+                <Search className="preview-search-icon" size={15} aria-hidden="true" />
+                <input
+                  ref={searchInputRef}
+                  aria-label="Find in current tab"
+                  value={searchQuery}
+                  placeholder="Find"
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value)
+                    setActiveSearchIndex(-1)
+                  }}
+                />
+                <span className="preview-search-count" aria-live="polite">
+                  {searchQuery.trim()
+                    ? searchMatchCount > 0
+                      ? `${activeSearchIndex + 1}/${searchMatchCount}`
+                      : '0/0'
+                    : '0/0'}
+                </span>
+                <button
+                  className="preview-search-button"
+                  type="button"
+                  aria-label="Previous match"
+                  disabled={searchMatchCount === 0}
+                  onClick={() => stepSearchMatch(-1)}
+                >
+                  <ChevronUp size={15} />
+                </button>
+                <button
+                  className="preview-search-button"
+                  type="button"
+                  aria-label="Next match"
+                  disabled={searchMatchCount === 0}
+                  onClick={() => stepSearchMatch(1)}
+                >
+                  <ChevronDown size={15} />
+                </button>
+                <button
+                  className="preview-search-button"
+                  type="button"
+                  aria-label="Close find"
+                  onClick={closePreviewSearch}
+                >
+                  <X size={15} />
+                </button>
+              </form>
+            )}
           </section>
         </section>
       )}

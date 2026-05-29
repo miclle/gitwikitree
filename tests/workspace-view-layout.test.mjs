@@ -18,6 +18,13 @@ async function readPanelResizeHook() {
   return readFile(new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url), 'utf8')
 }
 
+async function readPreviewContent() {
+  return readFile(
+    new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
 test('preview titlebar places file tabs in the titlebar row', async () => {
   const source = await readWorkspaceView()
 
@@ -82,6 +89,86 @@ test('workspace passes breadcrumb context menu handler from the hook', async () 
     source,
     /showBreadcrumbContextMenu: openBreadcrumbContextMenu,/,
     'workspace should read the breadcrumb context menu handler from workspace state'
+  )
+})
+
+test('current tab search command refocuses the find input even when already open', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /const \[searchFocusRequest, setSearchFocusRequest\] = useState\(0\)/,
+    'search should track focus requests separately from open state'
+  )
+  assert.match(
+    source,
+    /setSearchFocusRequest\(\(request\) => request \+ 1\)/,
+    'opening search should request focus even when the popover is already open'
+  )
+  assert.match(
+    source,
+    /\}, \[isSearchOpen, searchFocusRequest\]\)/,
+    'search focus effect should rerun for repeated find commands'
+  )
+})
+
+test('current tab search command seeds the query from selected preview text', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /const previewBodyRef = useRef<HTMLDivElement \| null>\(null\)/,
+    'workspace should keep a ref to the searchable preview content'
+  )
+  assert.match(
+    source,
+    /getSelectedPreviewSearchText\(window\.getSelection\(\), previewBodyRef\.current\)/,
+    'opening search should read the current selection from the preview content'
+  )
+  assert.match(
+    source,
+    /if \(selectedText\) \{[\s\S]*setSearchQuery\(selectedText\)[\s\S]*setActiveSearchIndex\(-1\)[\s\S]*\}/,
+    'selected preview text should seed the search query and reset the active match'
+  )
+  assert.match(
+    source,
+    /<div className="preview-body" ref=\{previewBodyRef\}>/,
+    'preview body should be the search selection boundary'
+  )
+})
+
+test('current tab search closes on Escape even when the find input is blurred', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /if \(event\.key === 'Escape' && isSearchOpen\) \{[\s\S]*event\.preventDefault\(\)[\s\S]*closePreviewSearch\(\)[\s\S]*return[\s\S]*\}/,
+    'window key handling should close the search popover when Escape is pressed outside the input'
+  )
+  assert.match(
+    source,
+    /\}, \[closePreviewSearch, isSearchOpen, openPreviewSearch\]\)/,
+    'global keyboard handler should react to search open state and close callback changes'
+  )
+})
+
+test('html previews register their iframe body as searchable content', async () => {
+  const source = await readPreviewContent()
+
+  assert.match(
+    source,
+    /const setHtmlPreviewRoot = \(element: HTMLIFrameElement \| null\): void => \{[\s\S]*previewSearchRootRef\.current = element\?\.contentDocument\?\.body \?\? null[\s\S]*\}/,
+    'html preview should expose the iframe body to the current-tab search highlighter'
+  )
+  assert.match(
+    source,
+    /sandbox="allow-same-origin"/,
+    'html preview iframe should remain script-disabled while allowing parent-side search access'
+  )
+  assert.match(
+    source,
+    /setSearchRootVersion\(\(version\) => version \+ 1\)/,
+    'html preview load should rerun search once iframe content is available'
   )
 })
 

@@ -788,12 +788,14 @@ kbd {
 
 .preview-panel {
   display: flex;
+  position: relative;
   flex-direction: column;
   overflow: hidden;
   padding: 0;
 }
 
 .repo-pathbar {
+  position: relative;
   flex: 0 0 auto;
   justify-content: space-between;
   gap: 16px;
@@ -849,6 +851,97 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.path-search-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  color: #59636e;
+  background: transparent;
+}
+
+.path-search-button:hover,
+.path-search-button[aria-expanded='true'] {
+  color: #1f2328;
+  background: #f0f3f6;
+}
+
+.preview-search-popover {
+  position: absolute;
+  z-index: 8;
+  top: calc(var(--top-bar-height) + 8px);
+  right: 16px;
+  display: grid;
+  align-items: center;
+  grid-template-columns: 16px minmax(150px, 220px) minmax(42px, auto) 28px 28px 28px;
+  gap: 4px;
+  width: min(520px, calc(100% - 32px));
+  min-height: 38px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid rgba(31, 35, 40, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow:
+    0 8px 22px rgba(31, 35, 40, 0.14),
+    0 2px 5px rgba(31, 35, 40, 0.08);
+}
+
+.preview-search-icon {
+  color: #6e7781;
+}
+
+.preview-search-popover input {
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  outline: 0;
+}
+
+.preview-search-count {
+  min-width: 42px;
+  color: #6e7781;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.preview-search-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 5px;
+  color: #59636e;
+  background: transparent;
+}
+
+.preview-search-button:hover:not(:disabled),
+.preview-search-button:focus-visible:not(:disabled) {
+  color: #1f2328;
+  background: #f0f3f6;
+  outline: 0;
+}
+
+.preview-search-match {
+  border-radius: 2px;
+  color: inherit;
+  background: #fff1a7;
+  box-shadow: 0 0 0 1px rgba(154, 103, 0, 0.12);
+}
+
+.preview-search-match.active {
+  background: #f7c948;
+  box-shadow: 0 0 0 1px rgba(154, 103, 0, 0.32);
 }
 
 .path-toolbar {
