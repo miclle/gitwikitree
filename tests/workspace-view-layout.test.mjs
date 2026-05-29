@@ -234,6 +234,52 @@ test('html previews register their iframe body as searchable content', async () 
   )
 })
 
+test('image preview lightbox supports click, keyboard, and adjacent image navigation', async () => {
+  const source = await readPreviewContent()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /collectPreviewImages\(container\.querySelectorAll\('img'\)\)/,
+    'image lightbox should collect images from the current preview only'
+  )
+  assert.match(
+    source,
+    /handlePreviewImageClick\(event\.currentTarget\)\(event\)[\s\S]*if \(event\.defaultPrevented\) return[\s\S]*handleMarkdownLinkClick\(sourcePath\)\(event\)/,
+    'markdown image clicks should open the lightbox before linked images can navigate'
+  )
+  assert.match(
+    source,
+    /event\.key === 'Escape'[\s\S]*closeImageLightbox\(\)/,
+    'image lightbox should close from the keyboard'
+  )
+  assert.match(
+    source,
+    /event\.key === 'ArrowLeft'[\s\S]*stepImageLightbox\(-1\)[\s\S]*event\.key === 'ArrowRight'[\s\S]*stepImageLightbox\(1\)/,
+    'image lightbox should navigate adjacent images from the keyboard'
+  )
+  assert.match(
+    source,
+    /onWheel=\{\(event\) => \{[\s\S]*getSteppedPreviewImageZoom[\s\S]*onDoubleClick=\{\(event\) => \{[\s\S]*getToggledPreviewImageZoom/,
+    'image lightbox should support mouse zoom through wheel and double click'
+  )
+  assert.match(
+    source,
+    /role="dialog"[\s\S]*aria-modal="true"[\s\S]*className="image-lightbox-nav previous"[\s\S]*className="image-lightbox-nav next"/,
+    'image lightbox should render a modal with previous and next controls'
+  )
+  assert.match(
+    css,
+    /\.image-lightbox\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*0;[\s\S]*z-index:\s*50;/,
+    'image lightbox should overlay the current window'
+  )
+  assert.match(
+    css,
+    /\.image-lightbox-image\s*\{[\s\S]*cursor:\s*zoom-in;[\s\S]*transform-origin:\s*center;/,
+    'image lightbox should expose the enlarged image as zoomable'
+  )
+})
+
 test('expanded sidebar keeps sidebar and history controls out of the sidebar titlebar', async () => {
   const source = await readWorkspaceView()
   const sidebarTitlebar = source.match(

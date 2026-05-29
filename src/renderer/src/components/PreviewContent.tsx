@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type Ref } from 'react'
 import DOMPurify from 'dompurify'
-import { FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, X } from 'lucide-react'
 import {
   getMarkdownPreview,
   isExternalLink,
@@ -12,6 +12,14 @@ import { createMarkdownLinkTarget } from '../markdown-link-context'
 import { isPrimaryClick, shouldHandleNavigationClick } from '../mouse-events'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
 import { applyPreviewSearchHighlights } from '../preview-search'
+import {
+  collectPreviewImages,
+  findPreviewImageIndex,
+  getSteppedPreviewImageIndex,
+  getSteppedPreviewImageZoom,
+  getToggledPreviewImageZoom,
+  type PreviewImage
+} from '../preview-images'
 import type { MarkdownLinkContext, PreviewPayload } from '../../../shared/types'
 
 function sanitizeMarkdownHtml(html: string): string {
@@ -59,6 +67,16 @@ function CodePreview({
   )
 }
 
+type ImageLightboxState = {
+  images: PreviewImage[]
+  index: number
+  zoom: number
+  previewKind: PreviewPayload['kind']
+  previewPath: string
+}
+
+const IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP = 0.25
+
 export function PreviewContent({
   preview,
   pendingAnchor,
@@ -81,6 +99,11 @@ export function PreviewContent({
   const markdownBodyRef = useRef<HTMLElement | null>(null)
   const previewSearchRootRef = useRef<HTMLElement | null>(null)
   const [searchRootVersion, setSearchRootVersion] = useState(0)
+  const [imageLightbox, setImageLightbox] = useState<ImageLightboxState | undefined>()
+  const activeImageLightbox =
+    imageLightbox?.previewKind === preview.kind && imageLightbox.previewPath === preview.path
+      ? imageLightbox
+      : undefined
   const setPreviewSearchRoot = (element: HTMLElement | null): void => {
     previewSearchRootRef.current = element
   }
@@ -133,6 +156,55 @@ export function PreviewContent({
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const closeImageLightbox = (): void => {
+    setImageLightbox(undefined)
+  }
+
+  const stepImageLightbox = (delta: number): void => {
+    setImageLightbox((current) =>
+      current
+        ? {
+            ...current,
+            index: getSteppedPreviewImageIndex(current.index, current.images.length, delta),
+            zoom: 1
+          }
+        : current
+    )
+  }
+
+  const setImageLightboxZoom = (updater: (currentZoom: number) => number): void => {
+    setImageLightbox((current) =>
+      current
+        ? { ...current, zoom: updater(Number.isFinite(current.zoom) ? current.zoom : 1) }
+        : current
+    )
+  }
+
+  const openImageLightbox = (image: HTMLImageElement, container: HTMLElement): void => {
+    const images = collectPreviewImages(container.querySelectorAll('img'))
+    if (images.length === 0) return
+
+    setImageLightbox({
+      images,
+      index: findPreviewImageIndex(images, image.src),
+      zoom: 1,
+      previewKind: preview.kind,
+      previewPath: preview.path
+    })
+  }
+
+  const handlePreviewImageClick =
+    (container: HTMLElement) => (event: ReactMouseEvent<HTMLElement>) => {
+      if (!isPrimaryClick(event)) return
+      if (!(event.target instanceof Element)) return
+
+      const image = event.target.closest<HTMLImageElement>('img')
+      if (!image || !container.contains(image)) return
+
+      event.preventDefault()
+      openImageLightbox(image, container)
+    }
+
   useEffect(() => {
     if (!pendingAnchor || pendingAnchor.path !== preview.path || !markdownBodyRef.current) return
 
@@ -158,6 +230,35 @@ export function PreviewContent({
       applyPreviewSearchHighlights({ container, query: '', activeIndex: -1 })
     }
   }, [activeSearchIndex, onSearchMatchCountChange, preview, searchQuery, searchRootVersion])
+
+  useEffect(() => {
+    if (!activeImageLightbox) return
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        closeImageLightbox()
+        return
+      }
+
+      if (event.key === 'ArrowLeft' && activeImageLightbox.images.length > 1) {
+        event.preventDefault()
+        event.stopPropagation()
+        stepImageLightbox(-1)
+        return
+      }
+
+      if (event.key === 'ArrowRight' && activeImageLightbox.images.length > 1) {
+        event.preventDefault()
+        event.stopPropagation()
+        stepImageLightbox(1)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [activeImageLightbox])
 
   const handleMarkdownLinkClick = (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return
@@ -199,6 +300,14 @@ export function PreviewContent({
     }
   }
 
+  const handleMarkdownPreviewClick =
+    (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
+      handlePreviewImageClick(event.currentTarget)(event)
+      if (event.defaultPrevented) return
+
+      handleMarkdownLinkClick(sourcePath)(event)
+    }
+
   const handleMarkdownLinkContextMenu =
     (sourcePath: string) => (event: ReactMouseEvent<HTMLElement>) => {
       if (!(event.target instanceof Element)) return
@@ -217,16 +326,124 @@ export function PreviewContent({
       void onOpenMarkdownLinkContextMenu(target)
     }
 
+  const renderImageLightbox = (): React.JSX.Element | undefined => {
+    if (!activeImageLightbox) return undefined
+
+    const image = activeImageLightbox.images[activeImageLightbox.index]
+    if (!image) return undefined
+
+    const imageLabel = image.alt || image.title || 'Preview image'
+    const canNavigate = activeImageLightbox.images.length > 1
+    const zoom = Number.isFinite(activeImageLightbox.zoom) ? activeImageLightbox.zoom : 1
+    const zoomLabel = `${Math.round(zoom * 100)}%`
+
+    return (
+      <div
+        className="image-lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Image preview"
+        onClick={closeImageLightbox}
+      >
+        <div className="image-lightbox-topbar" onClick={(event) => event.stopPropagation()}>
+          <div className="image-lightbox-meta">
+            <span className="image-lightbox-title">{imageLabel}</span>
+            {canNavigate && (
+              <span className="image-lightbox-count">
+                {activeImageLightbox.index + 1} / {activeImageLightbox.images.length}
+              </span>
+            )}
+            <span className="image-lightbox-count">{zoomLabel}</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Close image preview"
+            title="Close"
+            onClick={closeImageLightbox}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {canNavigate && (
+          <button
+            type="button"
+            className="image-lightbox-nav previous"
+            aria-label="Previous image"
+            title="Previous image"
+            onClick={(event) => {
+              event.stopPropagation()
+              stepImageLightbox(-1)
+            }}
+          >
+            <ChevronLeft size={28} />
+          </button>
+        )}
+
+        <div
+          className="image-lightbox-stage"
+          onClick={(event) => event.stopPropagation()}
+          onWheel={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setImageLightboxZoom((currentZoom) =>
+              getSteppedPreviewImageZoom(
+                currentZoom,
+                event.deltaY < 0 ? IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP : -IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP
+              )
+            )
+          }}
+        >
+          <img
+            alt={imageLabel}
+            className="image-lightbox-image"
+            src={image.src}
+            style={{ transform: `scale(${zoom})` }}
+            title="Scroll to zoom. Double-click to toggle zoom."
+            onDoubleClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setImageLightboxZoom(getToggledPreviewImageZoom)
+            }}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+
+        {canNavigate && (
+          <button
+            type="button"
+            className="image-lightbox-nav next"
+            aria-label="Next image"
+            title="Next image"
+            onClick={(event) => {
+              event.stopPropagation()
+              stepImageLightbox(1)
+            }}
+          >
+            <ChevronRight size={28} />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const withImageLightbox = (content: React.JSX.Element): React.JSX.Element => (
+    <>
+      {content}
+      {renderImageLightbox()}
+    </>
+  )
+
   if (preview.kind === 'directory') {
     if (preview.readme) {
       const markdownPreview = getMarkdownPreview(preview.readme.content)
 
-      return (
+      return withImageLightbox(
         <article
           ref={setMarkdownPreviewRoot}
           className="markdown-body"
           onAuxClick={handleMarkdownLinkClick(preview.readme.path)}
-          onClick={handleMarkdownLinkClick(preview.readme.path)}
+          onClick={handleMarkdownPreviewClick(preview.readme.path)}
           onContextMenu={handleMarkdownLinkContextMenu(preview.readme.path)}
         >
           {markdownPreview.title && (
@@ -244,7 +461,7 @@ export function PreviewContent({
       )
     }
 
-    return (
+    return withImageLightbox(
       <div ref={setPreviewSearchRoot} className="directory-list">
         {(preview.entries ?? []).map((entry) => (
           <button
@@ -268,12 +485,12 @@ export function PreviewContent({
   if (preview.previewType === 'markdown' && preview.content !== undefined) {
     const markdownPreview = getMarkdownPreview(preview.content)
 
-    return (
+    return withImageLightbox(
       <article
         ref={setMarkdownPreviewRoot}
         className="markdown-body"
         onAuxClick={handleMarkdownLinkClick(preview.path)}
-        onClick={handleMarkdownLinkClick(preview.path)}
+        onClick={handleMarkdownPreviewClick(preview.path)}
         onContextMenu={handleMarkdownLinkContextMenu(preview.path)}
       >
         {markdownPreview.title && (
@@ -289,7 +506,7 @@ export function PreviewContent({
   }
 
   if (preview.previewType === 'html' && preview.content !== undefined) {
-    return (
+    return withImageLightbox(
       <iframe
         ref={setHtmlPreviewRoot}
         className="html-preview"
@@ -305,8 +522,12 @@ export function PreviewContent({
   }
 
   if (preview.previewType === 'svg' && preview.content !== undefined) {
-    return (
-      <div className="image-preview">
+    return withImageLightbox(
+      <div
+        ref={setPreviewSearchRoot}
+        className="image-preview"
+        onClick={(event) => handlePreviewImageClick(event.currentTarget)(event)}
+      >
         <img
           alt={preview.name}
           src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.content)}`}
@@ -316,15 +537,19 @@ export function PreviewContent({
   }
 
   if (preview.previewType === 'image' && preview.dataUrl) {
-    return (
-      <div ref={setPreviewSearchRoot} className="image-preview">
+    return withImageLightbox(
+      <div
+        ref={setPreviewSearchRoot}
+        className="image-preview"
+        onClick={(event) => handlePreviewImageClick(event.currentTarget)(event)}
+      >
         <img alt={preview.name} src={preview.dataUrl} />
       </div>
     )
   }
 
   if (preview.content !== undefined) {
-    return (
+    return withImageLightbox(
       <CodePreview
         content={preview.content}
         extension={preview.extension}
@@ -333,7 +558,7 @@ export function PreviewContent({
     )
   }
 
-  return (
+  return withImageLightbox(
     <div ref={setPreviewSearchRoot} className="unsupported-preview">
       <FileText size={32} />
       <strong>Preview unavailable</strong>
