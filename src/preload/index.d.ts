@@ -5,7 +5,9 @@ import type {
   PreviewPayload,
   ProjectSessionState,
   RecentFileState,
+  RepositoryLoadOptions,
   RepositoryPayload,
+  RepositorySearchResult,
   SessionState,
   TreeItemOpenPayload
 } from '../shared/types'
@@ -29,6 +31,11 @@ export type GitWikitreeAPI = {
     }
   ) => Promise<PreviewPayload>
   saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
+  searchRepository: (
+    repoPath: string,
+    query: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<RepositorySearchResult[]>
   getSession: () => Promise<SessionState>
   getProjectSession: (repoPath: string) => Promise<ProjectSessionState | undefined>
   saveSession: (session: Partial<SessionState>) => Promise<SessionState>
@@ -39,6 +46,8 @@ export type GitWikitreeAPI = {
   onOpenTreeItemInNewTab: (callback: (path: string) => void) => () => void
   onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
+  onOpenCurrentTabSearch: (callback: () => void) => () => void
+  onOpenGlobalSearch: (callback: () => void) => () => void
 }
 
 declare global {

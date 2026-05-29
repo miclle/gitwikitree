@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type {
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
+  RepositoryLoadOptions,
   TreeItemOpenPayload
 } from '../shared/types'
 
@@ -44,6 +45,8 @@ const api = {
   ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
   saveFile: (repoPath: string, relativePath: string, content: string) =>
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content),
+  searchRepository: (repoPath: string, query: string, options?: RepositoryLoadOptions) =>
+    ipcRenderer.invoke('repository:search', repoPath, query, options),
   getSession: () => ipcRenderer.invoke('session:get'),
   getProjectSession: (repoPath: string) => ipcRenderer.invoke('session:get-project', repoPath),
   saveSession: (session: unknown) => ipcRenderer.invoke('session:save', session),
@@ -117,6 +120,18 @@ const api = {
     ipcRenderer.on('tab:close-current-or-window', listener)
 
     return () => ipcRenderer.removeListener('tab:close-current-or-window', listener)
+  },
+  onOpenCurrentTabSearch: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('search:open-current-tab', listener)
+
+    return () => ipcRenderer.removeListener('search:open-current-tab', listener)
+  },
+  onOpenGlobalSearch: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('search:open-global', listener)
+
+    return () => ipcRenderer.removeListener('search:open-global', listener)
   }
 }
 

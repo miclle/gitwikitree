@@ -58,6 +58,15 @@ export type RepositoryPayload = {
   index?: { name: string; path: string }
 }
 
+export type RepositorySearchResult = {
+  path: string
+  name: string
+  type: 'file' | 'directory'
+  matchType: 'path' | 'content'
+  snippet?: string
+  lineNumber?: number
+}
+
 export type DirectoryPreview = {
   kind: 'directory'
   path: string

@@ -18,6 +18,7 @@ async function loadRepositoryService() {
       'src/main/repository-service.ts',
       'src/main/repository-loader.ts',
       'src/main/repository-preview.ts',
+      'src/main/repository-search.ts',
       'src/main/repository-worktree.ts',
       'src/main/repository-paths.ts',
       'src/main/repository-tree.ts',

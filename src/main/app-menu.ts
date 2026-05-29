@@ -15,6 +15,8 @@ type AppMenuTemplateOptions = {
   openRecentFile: (file: RecentFileState, event: MenuClickEvent) => void
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
+  openCurrentTabSearch: () => void
+  openGlobalSearch: () => void
   closeWindow: () => void
 }
 
@@ -28,6 +30,8 @@ export function createAppMenuTemplate({
   openRecentFile,
   clearRecent,
   closeCurrentTabOrWindow,
+  openCurrentTabSearch,
+  openGlobalSearch,
   closeWindow
 }: AppMenuTemplateOptions): MenuItemConstructorOptions[] {
   const recentRepositoryItems: MenuItemConstructorOptions[] =
@@ -110,6 +114,16 @@ export function createAppMenuTemplate({
         { role: 'pasteAndMatchStyle' },
         { role: 'delete' },
         { type: 'separator' },
+        {
+          label: 'Find in Current Tab',
+          accelerator: 'CommandOrControl+F',
+          click: openCurrentTabSearch
+        },
+        {
+          label: 'Search Repository...',
+          accelerator: 'Shift+CommandOrControl+F',
+          click: openGlobalSearch
+        },
         { role: 'selectAll' }
       ]
     },

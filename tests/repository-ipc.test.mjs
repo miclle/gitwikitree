@@ -66,6 +66,11 @@ function createHarness() {
         relativePath,
         content
       }),
+      searchRepository: async (repoPath, query, options) => ({
+        repoPath,
+        query,
+        options
+      }),
       activateRepositoryInWindow: async (sourceWindow, repository) => {
         activated.push({ sourceWindow, repository })
       }
@@ -87,7 +92,8 @@ test('registerRepositoryIpcHandlers registers all repository load channels', asy
       'repository:load-ref',
       'repository:open-worktree',
       'repository:preview',
-      'repository:save-file'
+      'repository:save-file',
+      'repository:search'
     ]
   )
 })
@@ -154,5 +160,27 @@ test('repository:save-file saves content for the requested repository path', asy
     repoPath: '/repo',
     relativePath: 'README.md',
     content: '# Hi'
+  })
+})
+
+test('repository:search searches within the requested repository source', async () => {
+  const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
+  const { handlers, dependencies } = createHarness()
+
+  registerRepositoryIpcHandlers(dependencies)
+  const result = await handlers.get('repository:search')({}, '/repo', 'alpha', {
+    ref: 'main',
+    source: 'git-ref',
+    rootPath: '/repo'
+  })
+
+  assert.deepEqual(result, {
+    repoPath: '/repo',
+    query: 'alpha',
+    options: {
+      ref: 'main',
+      source: 'git-ref',
+      rootPath: '/repo'
+    }
   })
 })

@@ -23,6 +23,8 @@ function createActions() {
       openRecentFile: (file, event) => calls.push(['openRecentFile', file.filePath, event]),
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
+      openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
+      openGlobalSearch: () => calls.push(['openGlobalSearch']),
       closeWindow: () => calls.push(['closeWindow'])
     }
   }
@@ -52,6 +54,8 @@ test('createAppMenuTemplate builds file menu actions for recent repositories and
   recentMenu.submenu[1].click(undefined, undefined, event)
   recentMenu.submenu[4].click(undefined, undefined, event)
   fileMenu.submenu[3].click()
+  template.find((item) => item.label === 'Edit').submenu[9].click()
+  template.find((item) => item.label === 'Edit').submenu[10].click()
 
   assert.deepEqual(
     recentMenu.submenu.map((item) => item.label ?? item.type),
@@ -69,8 +73,56 @@ test('createAppMenuTemplate builds file menu actions for recent repositories and
     ['openRepository'],
     ['openRecentRepository', '/repo', event],
     ['openRecentFile', 'README.md', event],
-    ['closeCurrentTabOrWindow']
+    ['closeCurrentTabOrWindow'],
+    ['openCurrentTabSearch'],
+    ['openGlobalSearch']
   ])
+})
+
+test('createAppMenuTemplate exposes current-tab and repository search menu items', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const editMenu = template.find((item) => item.label === 'Edit')
+
+  assert.deepEqual(
+    editMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
+    [
+      'undo',
+      'redo',
+      'separator',
+      'cut',
+      'copy',
+      'paste',
+      'pasteAndMatchStyle',
+      'delete',
+      'separator',
+      'Find in Current Tab',
+      'Search Repository...',
+      'selectAll'
+    ]
+  )
+  assert.equal(
+    template.find((item) => item.label === 'Navigate'),
+    undefined
+  )
+  assert.deepEqual(
+    editMenu.submenu
+      .filter(
+        (item) => item.label === 'Find in Current Tab' || item.label === 'Search Repository...'
+      )
+      .map((item) => [item.label, item.accelerator]),
+    [
+      ['Find in Current Tab', 'CommandOrControl+F'],
+      ['Search Repository...', 'Shift+CommandOrControl+F']
+    ]
+  )
 })
 
 test('createAppMenuTemplate disables empty recent menus and adds darwin app menu', async () => {

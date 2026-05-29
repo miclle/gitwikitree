@@ -112,6 +112,41 @@ test('current tab search command refocuses the find input even when already open
   )
 })
 
+test('current tab search is available from the app menu event', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /window\.api\.onOpenCurrentTabSearch\(openPreviewSearch\)/,
+    'workspace should subscribe to the current-tab search app menu command'
+  )
+})
+
+test('global repository search is available from the sidebar and keyboard shortcut', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /const \[isGlobalSearchOpen, setIsGlobalSearchOpen\] = useState\(false\)/,
+    'workspace should keep global search modal state'
+  )
+  assert.match(
+    source,
+    /window\.api\.onOpenGlobalSearch\(\(\) => setIsGlobalSearchOpen\(true\)\)/,
+    'workspace should subscribe to the app menu global search command'
+  )
+  assert.match(
+    source,
+    /event\.shiftKey[\s\S]*setIsGlobalSearchOpen\(true\)/,
+    'Command/Ctrl+Shift+F should open global search'
+  )
+  assert.match(
+    source,
+    /<GlobalSearchModal[\s\S]*open=\{isGlobalSearchOpen\}/,
+    'workspace should render the global search modal'
+  )
+})
+
 test('current tab search command seeds the query from selected preview text', async () => {
   const source = await readWorkspaceView()
 

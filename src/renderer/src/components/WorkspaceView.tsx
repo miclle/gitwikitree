@@ -15,6 +15,7 @@ import {
 import { iconForNode } from '../app-utils'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
 import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-search'
+import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
@@ -69,6 +70,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [searchMatchCount, setSearchMatchCount] = useState(0)
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
   const appliedSearchQuery = isSearchOpen ? searchQuery : ''
   const openPreviewSearch = useCallback(() => {
     const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
@@ -117,6 +119,16 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
         return
       }
 
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLocaleLowerCase() === 'f'
+      ) {
+        event.preventDefault()
+        setIsGlobalSearchOpen(true)
+        return
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'f') {
         event.preventDefault()
         openPreviewSearch()
@@ -126,6 +138,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [closePreviewSearch, isSearchOpen, openPreviewSearch])
+
+  useEffect(() => {
+    return window.api.onOpenGlobalSearch(() => setIsGlobalSearchOpen(true))
+  }, [])
+
+  useEffect(() => {
+    return window.api.onOpenCurrentTabSearch(openPreviewSearch)
+  }, [openPreviewSearch])
 
   useEffect(() => {
     if (!isSearchOpen) return
@@ -255,6 +275,8 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     className="sidebar-control-button"
                     type="button"
                     aria-label="Search files"
+                    aria-expanded={isGlobalSearchOpen}
+                    onClick={() => setIsGlobalSearchOpen(true)}
                   >
                     <Search size={16} />
                   </button>
@@ -463,6 +485,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               </form>
             )}
           </section>
+          <GlobalSearchModal
+            open={isGlobalSearchOpen}
+            repository={repository}
+            onOpenChange={setIsGlobalSearchOpen}
+            onOpenResult={(result) => {
+              selectPreviewPath(result.path)
+            }}
+          />
         </section>
       )}
     </main>

@@ -1,3 +1,4 @@
 export { loadRepository } from './repository-loader'
 export { getPreview, saveFile } from './repository-preview'
+export { searchRepository } from './repository-search'
 export { openWorktree } from './repository-worktree'

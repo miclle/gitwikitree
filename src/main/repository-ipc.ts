@@ -1,5 +1,5 @@
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
-import type { PreviewPayload, RepositoryPayload } from '../shared/types'
+import type { PreviewPayload, RepositoryPayload, RepositorySearchResult } from '../shared/types'
 import type { RepositoryLoadOptions } from '../shared/types'
 
 type OpenDialogResult = {
@@ -23,6 +23,11 @@ type RepositoryIpcDependencies = {
     options?: RepositoryLoadOptions
   ) => Promise<PreviewPayload>
   saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
+  searchRepository: (
+    repoPath: string,
+    query: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<RepositorySearchResult[]>
   activateRepositoryInWindow: (
     sourceWindow: BrowserWindow | null | undefined,
     repository: RepositoryPayload
@@ -38,6 +43,7 @@ export function registerRepositoryIpcHandlers({
   openWorktree,
   getPreview,
   saveFile,
+  searchRepository,
   activateRepositoryInWindow
 }: RepositoryIpcDependencies): void {
   ipcMain.handle('repository:pick', async () => {
@@ -92,6 +98,13 @@ export function registerRepositoryIpcHandlers({
     'repository:save-file',
     async (_event, repoPath: string, relativePath: string, content: string) => {
       return saveFile(repoPath, relativePath, content)
+    }
+  )
+
+  ipcMain.handle(
+    'repository:search',
+    async (_event, repoPath: string, query: string, options?: RepositoryLoadOptions) => {
+      return searchRepository(repoPath, query, options)
     }
   )
 }

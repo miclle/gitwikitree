@@ -31,11 +31,21 @@ import {
   openRecentRepositoryMenuItem as openRecentRepositoryMenuItemWithDependencies
 } from './recent-navigation'
 import { openRepositoryInNewWindow } from './open-repository-dialog'
-import { getPreview, loadRepository, openWorktree, saveFile } from './repository-service'
+import {
+  getPreview,
+  loadRepository,
+  openWorktree,
+  saveFile,
+  searchRepository
+} from './repository-service'
 import { registerRepositoryIpcHandlers } from './repository-ipc'
 import { createRecentRepositoryState, createRepositorySessionReset } from './repository-session'
 import { registerSessionIpcHandlers } from './session-ipc'
 import { registerWindowIpcHandlers } from './window-ipc'
+import {
+  shouldOpenCurrentTabSearchFromInput,
+  shouldOpenGlobalSearchFromInput
+} from './window-shortcuts'
 import {
   getBrowserWindowBounds,
   getSavedWindowState,
@@ -111,6 +121,14 @@ function closeFocusedFileTabOrWindow(): void {
   if (!targetWindow) return
 
   targetWindow.webContents.send('tab:close-current-or-window')
+}
+
+function openGlobalSearch(): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('search:open-global')
+}
+
+function openCurrentTabSearch(): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('search:open-current-tab')
 }
 
 async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean> {
@@ -217,6 +235,19 @@ function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: Tree
     void showContextMenu(mainWindow, params)
   })
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (shouldOpenGlobalSearchFromInput(input)) {
+      event.preventDefault()
+      mainWindow.webContents.send('search:open-global')
+      return
+    }
+
+    if (!shouldOpenCurrentTabSearchFromInput(input)) return
+
+    event.preventDefault()
+    mainWindow.webContents.send('search:open-current-tab')
+  })
+
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -306,6 +337,8 @@ function createAppMenu(): void {
         openRecentFile: openRecentFileMenuItem,
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
+        openCurrentTabSearch,
+        openGlobalSearch,
         closeWindow: () => BrowserWindow.getFocusedWindow()?.close()
       })
     )
@@ -356,6 +389,7 @@ app.whenReady().then(async () => {
     openWorktree,
     getPreview,
     saveFile,
+    searchRepository,
     activateRepositoryInWindow
   })
 
