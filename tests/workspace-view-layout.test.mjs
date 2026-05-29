@@ -308,6 +308,21 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
     /onWheel=\{\(event\) => \{[\s\S]*getSteppedPreviewImageZoom[\s\S]*onDoubleClick=\{\(event\) => \{[\s\S]*getToggledPreviewImageZoom/,
     'image lightbox should support mouse zoom through wheel and double click'
   )
+  assert.doesNotMatch(
+    source,
+    /type ImageLightboxState = \{[\s\S]*zoom: number[\s\S]*\}/,
+    'wheel zoom state should stay inside the lightbox so large previews do not rerender on every wheel event'
+  )
+  assert.match(
+    source,
+    /function ImageLightbox\(/,
+    'image lightbox rendering should be isolated from the heavier preview content'
+  )
+  assert.match(
+    source,
+    /key=\{[\s\S]*activeImageLightbox\.index[\s\S]*activeImageLightbox\.images\[activeImageLightbox\.index\]\?\.src/,
+    'image navigation should remount the lightbox by index before src so duplicate image URLs reset zoom'
+  )
   assert.match(
     source,
     /role="dialog"[\s\S]*aria-modal="true"[\s\S]*className="image-lightbox-nav previous"[\s\S]*className="image-lightbox-nav next"/,

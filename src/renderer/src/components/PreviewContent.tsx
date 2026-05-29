@@ -79,12 +79,119 @@ function CodePreview({
 type ImageLightboxState = {
   images: PreviewImage[]
   index: number
-  zoom: number
   previewKind: PreviewPayload['kind']
   previewPath: string
 }
 
 const IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP = 0.25
+
+function ImageLightbox({
+  images,
+  index,
+  onClose,
+  onStep
+}: {
+  images: PreviewImage[]
+  index: number
+  onClose: () => void
+  onStep: (delta: number) => void
+}): React.JSX.Element | undefined {
+  const [zoom, setZoom] = useState(1)
+  const image = images[index]
+  if (!image) return undefined
+
+  const imageLabel = image.alt || image.title || 'Preview image'
+  const canNavigate = images.length > 1
+  const normalizedZoom = Number.isFinite(zoom) ? zoom : 1
+  const zoomLabel = `${Math.round(normalizedZoom * 100)}%`
+  const setImageLightboxZoom = (updater: (currentZoom: number) => number): void => {
+    setZoom((currentZoom) => updater(Number.isFinite(currentZoom) ? currentZoom : 1))
+  }
+
+  return (
+    <div
+      className="image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+      onClick={onClose}
+    >
+      <div className="image-lightbox-topbar" onClick={(event) => event.stopPropagation()}>
+        <div className="image-lightbox-meta">
+          <span className="image-lightbox-title">{imageLabel}</span>
+          {canNavigate && (
+            <span className="image-lightbox-count">
+              {index + 1} / {images.length}
+            </span>
+          )}
+          <span className="image-lightbox-count">{zoomLabel}</span>
+        </div>
+        <button type="button" aria-label="Close image preview" title="Close" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </div>
+
+      {canNavigate && (
+        <button
+          type="button"
+          className="image-lightbox-nav previous"
+          aria-label="Previous image"
+          title="Previous image"
+          onClick={(event) => {
+            event.stopPropagation()
+            onStep(-1)
+          }}
+        >
+          <ChevronLeft size={28} />
+        </button>
+      )}
+
+      <div
+        className="image-lightbox-stage"
+        onClick={(event) => event.stopPropagation()}
+        onWheel={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          setImageLightboxZoom((currentZoom) =>
+            getSteppedPreviewImageZoom(
+              currentZoom,
+              event.deltaY < 0 ? IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP : -IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP
+            )
+          )
+        }}
+      >
+        <img
+          alt={imageLabel}
+          className="image-lightbox-image"
+          src={image.src}
+          style={{ transform: `scale(${normalizedZoom})` }}
+          title="Scroll to zoom. Double-click to toggle zoom."
+          onDoubleClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setImageLightboxZoom(getToggledPreviewImageZoom)
+          }}
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
+
+      {canNavigate && (
+        <button
+          type="button"
+          className="image-lightbox-nav next"
+          aria-label="Next image"
+          title="Next image"
+          onClick={(event) => {
+            event.stopPropagation()
+            onStep(1)
+          }}
+        >
+          <ChevronRight size={28} />
+        </button>
+      )}
+    </div>
+  )
+}
 
 export function PreviewContent({
   preview,
@@ -174,17 +281,8 @@ export function PreviewContent({
       current
         ? {
             ...current,
-            index: getSteppedPreviewImageIndex(current.index, current.images.length, delta),
-            zoom: 1
+            index: getSteppedPreviewImageIndex(current.index, current.images.length, delta)
           }
-        : current
-    )
-  }
-
-  const setImageLightboxZoom = (updater: (currentZoom: number) => number): void => {
-    setImageLightbox((current) =>
-      current
-        ? { ...current, zoom: updater(Number.isFinite(current.zoom) ? current.zoom : 1) }
         : current
     )
   }
@@ -196,7 +294,6 @@ export function PreviewContent({
     setImageLightbox({
       images,
       index: findPreviewImageIndex(images, image.src),
-      zoom: 1,
       previewKind: preview.kind,
       previewPath: preview.path
     })
@@ -339,101 +436,14 @@ export function PreviewContent({
   const renderImageLightbox = (): React.JSX.Element | undefined => {
     if (!activeImageLightbox) return undefined
 
-    const image = activeImageLightbox.images[activeImageLightbox.index]
-    if (!image) return undefined
-
-    const imageLabel = image.alt || image.title || 'Preview image'
-    const canNavigate = activeImageLightbox.images.length > 1
-    const zoom = Number.isFinite(activeImageLightbox.zoom) ? activeImageLightbox.zoom : 1
-    const zoomLabel = `${Math.round(zoom * 100)}%`
-
     return (
-      <div
-        className="image-lightbox"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Image preview"
-        onClick={closeImageLightbox}
-      >
-        <div className="image-lightbox-topbar" onClick={(event) => event.stopPropagation()}>
-          <div className="image-lightbox-meta">
-            <span className="image-lightbox-title">{imageLabel}</span>
-            {canNavigate && (
-              <span className="image-lightbox-count">
-                {activeImageLightbox.index + 1} / {activeImageLightbox.images.length}
-              </span>
-            )}
-            <span className="image-lightbox-count">{zoomLabel}</span>
-          </div>
-          <button
-            type="button"
-            aria-label="Close image preview"
-            title="Close"
-            onClick={closeImageLightbox}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {canNavigate && (
-          <button
-            type="button"
-            className="image-lightbox-nav previous"
-            aria-label="Previous image"
-            title="Previous image"
-            onClick={(event) => {
-              event.stopPropagation()
-              stepImageLightbox(-1)
-            }}
-          >
-            <ChevronLeft size={28} />
-          </button>
-        )}
-
-        <div
-          className="image-lightbox-stage"
-          onClick={(event) => event.stopPropagation()}
-          onWheel={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            setImageLightboxZoom((currentZoom) =>
-              getSteppedPreviewImageZoom(
-                currentZoom,
-                event.deltaY < 0 ? IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP : -IMAGE_LIGHTBOX_WHEEL_ZOOM_STEP
-              )
-            )
-          }}
-        >
-          <img
-            alt={imageLabel}
-            className="image-lightbox-image"
-            src={image.src}
-            style={{ transform: `scale(${zoom})` }}
-            title="Scroll to zoom. Double-click to toggle zoom."
-            onDoubleClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              setImageLightboxZoom(getToggledPreviewImageZoom)
-            }}
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>
-
-        {canNavigate && (
-          <button
-            type="button"
-            className="image-lightbox-nav next"
-            aria-label="Next image"
-            title="Next image"
-            onClick={(event) => {
-              event.stopPropagation()
-              stepImageLightbox(1)
-            }}
-          >
-            <ChevronRight size={28} />
-          </button>
-        )}
-      </div>
+      <ImageLightbox
+        key={`${activeImageLightbox.index}:${activeImageLightbox.images[activeImageLightbox.index]?.src ?? ''}`}
+        images={activeImageLightbox.images}
+        index={activeImageLightbox.index}
+        onClose={closeImageLightbox}
+        onStep={stepImageLightbox}
+      />
     )
   }
 
