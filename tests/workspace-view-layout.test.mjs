@@ -18,6 +18,13 @@ async function readPanelResizeHook() {
   return readFile(new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url), 'utf8')
 }
 
+async function readSessionPersistenceHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useSessionPersistence.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readRepositoryWorkspaceHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/useRepositoryWorkspace.ts', import.meta.url),
@@ -376,6 +383,33 @@ test('files sidebar resize keeps a 170px minimum width', async () => {
     source,
     /Math\.min\(Math\.max\(event\.clientX,\s*170\),\s*520\)/,
     'files sidebar should clamp drag resizing to a 170px minimum'
+  )
+})
+
+test('files sidebar initializes at 250px wide', async () => {
+  const source = await readPanelResizeHook()
+
+  assert.match(source, /useState\(250\)/, 'files sidebar should default to a compact 250px width')
+})
+
+test('files sidebar width is saved and restored with the project session', async () => {
+  const workspaceSource = await readRepositoryWorkspaceHook()
+  const persistenceSource = await readSessionPersistenceHook()
+
+  assert.match(
+    persistenceSource,
+    /sidebarWidth[\s\S]*window\.api\.saveSession\(\{[\s\S]*sidebarWidth/,
+    'session persistence should accept and save the current sidebar width'
+  )
+  assert.match(
+    workspaceSource,
+    /const \{ sidebarWidth, setSidebarWidth, isResizing, startResizing \} = usePanelResize\(\)/,
+    'workspace should receive a sidebar width setter'
+  )
+  assert.match(
+    workspaceSource,
+    /restoreRepositorySession[\s\S]*if \(session\.sidebarWidth\) setSidebarWidth\(session\.sidebarWidth\)/,
+    'workspace should restore the saved sidebar width when a project session loads'
   )
 })
 

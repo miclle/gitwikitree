@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 
 export function usePanelResize(): {
   sidebarWidth: number
+  setSidebarWidth: (width: number) => void
   isResizing: boolean
   startResizing: () => void
 } {
-  const [sidebarWidth, setSidebarWidth] = useState(360)
+  const [sidebarWidth, setSidebarWidth] = useState(250)
   const [isResizing, setIsResizing] = useState(false)
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function usePanelResize(): {
 
   return {
     sidebarWidth,
+    setSidebarWidth,
     isResizing,
     startResizing: () => setIsResizing(true)
   }

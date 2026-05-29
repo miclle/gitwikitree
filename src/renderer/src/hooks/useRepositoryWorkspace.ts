@@ -135,7 +135,7 @@ export function useRepositoryWorkspace(): {
   const [pendingMarkdownAnchor, setPendingMarkdownAnchor] = useState<
     { path: string; hash: string; token: number } | undefined
   >()
-  const { sidebarWidth, isResizing, startResizing } = usePanelResize()
+  const { sidebarWidth, setSidebarWidth, isResizing, startResizing } = usePanelResize()
   const {
     titlebarTabsRef,
     tabPopover,
@@ -213,9 +213,10 @@ export function useRepositoryWorkspace(): {
       setActiveFilePath(restoredActiveFile)
       setActiveFileTabId(restoredActiveTabId)
       setSelectedPath(nextSelectedPath)
+      if (session.sidebarWidth) setSidebarWidth(session.sidebarWidth)
       await loadPreview(nextSelectedPath, nextRepository)
     },
-    [loadPreview]
+    [loadPreview, setSidebarWidth]
   )
 
   const openRepository = useCallback(async (): Promise<void> => {
@@ -446,7 +447,8 @@ export function useRepositoryWorkspace(): {
     activeFilePath,
     activeFileTabId,
     openFileTabs,
-    expandedPaths
+    expandedPaths,
+    sidebarWidth
   })
 
   const handleSelect = useCallback(

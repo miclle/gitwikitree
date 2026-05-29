@@ -200,6 +200,12 @@ function normalizeDimension(value: unknown, fallback: number): number {
     : fallback
 }
 
+function normalizeSidebarWidth(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 170 && value <= 520
+    ? value
+    : undefined
+}
+
 function normalizeWindowState(value: unknown): WindowState | undefined {
   const record = asRecord(value)
   if (!Object.keys(record).length) return undefined
@@ -244,6 +250,7 @@ function normalizeProjectSessionState(value: unknown): ProjectSessionState {
   const openFileTabs = normalizeOpenFileTabs(record.openFileTabs)
   const activeFilePath = normalizeOptionalRelativePath(record.activeFilePath)
   const activeFileTabId = asString(record.activeFileTabId)
+  const sidebarWidth = normalizeSidebarWidth(record.sidebarWidth)
   const windowState = normalizeWindowState(record.windowState)
   const normalizedSource =
     source === 'git-ref' || source === 'worktree' || source === 'working-tree' ? source : undefined
@@ -258,6 +265,7 @@ function normalizeProjectSessionState(value: unknown): ProjectSessionState {
     ...(activeFileTabId ? { activeFileTabId } : {}),
     openFileTabs,
     expandedPaths: normalizeExpandedPaths(record.expandedPaths),
+    ...(sidebarWidth ? { sidebarWidth } : {}),
     ...(windowState ? { windowState } : {})
   }
 }
@@ -437,6 +445,7 @@ export function mergeSessionState(
         activeFileTabId: merged.activeFileTabId,
         openFileTabs: merged.openFileTabs,
         expandedPaths: merged.expandedPaths,
+        sidebarWidth: merged.sidebarWidth,
         windowState:
           merged.windowState ?? merged.projectSessions[merged.repositoryPath]?.windowState
       }
