@@ -147,6 +147,7 @@ export type ProjectSessionState = {
   openFileTabs: OpenFileTabState[]
   expandedPaths: string[]
   sidebarWidth?: number
+  isSidebarOpen?: boolean
   windowState?: WindowState
 }
 

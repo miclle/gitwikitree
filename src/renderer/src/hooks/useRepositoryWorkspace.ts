@@ -150,6 +150,11 @@ export function useRepositoryWorkspace(): {
     return `tab-${Date.now().toString(36)}-${nextTabId.current}`
   }, [])
 
+  const resetRepositoryLayout = useCallback((): void => {
+    setSidebarWidth(250)
+    setIsSidebarOpen(true)
+  }, [setSidebarWidth])
+
   const loadPreview = useCallback(
     async (path: string, repo = repository): Promise<PreviewPayload | undefined> => {
       if (!repo) return undefined
@@ -214,6 +219,9 @@ export function useRepositoryWorkspace(): {
       setActiveFileTabId(restoredActiveTabId)
       setSelectedPath(nextSelectedPath)
       if (session.sidebarWidth) setSidebarWidth(session.sidebarWidth)
+      if (typeof session.isSidebarOpen === 'boolean') {
+        setIsSidebarOpen(session.isSidebarOpen)
+      }
       await loadPreview(nextSelectedPath, nextRepository)
     },
     [loadPreview, setSidebarWidth]
@@ -237,6 +245,7 @@ export function useRepositoryWorkspace(): {
       }
 
       setRepository(nextRepository)
+      resetRepositoryLayout()
       setSelectedPath('')
       setExpandedPaths(defaultExpanded)
       setOpenFileTabs([])
@@ -248,7 +257,7 @@ export function useRepositoryWorkspace(): {
     } finally {
       setLoading(false)
     }
-  }, [loadPreview, restoreRepositorySession])
+  }, [loadPreview, resetRepositoryLayout, restoreRepositorySession])
 
   const loadRepositoryPath = useCallback(
     async (repoPath: string): Promise<void> => {
@@ -279,6 +288,7 @@ export function useRepositoryWorkspace(): {
         }
 
         setRepository(nextRepository)
+        resetRepositoryLayout()
         setSelectedPath('')
         setExpandedPaths(defaultExpanded)
         setOpenFileTabs([])
@@ -291,7 +301,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [loadPreview, restoreRepositorySession]
+    [loadPreview, resetRepositoryLayout, restoreRepositorySession]
   )
 
   const loadRepositoryWithSession = useCallback(
@@ -448,7 +458,8 @@ export function useRepositoryWorkspace(): {
     activeFileTabId,
     openFileTabs,
     expandedPaths,
-    sidebarWidth
+    sidebarWidth,
+    isSidebarOpen
   })
 
   const handleSelect = useCallback(

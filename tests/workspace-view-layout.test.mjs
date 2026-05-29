@@ -413,6 +413,42 @@ test('files sidebar width is saved and restored with the project session', async
   )
 })
 
+test('files sidebar collapsed state is saved and restored with the project session', async () => {
+  const workspaceSource = await readRepositoryWorkspaceHook()
+  const persistenceSource = await readSessionPersistenceHook()
+
+  assert.match(
+    persistenceSource,
+    /isSidebarOpen[\s\S]*window\.api\.saveSession\(\{[\s\S]*isSidebarOpen/,
+    'session persistence should accept and save the current sidebar visibility'
+  )
+  assert.match(
+    workspaceSource,
+    /restoreRepositorySession[\s\S]*if \(typeof session\.isSidebarOpen === 'boolean'\) \{[\s\S]*setIsSidebarOpen\(session\.isSidebarOpen\)/,
+    'workspace should restore saved sidebar visibility when a project session loads'
+  )
+})
+
+test('files sidebar layout resets for projects without saved session state', async () => {
+  const workspaceSource = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    workspaceSource,
+    /const resetRepositoryLayout = useCallback\([\s\S]*setSidebarWidth\(250\)[\s\S]*setIsSidebarOpen\(true\)/,
+    'workspace should have a default layout reset for projects without saved session state'
+  )
+  assert.match(
+    workspaceSource,
+    /const openRepository = useCallback[\s\S]*if \(projectSession\)[\s\S]*return[\s\S]*resetRepositoryLayout\(\)/,
+    'repository picker should reset layout when no project session exists'
+  )
+  assert.match(
+    workspaceSource,
+    /const loadRepositoryPath = useCallback[\s\S]*if \(normalizedProjectSession\)[\s\S]*return[\s\S]*resetRepositoryLayout\(\)/,
+    'repository path opens should reset layout when no project session exists'
+  )
+})
+
 test('files tree rows use compact spacing for narrow sidebars', async () => {
   const css = await readMainCss()
 

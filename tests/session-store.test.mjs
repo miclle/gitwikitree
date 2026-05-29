@@ -350,6 +350,7 @@ test('normalizeSessionState migrates the active project into project sessions', 
     openFileTabs: [{ id: 'tab-a', path: 'README.md', name: 'README.md' }],
     expandedPaths: ['', 'docs'],
     sidebarWidth: 312,
+    isSidebarOpen: false,
     windowState: { x: 12, y: 24, width: 1300, height: 900, isMaximized: true }
   })
 
@@ -369,6 +370,7 @@ test('normalizeSessionState migrates the active project into project sessions', 
     ],
     expandedPaths: ['', 'docs'],
     sidebarWidth: 312,
+    isSidebarOpen: false,
     windowState: { x: 12, y: 24, width: 1300, height: 900, isMaximized: true }
   })
 })
@@ -400,11 +402,13 @@ test('mergeSessionState updates only the active project session', async () => {
     openFileTabs: [{ path: 'docs/intro.md', name: 'intro.md' }],
     expandedPaths: ['', 'docs'],
     sidebarWidth: 280,
+    isSidebarOpen: false,
     windowState: { width: 1220, height: 820 }
   })
 
   assert.equal(next.projectSessions['/repo-a'].selectedPath, 'docs/intro.md')
   assert.equal(next.projectSessions['/repo-a'].sidebarWidth, 280)
+  assert.equal(next.projectSessions['/repo-a'].isSidebarOpen, false)
   assert.equal(next.projectSessions['/repo-b'].selectedPath, 'guide.md')
   assert.deepEqual(next.projectSessions['/repo-b'].windowState, { width: 1440, height: 960 })
 })

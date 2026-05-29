@@ -9,7 +9,8 @@ export function useSessionPersistence({
   activeFileTabId,
   openFileTabs,
   expandedPaths,
-  sidebarWidth
+  sidebarWidth,
+  isSidebarOpen
 }: {
   repository: RepositoryPayload | undefined
   selectedPath: string
@@ -18,6 +19,7 @@ export function useSessionPersistence({
   openFileTabs: OpenFileTab[]
   expandedPaths: Set<string>
   sidebarWidth: number
+  isSidebarOpen: boolean
 }): void {
   useEffect(() => {
     if (!repository) return
@@ -33,7 +35,8 @@ export function useSessionPersistence({
         activeFileTabId,
         openFileTabs,
         expandedPaths: Array.from(expandedPaths),
-        sidebarWidth
+        sidebarWidth,
+        isSidebarOpen
       })
     }, 250)
 
@@ -45,6 +48,7 @@ export function useSessionPersistence({
     openFileTabs,
     repository,
     selectedPath,
-    sidebarWidth
+    sidebarWidth,
+    isSidebarOpen
   ])
 }

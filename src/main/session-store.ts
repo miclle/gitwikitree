@@ -251,6 +251,7 @@ function normalizeProjectSessionState(value: unknown): ProjectSessionState {
   const activeFilePath = normalizeOptionalRelativePath(record.activeFilePath)
   const activeFileTabId = asString(record.activeFileTabId)
   const sidebarWidth = normalizeSidebarWidth(record.sidebarWidth)
+  const isSidebarOpen = typeof record.isSidebarOpen === 'boolean' ? record.isSidebarOpen : undefined
   const windowState = normalizeWindowState(record.windowState)
   const normalizedSource =
     source === 'git-ref' || source === 'worktree' || source === 'working-tree' ? source : undefined
@@ -266,6 +267,7 @@ function normalizeProjectSessionState(value: unknown): ProjectSessionState {
     openFileTabs,
     expandedPaths: normalizeExpandedPaths(record.expandedPaths),
     ...(sidebarWidth ? { sidebarWidth } : {}),
+    ...(isSidebarOpen !== undefined ? { isSidebarOpen } : {}),
     ...(windowState ? { windowState } : {})
   }
 }
@@ -446,6 +448,7 @@ export function mergeSessionState(
         openFileTabs: merged.openFileTabs,
         expandedPaths: merged.expandedPaths,
         sidebarWidth: merged.sidebarWidth,
+        isSidebarOpen: merged.isSidebarOpen,
         windowState:
           merged.windowState ?? merged.projectSessions[merged.repositoryPath]?.windowState
       }
