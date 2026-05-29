@@ -10,9 +10,15 @@ export type PreviewImageElement = {
   title?: string | null
 }
 
+export type PreviewImagePan = {
+  x: number
+  y: number
+}
+
 const MIN_PREVIEW_IMAGE_ZOOM = 1
 const MAX_PREVIEW_IMAGE_ZOOM = 4
 const TOGGLED_PREVIEW_IMAGE_ZOOM = 2
+const RESET_PREVIEW_IMAGE_PAN: PreviewImagePan = { x: 0, y: 0 }
 
 export function collectPreviewImages(images: ArrayLike<PreviewImageElement>): PreviewImage[] {
   return Array.from(images)
@@ -48,4 +54,36 @@ export function getSteppedPreviewImageZoom(currentZoom: number, delta: number): 
 
 export function getToggledPreviewImageZoom(currentZoom: number): number {
   return currentZoom > MIN_PREVIEW_IMAGE_ZOOM ? MIN_PREVIEW_IMAGE_ZOOM : TOGGLED_PREVIEW_IMAGE_ZOOM
+}
+
+export function clampPreviewImagePan({
+  pan,
+  zoom,
+  imageWidth,
+  imageHeight,
+  stageWidth,
+  stageHeight
+}: {
+  pan: PreviewImagePan
+  zoom: number
+  imageWidth: number
+  imageHeight: number
+  stageWidth: number
+  stageHeight: number
+}): PreviewImagePan {
+  const normalizedZoom = Number.isFinite(zoom) ? zoom : MIN_PREVIEW_IMAGE_ZOOM
+  if (normalizedZoom <= MIN_PREVIEW_IMAGE_ZOOM) return RESET_PREVIEW_IMAGE_PAN
+
+  const maxX = Math.max(0, (Math.max(0, imageWidth) * normalizedZoom - Math.max(0, stageWidth)) / 2)
+  const maxY = Math.max(
+    0,
+    (Math.max(0, imageHeight) * normalizedZoom - Math.max(0, stageHeight)) / 2
+  )
+  const panX = Number.isFinite(pan.x) ? pan.x : 0
+  const panY = Number.isFinite(pan.y) ? pan.y : 0
+
+  return {
+    x: Math.min(maxX, Math.max(-maxX, panX)),
+    y: Math.min(maxY, Math.max(-maxY, panY))
+  }
 }

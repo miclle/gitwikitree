@@ -308,6 +308,16 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
     /onWheel=\{\(event\) => \{[\s\S]*getSteppedPreviewImageZoom[\s\S]*onDoubleClick=\{\(event\) => \{[\s\S]*getToggledPreviewImageZoom/,
     'image lightbox should support mouse zoom through wheel and double click'
   )
+  assert.match(
+    source,
+    /onPointerDown=\{handleImagePointerDown\}[\s\S]*onPointerMove=\{handleImagePointerMove\}[\s\S]*onPointerUp=\{handleImagePointerEnd\}/,
+    'image lightbox should support dragging a zoomed image to inspect clipped regions'
+  )
+  assert.match(
+    source,
+    /clampPreviewImagePan\(/,
+    'image lightbox should keep dragged zoomed images within visible bounds'
+  )
   assert.doesNotMatch(
     source,
     /type ImageLightboxState = \{[\s\S]*zoom: number[\s\S]*\}/,
@@ -335,8 +345,13 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
   )
   assert.match(
     css,
-    /\.image-lightbox-image\s*\{[\s\S]*cursor:\s*zoom-in;[\s\S]*transform-origin:\s*center;/,
-    'image lightbox should expose the enlarged image as zoomable'
+    /\.image-lightbox-image\s*\{[\s\S]*cursor:\s*zoom-in;[\s\S]*transform-origin:\s*center;[\s\S]*touch-action:\s*none;/,
+    'image lightbox should expose the enlarged image as zoomable and draggable'
+  )
+  assert.match(
+    css,
+    /\.image-lightbox-image\.is-pannable\s*\{[\s\S]*cursor:\s*grab;[\s\S]*\}[\s\S]*\.image-lightbox-image\.is-dragging\s*\{[\s\S]*cursor:\s*grabbing;/,
+    'image lightbox should communicate when a zoomed image can be dragged'
   )
 })
 

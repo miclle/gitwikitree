@@ -40,3 +40,30 @@ test('preview image zoom steps within useful bounds', async () => {
   assert.equal(getToggledPreviewImageZoom(1), 2)
   assert.equal(getToggledPreviewImageZoom(2.5), 1)
 })
+
+test('preview image pan clamps to the visible zoom overflow', async () => {
+  const { clampPreviewImagePan } = await loadPreviewImages()
+
+  assert.deepEqual(
+    clampPreviewImagePan({
+      pan: { x: 180, y: -160 },
+      zoom: 2,
+      imageWidth: 300,
+      imageHeight: 200,
+      stageWidth: 400,
+      stageHeight: 300
+    }),
+    { x: 100, y: -50 }
+  )
+  assert.deepEqual(
+    clampPreviewImagePan({
+      pan: { x: 80, y: 40 },
+      zoom: 1,
+      imageWidth: 300,
+      imageHeight: 200,
+      stageWidth: 400,
+      stageHeight: 300
+    }),
+    { x: 0, y: 0 }
+  )
+})
