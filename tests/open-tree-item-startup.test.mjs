@@ -41,3 +41,32 @@ test('workspace registers launch listeners before restoring session', async () =
     'explicit open intents should be observed before session restore can overwrite tabs'
   )
 })
+
+test('workspace reads project session before loading an opened repository path', async () => {
+  const source = await readWorkspaceHook()
+  const loaderStart = source.indexOf('const loadRepositoryPath = useCallback')
+  const loaderEnd = source.indexOf('const loadRepositoryWithSession = useCallback')
+
+  assert.notEqual(loaderStart, -1, 'workspace should define repository path loading')
+  assert.notEqual(loaderEnd, -1, 'workspace should define session loading after path loading')
+
+  const loaderSource = source.slice(loaderStart, loaderEnd)
+  const sessionIndex = loaderSource.indexOf('window.api.getProjectSession(repoPath)')
+  const repositoryLoadIndex = loaderSource.indexOf('window.api.loadRepository(repoPath)')
+
+  assert.notEqual(sessionIndex, -1, 'repository path loading should read saved project session')
+  assert.notEqual(
+    repositoryLoadIndex,
+    -1,
+    'repository path loading should fall back to working tree loading'
+  )
+  assert.ok(
+    sessionIndex < repositoryLoadIndex,
+    'saved ref context should be known before loading the repository path'
+  )
+  assert.match(
+    loaderSource,
+    /window\.api\.getProjectSession\(nextRepository\.path\)/,
+    'repository path loading should retry project session lookup with the normalized repository path'
+  )
+})

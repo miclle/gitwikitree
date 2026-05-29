@@ -19,12 +19,45 @@ import type {
   ProjectSessionState,
   RecentFileState,
   RepositoryPayload,
+  RepositorySource,
   SessionState,
   TreeItemOpenPayload,
   TreeNode
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
+
+type RepositoryLoadContext = {
+  repoPath: string
+  rootPath?: string
+  activeRef?: string
+  source?: RepositorySource
+}
+
+async function loadRepositoryFromContext({
+  repoPath,
+  rootPath,
+  activeRef,
+  source
+}: RepositoryLoadContext): Promise<RepositoryPayload> {
+  return source === 'git-ref' && activeRef
+    ? window.api.loadRef(rootPath ?? repoPath, activeRef, rootPath)
+    : window.api.loadRepository(repoPath)
+}
+
+async function loadRepositoryForProjectSession(
+  fallbackRepository: RepositoryPayload,
+  session: ProjectSessionState
+): Promise<RepositoryPayload> {
+  if (session.source !== 'git-ref' || !session.activeRef) return fallbackRepository
+
+  return loadRepositoryFromContext({
+    repoPath: session.repositoryPath ?? fallbackRepository.path,
+    rootPath: session.rootPath,
+    activeRef: session.activeRef,
+    source: session.source
+  })
+}
 
 function resolveHistoryTargets(
   repository: RepositoryPayload,
@@ -195,7 +228,10 @@ export function useRepositoryWorkspace(): {
 
       const projectSession = await window.api.getProjectSession(nextRepository.path)
       if (projectSession) {
-        await restoreRepositorySession(nextRepository, projectSession)
+        await restoreRepositorySession(
+          await loadRepositoryForProjectSession(nextRepository, projectSession),
+          projectSession
+        )
         return
       }
 
@@ -219,10 +255,25 @@ export function useRepositoryWorkspace(): {
       setError(undefined)
 
       try {
-        const nextRepository = await window.api.loadRepository(repoPath)
-        const projectSession = await window.api.getProjectSession(nextRepository.path)
+        const projectSession = await window.api.getProjectSession(repoPath)
         if (projectSession) {
+          const nextRepository = await loadRepositoryFromContext({
+            repoPath: projectSession.repositoryPath ?? repoPath,
+            rootPath: projectSession.rootPath,
+            activeRef: projectSession.activeRef,
+            source: projectSession.source
+          })
           await restoreRepositorySession(nextRepository, projectSession)
+          return
+        }
+
+        const nextRepository = await window.api.loadRepository(repoPath)
+        const normalizedProjectSession = await window.api.getProjectSession(nextRepository.path)
+        if (normalizedProjectSession) {
+          await restoreRepositorySession(
+            await loadRepositoryForProjectSession(nextRepository, normalizedProjectSession),
+            normalizedProjectSession
+          )
           return
         }
 
@@ -250,14 +301,12 @@ export function useRepositoryWorkspace(): {
       setError(undefined)
 
       try {
-        const nextRepository =
-          session.source === 'git-ref' && session.activeRef
-            ? await window.api.loadRef(
-                session.rootPath ?? session.repositoryPath,
-                session.activeRef,
-                session.rootPath
-              )
-            : await window.api.loadRepository(session.repositoryPath)
+        const nextRepository = await loadRepositoryFromContext({
+          repoPath: session.repositoryPath,
+          rootPath: session.rootPath,
+          activeRef: session.activeRef,
+          source: session.source
+        })
         await restoreRepositorySession(nextRepository, session)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -274,14 +323,7 @@ export function useRepositoryWorkspace(): {
       setError(undefined)
 
       try {
-        const nextRepository =
-          file.source === 'git-ref' && file.activeRef
-            ? await window.api.loadRef(
-                file.rootPath ?? file.repoPath,
-                file.activeRef,
-                file.rootPath
-              )
-            : await window.api.loadRepository(file.repoPath)
+        const nextRepository = await loadRepositoryFromContext(file)
         const filePath = file.filePath
         const resolved = resolveRepositoryNavigationTarget(nextRepository, filePath)
 
@@ -322,14 +364,7 @@ export function useRepositoryWorkspace(): {
       setError(undefined)
 
       try {
-        const nextRepository =
-          item.source === 'git-ref' && item.activeRef
-            ? await window.api.loadRef(
-                item.rootPath ?? item.repoPath,
-                item.activeRef,
-                item.rootPath
-              )
-            : await window.api.loadRepository(item.repoPath)
+        const nextRepository = await loadRepositoryFromContext(item)
         const resolved = resolveRepositoryNavigationTarget(nextRepository, item.path)
 
         setRepository(nextRepository)
