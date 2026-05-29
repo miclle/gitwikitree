@@ -169,14 +169,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     </select>
                   </span>
                   <button className="sidebar-control-button" type="button" aria-label="Add">
-                    <Plus size={18} />
+                    <Plus size={16} />
                   </button>
                   <button
                     className="sidebar-control-button"
                     type="button"
                     aria-label="Search files"
                   >
-                    <Search size={18} />
+                    <Search size={16} />
                   </button>
                 </div>
 
