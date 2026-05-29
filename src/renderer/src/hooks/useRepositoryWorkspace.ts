@@ -170,7 +170,12 @@ export function useRepositoryWorkspace(): {
       const nextSelectedPath = selectedTarget?.target.path ?? ''
 
       setRepository(nextRepository)
-      setExpandedPaths(new Set(session.expandedPaths.length ? session.expandedPaths : ['']))
+      setExpandedPaths(
+        new Set([
+          ...(session.expandedPaths.length ? session.expandedPaths : ['']),
+          ...parentPaths(nextSelectedPath)
+        ])
+      )
       setOpenFileTabs(restoredTabs)
       setActiveFilePath(restoredActiveFile)
       setActiveFileTabId(restoredActiveTabId)
@@ -651,6 +656,9 @@ export function useRepositoryWorkspace(): {
             token: nextAnchorToken.current
           })
         }
+        setExpandedPaths(
+          (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
+        )
         void handleSelect(resolved.node, { openInNewTab })
         return true
       }
@@ -664,6 +672,9 @@ export function useRepositoryWorkspace(): {
             token: nextAnchorToken.current
           })
         }
+        setExpandedPaths(
+          (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
+        )
         setSelectedPath(resolved.target.path)
         setActiveFilePath(undefined)
         const result = navigateFileTabs({

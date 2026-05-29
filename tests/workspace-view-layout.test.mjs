@@ -18,6 +18,13 @@ async function readPanelResizeHook() {
   return readFile(new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url), 'utf8')
 }
 
+async function readRepositoryWorkspaceHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useRepositoryWorkspace.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
@@ -144,6 +151,26 @@ test('global repository search is available from the sidebar and keyboard shortc
     source,
     /<GlobalSearchModal[\s\S]*open=\{isGlobalSearchOpen\}/,
     'workspace should render the global search modal'
+  )
+})
+
+test('global repository search opens reveal the selected file in the tree', async () => {
+  const source = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    source,
+    /selectPreviewPath[\s\S]*setExpandedPaths\([\s\S]*\(current\) => new Set\(\[\.\.\.current, '', \.\.\.parentPaths\(resolved\.target\.path\)\]\)[\s\S]*\)[\s\S]*handleSelect\(resolved\.node, \{ openInNewTab \}\)/,
+    'opening a search result should expand ancestor folders before selecting the matching file'
+  )
+})
+
+test('restored active file tabs reveal their item in the tree', async () => {
+  const source = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    source,
+    /restoreRepositorySession[\s\S]*setExpandedPaths\([\s\S]*new Set\(\[[\s\S]*\.\.\.\(session\.expandedPaths\.length \? session\.expandedPaths : \[''\]\),[\s\S]*\.\.\.parentPaths\(nextSelectedPath\)[\s\S]*\]\)[\s\S]*\)/,
+    'restoring a window should expand ancestor folders for the active tab'
   )
 })
 
