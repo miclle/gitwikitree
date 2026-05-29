@@ -21,6 +21,7 @@ jobs:
   analyze:
     name: Analyze JavaScript and TypeScript
     runs-on: ubuntu-latest
+    if: github.repository_visibility == 'public'
 
     steps:
       - name: Checkout
