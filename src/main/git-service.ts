@@ -77,14 +77,22 @@ export async function getRefs(
   repoPath: string,
   currentBranch: string
 ): Promise<RepositoryPayload['refs']> {
-  const { stdout } = await execFileAsync('git', [
-    '-C',
-    repoPath,
-    'for-each-ref',
-    '--format=%(refname:short)%09%(refname)',
-    'refs/heads',
-    'refs/remotes'
+  const [{ stdout }, worktrees] = await Promise.all([
+    execFileAsync('git', [
+      '-C',
+      repoPath,
+      'for-each-ref',
+      '--format=%(refname:short)%09%(refname)',
+      'refs/heads',
+      'refs/remotes'
+    ]),
+    getWorktrees(repoPath)
   ])
+  const worktreePathsByBranch = new Map(
+    worktrees
+      .filter((worktree): worktree is GitWorktree & { branch: string } => Boolean(worktree.branch))
+      .map((worktree) => [worktree.branch, worktree.path])
+  )
 
   const seen = new Set<string>()
   return stdout
@@ -96,7 +104,10 @@ export async function getRefs(
       return {
         name,
         type: fullName?.startsWith('refs/remotes/') ? ('remote' as const) : ('local' as const),
-        current: name === currentBranch
+        current: name === currentBranch,
+        worktreePath: fullName?.startsWith('refs/remotes/')
+          ? undefined
+          : worktreePathsByBranch.get(name)
       }
     })
     .filter((ref) => {

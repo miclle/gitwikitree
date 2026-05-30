@@ -236,8 +236,13 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
-    /onClick=\{\(\) => openBranchActionModal\(ref\.name\)\}/,
-    'choosing a branch row should open the follow-up action modal'
+    /onClick=\{\(\) => handleBranchRefSelect\(ref\)\}/,
+    'choosing a branch row should route through the branch selection handler'
+  )
+  assert.match(
+    source,
+    /if \(ref\.worktreePath\)[\s\S]*void openBranchWorktree\(ref\.name\)[\s\S]*return/,
+    'refs that already have a worktree should open directly without the action modal'
   )
   assert.match(
     source,

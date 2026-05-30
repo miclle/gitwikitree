@@ -19,6 +19,7 @@ import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
+import type { RepositoryRef } from '../../../shared/types'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const {
@@ -170,11 +171,30 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     searchInputRef.current?.select()
   }, [isSearchOpen, searchFocusRequest])
 
-  const openBranchActionModal = (refName: string): void => {
-    setBranchActionRef(refName)
+  const closeBranchPicker = (): void => {
     setIsBranchPickerOpen(false)
     setBranchPickerTab('branches')
     setBranchQuery('')
+  }
+
+  const openBranchActionModal = (refName: string): void => {
+    setBranchActionRef(refName)
+    closeBranchPicker()
+  }
+
+  const handleBranchRefSelect = (ref: RepositoryRef): void => {
+    if (ref.current) {
+      closeBranchPicker()
+      return
+    }
+
+    if (ref.worktreePath) {
+      closeBranchPicker()
+      void openBranchWorktree(ref.name)
+      return
+    }
+
+    openBranchActionModal(ref.name)
   }
 
   const closeBranchActionModal = (): void => {
@@ -342,11 +362,12 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               className="branch-picker-row"
                               type="button"
                               key={`${ref.type}:${ref.name}`}
-                              onClick={() => openBranchActionModal(ref.name)}
+                              onClick={() => handleBranchRefSelect(ref)}
                             >
                               <span aria-hidden="true">{ref.current ? '✓' : ''}</span>
                               <span title={ref.name}>{ref.name}</span>
                               {ref.current && <strong>current</strong>}
+                              {!ref.current && ref.worktreePath && <strong>open</strong>}
                             </button>
                           ))}
                           {displayedBranchRefs.length === 0 && (

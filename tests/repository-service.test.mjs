@@ -177,6 +177,42 @@ test('loadRepository keeps the primary worktree root when opening a linked workt
   }
 })
 
+test('loadRepository annotates local refs that already have a worktree', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    const worktreePath = join(repoPath, '.worktrees', 'wiki')
+    await execFileAsync('git', ['worktree', 'add', worktreePath, 'wiki'], { cwd: repoPath })
+
+    const repository = await service.loadRepository(worktreePath)
+    const mainRef = repository.refs.find((ref) => ref.name === 'main')
+    const wikiRef = repository.refs.find((ref) => ref.name === 'wiki')
+    const realRepoPath = await realpath(repoPath)
+    const realWorktreePath = await realpath(worktreePath)
+
+    assert.equal(mainRef?.worktreePath, realRepoPath)
+    assert.equal(wikiRef?.worktreePath, realWorktreePath)
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('openWorktree reuses an existing worktree when the target branch is already checked out', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()

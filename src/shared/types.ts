@@ -43,6 +43,7 @@ export type RepositoryRef = {
   name: string
   type: 'local' | 'remote'
   current: boolean
+  worktreePath?: string
 }
 
 export type RepositoryPayload = {
