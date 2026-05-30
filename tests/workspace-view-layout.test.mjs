@@ -14,6 +14,10 @@ async function readMainCss() {
   return readFile(new URL('../src/renderer/src/assets/main.css', import.meta.url), 'utf8')
 }
 
+async function readRendererIndex() {
+  return readFile(new URL('../src/renderer/index.html', import.meta.url), 'utf8')
+}
+
 async function readPanelResizeHook() {
   return readFile(new URL('../src/renderer/src/hooks/usePanelResize.ts', import.meta.url), 'utf8')
 }
@@ -46,6 +50,16 @@ test('preview titlebar places file tabs in the titlebar row', async () => {
     source,
     /<div className="main-titlebar">[\s\S]*\{fileTabsNav\}[\s\S]*<\/div>/,
     'preview titlebar should render the file tab strip inside the titlebar'
+  )
+})
+
+test('renderer content security policy allows remote markdown images', async () => {
+  const source = await readRendererIndex()
+
+  assert.match(
+    source,
+    /img-src[^"]*'self'[^"]*data:[^"]*https:[^"]*http:/,
+    'Markdown badge images served over HTTP or HTTPS should not be blocked by the renderer CSP'
   )
 })
 
