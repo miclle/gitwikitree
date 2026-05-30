@@ -6,6 +6,11 @@ import type { RepositoryPayload } from '../shared/types'
 
 export const execFileAsync = promisify(execFile)
 
+export type GitWorktree = {
+  path: string
+  branch?: string
+}
+
 export async function assertRepositoryPath(repoPath: string): Promise<string> {
   const resolved = resolve(repoPath)
   const stats = await fs.stat(resolved)
@@ -21,6 +26,42 @@ export async function assertRepositoryPath(repoPath: string): Promise<string> {
 export async function getRepositoryRoot(repoPath: string): Promise<string> {
   const { stdout } = await execFileAsync('git', ['-C', repoPath, 'rev-parse', '--show-toplevel'])
   return stdout.trim()
+}
+
+export async function getWorktrees(repoPath: string): Promise<GitWorktree[]> {
+  const { stdout } = await execFileAsync('git', ['-C', repoPath, 'worktree', 'list', '--porcelain'])
+  const worktrees: GitWorktree[] = []
+  let current: GitWorktree | undefined
+
+  for (const line of stdout.split('\n')) {
+    const value = line.trim()
+
+    if (!value) {
+      if (current) {
+        worktrees.push(current)
+        current = undefined
+      }
+      continue
+    }
+
+    if (value.startsWith('worktree ')) {
+      if (current) {
+        worktrees.push(current)
+      }
+      current = { path: await fs.realpath(value.slice('worktree '.length)) }
+      continue
+    }
+
+    if (value.startsWith('branch ') && current) {
+      current.branch = value.slice('branch '.length).replace(/^refs\/heads\//, '')
+    }
+  }
+
+  if (current) {
+    worktrees.push(current)
+  }
+
+  return worktrees
 }
 
 export async function getBranch(repoPath: string): Promise<string> {

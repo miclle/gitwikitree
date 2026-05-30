@@ -5,10 +5,12 @@ import {
   assertValidRef,
   execFileAsync,
   getBranch,
-  getRefs
+  getRefs,
+  getWorktrees,
+  type GitWorktree
 } from './git-service'
 import { loadRepository } from './repository-loader'
-import type { RepositoryPayload } from '../shared/types'
+import type { RepositoryPayload, RepositorySource } from '../shared/types'
 
 function slugifyRef(ref: string): string {
   return ref
@@ -19,15 +21,42 @@ function slugifyRef(ref: string): string {
     .slice(0, 80)
 }
 
+function getWorktreeSource(worktreePath: string, rootPath: string): RepositorySource {
+  return worktreePath === rootPath ? 'working-tree' : 'worktree'
+}
+
+function findWorktreeForBranch(worktrees: GitWorktree[], branch: string): GitWorktree | undefined {
+  return worktrees.find((worktree) => worktree.branch === branch)
+}
+
+function loadWorktree(worktreePath: string, rootPath: string): Promise<RepositoryPayload> {
+  return loadRepository(worktreePath, {
+    source: getWorktreeSource(worktreePath, rootPath),
+    rootPath
+  })
+}
+
 export async function openWorktree(repoPath: string, ref: string): Promise<RepositoryPayload> {
-  const rootPath = await assertRepositoryPath(repoPath)
+  const resolvedPath = await assertRepositoryPath(repoPath)
+  const worktrees = await getWorktrees(resolvedPath)
+  const rootPath = worktrees[0]?.path ?? resolvedPath
   const currentBranch = await getBranch(rootPath)
 
-  if (ref === currentBranch) {
-    return loadRepository(rootPath)
+  await assertValidRef(rootPath, ref)
+
+  const refs = await getRefs(rootPath, currentBranch)
+  const localBranches = new Set(
+    refs.filter((item) => item.type === 'local').map((item) => item.name)
+  )
+  const remotePrefix = ref.includes('/') ? ref.split('/')[0] : ''
+  const remoteTail = remotePrefix ? ref.slice(remotePrefix.length + 1) : ref
+  const targetBranch = localBranches.has(ref) ? ref : remoteTail
+  const existingWorktree = findWorktreeForBranch(worktrees, targetBranch)
+
+  if (existingWorktree) {
+    return loadWorktree(existingWorktree.path, rootPath)
   }
 
-  await assertValidRef(rootPath, ref)
   const worktreesDir = join(rootPath, '.worktrees')
   const worktreePath = join(worktreesDir, slugifyRef(ref) || 'branch')
 
@@ -38,17 +67,6 @@ export async function openWorktree(repoPath: string, ref: string): Promise<Repos
     }
   } catch {
     await fs.mkdir(worktreesDir, { recursive: true })
-  }
-
-  const refs = await getRefs(rootPath, currentBranch)
-  const localBranches = new Set(
-    refs.filter((item) => item.type === 'local').map((item) => item.name)
-  )
-  const remotePrefix = ref.includes('/') ? ref.split('/')[0] : ''
-  const remoteTail = remotePrefix ? ref.slice(remotePrefix.length + 1) : ref
-
-  if (remoteTail === currentBranch) {
-    return loadRepository(rootPath)
   }
 
   if (localBranches.has(ref)) {
