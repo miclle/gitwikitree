@@ -17,6 +17,7 @@ async function loadRepositoryService() {
     modules: [
       'src/main/repository-service.ts',
       'src/main/repository-loader.ts',
+      'src/main/repository-files.ts',
       'src/main/repository-preview.ts',
       'src/main/repository-search.ts',
       'src/main/repository-worktree.ts',
@@ -59,7 +60,7 @@ async function createRepository() {
   return repoPath
 }
 
-test('loadRepository builds a working tree from tracked and untracked files', async () => {
+test('loadRepository builds a working tree from local workspace files', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()
 
@@ -79,6 +80,29 @@ test('loadRepository builds a working tree from tracked and untracked files', as
       ['docs/guide.md']
     )
     assert.deepEqual(repository.tree[1].children, [])
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('loadRepository builds the workspace tree from local files instead of git visibility', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await mkdir(join(repoPath, 'node_modules', 'pkg'), { recursive: true })
+    await writeFile(join(repoPath, '.gitignore'), 'ignored-local.log\n')
+    await writeFile(join(repoPath, 'ignored-local.log'), 'kept in local workspace')
+    await writeFile(join(repoPath, 'node_modules', 'pkg', 'index.js'), 'ignored dependency')
+
+    const repository = await service.loadRepository(repoPath)
+    const paths = repository.tree.map((node) => node.path)
+
+    assert.ok(paths.includes('ignored-local.log'))
+    assert.ok(!paths.includes('.git'))
+    assert.ok(!paths.includes('.worktrees'))
+    assert.ok(!paths.includes('node_modules'))
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

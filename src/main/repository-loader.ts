@@ -1,11 +1,6 @@
 import { basename, resolve } from 'path'
-import {
-  assertRepositoryPath,
-  getBranch,
-  getGitVisibleFiles,
-  getRefs,
-  getRepositoryRoot
-} from './git-service'
+import { assertRepositoryPath, getBranch, getRefs, getRepositoryRoot } from './git-service'
+import { getWorkspaceFiles } from './repository-files'
 import { buildRepositoryTree } from './repository-tree'
 import type { RepositoryLoadOptions, RepositoryPayload } from '../shared/types'
 
@@ -24,7 +19,7 @@ export async function loadRepository(
     getRefs(resolvedPath, currentBranch)
   ])
   const activeRef = branch
-  const files = await getGitVisibleFiles(resolvedPath)
+  const files = await getWorkspaceFiles(resolvedPath)
 
   const repositoryTree = buildRepositoryTree(files)
 

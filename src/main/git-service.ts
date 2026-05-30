@@ -69,22 +69,6 @@ export async function getRefs(
     })
 }
 
-export async function getGitVisibleFiles(repoPath: string): Promise<string[]> {
-  const { stdout } = await execFileAsync('git', [
-    '-C',
-    repoPath,
-    'ls-files',
-    '-co',
-    '--exclude-standard'
-  ])
-
-  return stdout
-    .split('\n')
-    .map((file) => file.trim())
-    .filter((file) => Boolean(file) && !file.startsWith('.worktrees/'))
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-}
-
 export async function assertValidRef(repoPath: string, ref: string): Promise<void> {
   if (!ref || ref.includes('\0') || ref.startsWith('-')) {
     throw new Error('Invalid git ref.')

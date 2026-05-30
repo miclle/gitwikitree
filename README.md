@@ -8,8 +8,8 @@ surface with branch, worktree, tab, and session-aware navigation.
 ## Features
 
 - Open local Git repositories from the app UI, menu, or startup path.
-- Build a repository tree from tracked and untracked files while ignoring Git
-  internals and worktree metadata.
+- Build the repository tree from local workspace files while ignoring Git
+  internals, `.worktrees`, and dependency directories.
 - Preview directories through README/index files or compact directory listings.
 - Preview Markdown, HTML, SVG, common image formats, and text-like files.
 - Search and preview workspace content from local files rather than Git object

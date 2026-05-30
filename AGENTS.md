@@ -4,7 +4,7 @@ This file is the shared entry point for Codex, Claude Code, and other agentic to
 
 ## Project Overview
 
-Git Wikitree is a local Git file workspace desktop app built with Electron, electron-vite, React 19, and TypeScript. The app opens local Git repositories, displays tracked and untracked file trees, previews directories, Markdown, HTML, SVG, images, and text files, and supports explicit branch switching, worktree opening, file tabs, recent repositories/files, and session restoration.
+Git Wikitree is a local Git file workspace desktop app built with Electron, electron-vite, React 19, and TypeScript. The app opens local Git repositories, displays local workspace file trees, previews directories, Markdown, HTML, SVG, images, and text files, and supports explicit branch switching, worktree opening, file tabs, recent repositories/files, and session restoration.
 
 ## Directory Layout
 

@@ -17,6 +17,7 @@ async function loadRepositorySearch() {
     modules: [
       'src/main/repository-search.ts',
       'src/main/repository-loader.ts',
+      'src/main/repository-files.ts',
       'src/main/repository-paths.ts',
       'src/main/repository-tree.ts',
       'src/main/git-service.ts',
