@@ -114,6 +114,19 @@ export async function assertValidRef(repoPath: string, ref: string): Promise<voi
   await execFileAsync('git', ['-C', repoPath, 'rev-parse', '--verify', `${ref}^{commit}`])
 }
 
+export async function assertLocalBranch(repoPath: string, branch: string): Promise<void> {
+  if (!branch || branch.includes('\0') || branch.startsWith('-')) {
+    throw new Error('Invalid git branch.')
+  }
+
+  await execFileAsync('git', ['-C', repoPath, 'show-ref', '--verify', `refs/heads/${branch}`])
+}
+
+export async function switchLocalBranch(repoPath: string, branch: string): Promise<void> {
+  await assertLocalBranch(repoPath, branch)
+  await execFileAsync('git', ['-C', repoPath, 'switch', branch])
+}
+
 export async function readRefFile(
   repoPath: string,
   ref: string,

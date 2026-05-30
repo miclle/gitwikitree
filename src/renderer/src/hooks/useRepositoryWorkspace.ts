@@ -35,21 +35,16 @@ type RepositoryLoadContext = {
 }
 
 async function loadRepositoryFromContext({
-  repoPath,
-  rootPath,
-  activeRef,
-  source
+  repoPath
 }: RepositoryLoadContext): Promise<RepositoryPayload> {
-  return source === 'git-ref' && activeRef
-    ? window.api.loadRef(rootPath ?? repoPath, activeRef, rootPath)
-    : window.api.loadRepository(repoPath)
+  return window.api.loadRepository(repoPath)
 }
 
 async function loadRepositoryForProjectSession(
   fallbackRepository: RepositoryPayload,
   session: ProjectSessionState
 ): Promise<RepositoryPayload> {
-  if (session.source !== 'git-ref' || !session.activeRef) return fallbackRepository
+  if (session.repositoryPath === fallbackRepository.path) return fallbackRepository
 
   return loadRepositoryFromContext({
     repoPath: session.repositoryPath ?? fallbackRepository.path,
@@ -105,7 +100,8 @@ export function useRepositoryWorkspace(): {
   selectFileTab: (tab: OpenFileTab) => Promise<void>
   closeFileTab: (id: string) => void
   navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
-  switchRef: (ref: string) => Promise<void>
+  checkoutBranch: (branch: string) => Promise<void>
+  openBranchWorktree: (ref: string) => Promise<void>
   openRepositoryPreview: () => void
   openBreadcrumbPath: (path: string) => void
   selectPreviewPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
@@ -615,33 +611,55 @@ export function useRepositoryWorkspace(): {
     return window.api.onCloseCurrentTabOrWindow(closeCurrentTabOrWindow)
   }, [closeCurrentTabOrWindow])
 
-  const switchRef = useCallback(
-    async (ref: string): Promise<void> => {
-      if (!repository || ref === repository.activeRef) return
+  const replaceRepositoryWorkspace = useCallback(
+    async (nextRepository: RepositoryPayload): Promise<void> => {
+      setRepository(nextRepository)
+      setSelectedPath('')
+      setExpandedPaths(defaultExpanded)
+      setOpenFileTabs([])
+      setActiveFilePath(undefined)
+      setActiveFileTabId(undefined)
+      await loadPreview('', nextRepository)
+    },
+    [loadPreview]
+  )
+
+  const checkoutBranch = useCallback(
+    async (branch: string): Promise<void> => {
+      if (!repository || branch === repository.branch) return
 
       setLoading(true)
       setError(undefined)
 
       try {
-        const nextRepository = await window.api.loadRef(
-          repository.rootPath,
-          ref,
-          repository.rootPath
-        )
-        setRepository(nextRepository)
-        setSelectedPath('')
-        setExpandedPaths(defaultExpanded)
-        setOpenFileTabs([])
-        setActiveFilePath(undefined)
-        setActiveFileTabId(undefined)
-        await loadPreview('', nextRepository)
+        const nextRepository = await window.api.checkoutBranch(repository.path, branch)
+        await replaceRepositoryWorkspace(nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
       } finally {
         setLoading(false)
       }
     },
-    [loadPreview, repository]
+    [replaceRepositoryWorkspace, repository]
+  )
+
+  const openBranchWorktree = useCallback(
+    async (ref: string): Promise<void> => {
+      if (!repository) return
+
+      setLoading(true)
+      setError(undefined)
+
+      try {
+        const nextRepository = await window.api.openWorktree(repository.rootPath, ref)
+        await replaceRepositoryWorkspace(nextRepository)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [replaceRepositoryWorkspace, repository]
   )
 
   const openRepositoryPreview = useCallback((): void => {
@@ -821,7 +839,8 @@ export function useRepositoryWorkspace(): {
     selectFileTab,
     closeFileTab,
     navigateActiveTabHistory,
-    switchRef,
+    checkoutBranch,
+    openBranchWorktree,
     openRepositoryPreview,
     openBreadcrumbPath,
     selectPreviewPath,

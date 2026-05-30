@@ -48,6 +48,13 @@ function createHarness() {
         activeRef: options?.ref ?? loadedRepository.activeRef,
         source: options?.source ?? loadedRepository.source
       }),
+      checkoutBranch: async (repoPath, branch) => ({
+        ...loadedRepository,
+        path: repoPath,
+        branch,
+        activeRef: branch,
+        source: 'working-tree'
+      }),
       openWorktree: async (repoPath, ref) => ({
         ...loadedRepository,
         path: `${repoPath}/.worktrees/${ref}`,
@@ -89,7 +96,7 @@ test('registerRepositoryIpcHandlers registers all repository load channels', asy
     [
       'repository:pick',
       'repository:load',
-      'repository:load-ref',
+      'repository:checkout-branch',
       'repository:open-worktree',
       'repository:preview',
       'repository:save-file',
@@ -109,27 +116,32 @@ test('repository:load activates the repository in the sender window', async () =
   assert.deepEqual(activated, [{ sourceWindow: { id: 'sender-window' }, repository }])
 })
 
-test('repository:load-ref loads a ref from the requested root path', async () => {
+test('repository:checkout-branch switches a local branch and activates the workspace', async () => {
   const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
-  const { handlers, dependencies } = createHarness()
-  const seenLoads = []
-  dependencies.loadRepository = async (repoPath, options) => {
-    seenLoads.push({ repoPath, options })
+  const { handlers, activated, dependencies } = createHarness()
+  const seenCheckouts = []
+  dependencies.checkoutBranch = async (repoPath, branch) => {
+    seenCheckouts.push({ repoPath, branch })
     return {
       ...createHarness().loadedRepository,
       path: repoPath,
-      rootPath: options.rootPath,
-      activeRef: options.ref,
-      source: options.source
+      branch,
+      activeRef: branch,
+      source: 'working-tree'
     }
   }
 
   registerRepositoryIpcHandlers(dependencies)
-  await handlers.get('repository:load-ref')({ sender: {} }, '/repo', 'feature/docs', '/root')
+  const repository = await handlers.get('repository:checkout-branch')(
+    { sender: {} },
+    '/repo',
+    'feature/docs'
+  )
 
-  assert.deepEqual(seenLoads, [
-    { repoPath: '/repo', options: { ref: 'feature/docs', source: 'git-ref', rootPath: '/root' } }
-  ])
+  assert.deepEqual(seenCheckouts, [{ repoPath: '/repo', branch: 'feature/docs' }])
+  assert.equal(repository.source, 'working-tree')
+  assert.equal(repository.activeRef, 'feature/docs')
+  assert.deepEqual(activated, [{ sourceWindow: { id: 'sender-window' }, repository }])
 })
 
 test('repository:preview returns a preview for the requested repository path', async () => {

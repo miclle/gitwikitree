@@ -4,7 +4,7 @@ This file is the shared entry point for Codex, Claude Code, and other agentic to
 
 ## Project Overview
 
-Git Wikitree is a local Git file workspace desktop app built with Electron, electron-vite, React 19, and TypeScript. The app opens local Git repositories, displays tracked and untracked file trees, previews directories, Markdown, HTML, SVG, images, and text files, and supports branch/ref browsing, worktree opening, file tabs, recent repositories/files, and session restoration.
+Git Wikitree is a local Git file workspace desktop app built with Electron, electron-vite, React 19, and TypeScript. The app opens local Git repositories, displays tracked and untracked file trees, previews directories, Markdown, HTML, SVG, images, and text files, and supports explicit branch switching, worktree opening, file tabs, recent repositories/files, and session restoration.
 
 ## Directory Layout
 
@@ -34,7 +34,7 @@ The development server listens on `127.0.0.1:43173` with strict port checking. I
 ## Core Rules
 
 - When changing capabilities that cross the main, preload, and renderer boundary, update the IPC handler, `src/preload/index.ts`, `src/preload/index.d.ts`, and the matching contract in `src/shared/types.ts`.
-- Keep boundary checks for repository paths, file paths, refs, and worktrees. Relative paths must not escape the selected repository root.
+- Keep boundary checks for repository paths, file paths, branch refs, and worktrees. Relative paths must not escape the selected repository root.
 - File previews, Markdown links, tab history, recent files/repositories, and session state are connected. When changing one, check restoration, menu-driven opens, and new-window paths.
 - New UI should match the existing desktop-tool feel: clear controls, moderate density, accessible icon buttons, and no marketing-page layout.
 - Do not overwrite user changes. The workspace may contain in-progress renderer edits, so inspect `git status` before modifying files.

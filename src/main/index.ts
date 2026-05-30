@@ -33,6 +33,7 @@ import {
 import { openRepositoryInNewWindow } from './open-repository-dialog'
 import {
   getPreview,
+  checkoutBranch,
   loadRepository,
   openWorktree,
   saveFile,
@@ -477,6 +478,7 @@ app.whenReady().then(async () => {
         ? dialog.showOpenDialog(browserWindowOrOptions as BrowserWindow, options)
         : dialog.showOpenDialog(browserWindowOrOptions),
     loadRepository,
+    checkoutBranch,
     openWorktree,
     getPreview,
     saveFile,

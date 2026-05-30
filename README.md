@@ -3,7 +3,7 @@
 Git Wikitree is a desktop Git file workspace built with Electron, electron-vite,
 React, and TypeScript. It opens local Git repositories, presents the repository
 as a navigable file tree, and gives Markdown-heavy projects a fast preview
-surface with branch, ref, worktree, tab, and session-aware navigation.
+surface with branch, worktree, tab, and session-aware navigation.
 
 ## Features
 
@@ -14,8 +14,8 @@ surface with branch, ref, worktree, tab, and session-aware navigation.
 - Preview Markdown, HTML, SVG, common image formats, and text-like files.
 - Render Markdown with GitHub-flavored Markdown, syntax highlighting, heading
   anchors, copy-code buttons, and intercepted repository links.
-- Browse branches and refs in read-only `git-ref` mode, or open an editable
-  worktree for a selected ref.
+- Choose a branch action explicitly: switch the current local workspace, or open
+  the selected branch as an editable worktree under `.worktrees`.
 - Keep multiple file and directory tabs, including per-tab back/forward history.
 - Persist project sessions, expanded paths, active tabs, recent repositories,
   recent files, and window bounds.
@@ -97,8 +97,8 @@ npm run format          # Format the repository with Prettier
   together.
 - Repository-relative paths must be validated on the main side so preview and
   save operations cannot escape the selected repository root.
-- `git-ref` previews are read-only; working tree and opened worktree sources are
-  editable.
+- The primary workspace is always a local working tree or worktree; Git actions
+  such as branch switching and worktree creation are explicit user choices.
 - Session state tracks repository context through `repoPath`, `rootPath`,
   `activeRef`, and `source`; preserve those fields when changing navigation or
   recent-item behavior.

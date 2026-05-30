@@ -30,8 +30,8 @@ const api = {
     ipcRenderer.invoke('context-menu:markdown-link', item),
   pickRepository: () => ipcRenderer.invoke('repository:pick'),
   loadRepository: (repoPath: string) => ipcRenderer.invoke('repository:load', repoPath),
-  loadRef: (repoPath: string, ref: string, rootPath?: string) =>
-    ipcRenderer.invoke('repository:load-ref', repoPath, ref, rootPath),
+  checkoutBranch: (repoPath: string, branch: string) =>
+    ipcRenderer.invoke('repository:checkout-branch', repoPath, branch),
   openWorktree: (repoPath: string, ref: string) =>
     ipcRenderer.invoke('repository:open-worktree', repoPath, ref),
   previewPath: (

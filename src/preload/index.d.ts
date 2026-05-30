@@ -19,7 +19,7 @@ export type GitWikitreeAPI = {
   showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   pickRepository: () => Promise<RepositoryPayload | undefined>
   loadRepository: (repoPath: string) => Promise<RepositoryPayload>
-  loadRef: (repoPath: string, ref: string, rootPath?: string) => Promise<RepositoryPayload>
+  checkoutBranch: (repoPath: string, branch: string) => Promise<RepositoryPayload>
   openWorktree: (repoPath: string, ref: string) => Promise<RepositoryPayload>
   previewPath: (
     repoPath: string,

@@ -16,6 +16,7 @@ type RepositoryIpcDependencies = {
     options?: OpenDialogOptions
   ) => Promise<OpenDialogResult>
   loadRepository: (repoPath: string, options?: RepositoryLoadOptions) => Promise<RepositoryPayload>
+  checkoutBranch: (repoPath: string, branch: string) => Promise<RepositoryPayload>
   openWorktree: (repoPath: string, ref: string) => Promise<RepositoryPayload>
   getPreview: (
     repoPath: string,
@@ -40,6 +41,7 @@ export function registerRepositoryIpcHandlers({
   getWindowFromWebContents,
   showOpenDialog,
   loadRepository,
+  checkoutBranch,
   openWorktree,
   getPreview,
   saveFile,
@@ -70,15 +72,12 @@ export function registerRepositoryIpcHandlers({
     return repository
   })
 
-  ipcMain.handle(
-    'repository:load-ref',
-    async (event, repoPath: string, ref: string, rootPath?: string) => {
-      const repository = await loadRepository(repoPath, { ref, source: 'git-ref', rootPath })
-      const sourceWindow = getWindowFromWebContents(event.sender)
-      await activateRepositoryInWindow(sourceWindow, repository)
-      return repository
-    }
-  )
+  ipcMain.handle('repository:checkout-branch', async (event, repoPath: string, branch: string) => {
+    const repository = await checkoutBranch(repoPath, branch)
+    const sourceWindow = getWindowFromWebContents(event.sender)
+    await activateRepositoryInWindow(sourceWindow, repository)
+    return repository
+  })
 
   ipcMain.handle('repository:open-worktree', async (event, repoPath: string, ref: string) => {
     const repository = await openWorktree(repoPath, ref)

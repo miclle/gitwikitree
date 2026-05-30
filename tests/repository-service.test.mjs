@@ -20,6 +20,7 @@ async function loadRepositoryService() {
       'src/main/repository-preview.ts',
       'src/main/repository-search.ts',
       'src/main/repository-worktree.ts',
+      'src/main/repository-workspace.ts',
       'src/main/repository-paths.ts',
       'src/main/repository-tree.ts',
       'src/main/git-service.ts',
@@ -78,6 +79,39 @@ test('loadRepository builds a working tree from tracked and untracked files', as
       ['docs/guide.md']
     )
     assert.deepEqual(repository.tree[1].children, [])
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('checkoutBranch switches to a local branch and reloads the working tree', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'feature/docs'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'feature.md'), '# Feature\n')
+    await execFileAsync('git', ['add', 'feature.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add feature docs'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+
+    const repository = await service.checkoutBranch(repoPath, 'feature/docs')
+
+    assert.equal(repository.branch, 'feature/docs')
+    assert.equal(repository.activeRef, 'feature/docs')
+    assert.equal(repository.source, 'working-tree')
+    assert.equal(repository.editable, true)
+    assert.ok(repository.tree.some((node) => node.path === 'feature.md'))
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
