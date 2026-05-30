@@ -295,7 +295,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               <aside className="tree-panel" aria-label="Files">
                 <div className="sidebar-titlebar">
                   <TitlebarWindowControls />
-                  <div className="titlebar-repository" title={repositoryLabel}>
+                  <div className="titlebar-repository" title={repository.path}>
                     {repositoryLabel}
                   </div>
                 </div>

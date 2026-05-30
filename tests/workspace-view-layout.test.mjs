@@ -85,6 +85,16 @@ test('collapsed sidebar omits the repository label from the tab bar', async () =
   )
 })
 
+test('sidebar repository label exposes the local workspace path on hover', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /<div className="titlebar-repository" title=\{repository\.path\}>/,
+    'sidebar repository label should keep the visible label concise and expose the full path as hover text'
+  )
+})
+
 test('preview titlebar keeps preview controls tight before tabs', async () => {
   const css = await readMainCss()
 

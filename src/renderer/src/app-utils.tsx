@@ -1,13 +1,8 @@
 import { File, Folder } from 'lucide-react'
 import { getTreeIcon } from './tree-icons'
+export { getRepositoryLabel } from './repository-label'
 import type { OpenFileTab } from './app-navigation'
-import type { NavigationTarget, RepositoryPayload, TreeNode } from '../../shared/types'
-
-export function getRepositoryLabel(repository: RepositoryPayload): string {
-  const parts = repository.rootPath.split(/[\\/]/).filter(Boolean)
-  const owner = parts.at(-2)
-  return owner ? `${owner}/${repository.name}` : repository.name
-}
+import type { NavigationTarget, TreeNode } from '../../shared/types'
 
 export function fileNameFromPath(path: string): string {
   return path.split('/').filter(Boolean).at(-1) ?? path
