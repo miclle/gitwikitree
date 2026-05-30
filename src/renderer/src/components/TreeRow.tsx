@@ -8,6 +8,7 @@ export function TreeRow({
   level,
   expandedPaths,
   selectedPath,
+  dirtyPath,
   onSelect,
   onToggle,
   onOpenContextMenu
@@ -16,12 +17,14 @@ export function TreeRow({
   level: number
   expandedPaths: Set<string>
   selectedPath: string
+  dirtyPath?: string
   onSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   onToggle: (path: string) => void
   onOpenContextMenu: (node: TreeNode) => Promise<void>
 }): React.JSX.Element {
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
+  const isDirty = dirtyPath === node.path
   const selectNode = (openInNewTab = false): void => {
     void onSelect(node, { openInNewTab })
   }
@@ -70,7 +73,15 @@ export function TreeRow({
         )}
         <span className="tree-node-button">
           {iconForNode(node, expanded)}
-          <span>{node.name}</span>
+          <span className="tree-node-name">{node.name}</span>
+          {isDirty && (
+            <span className="tree-node-dirty" aria-label="Unsaved changes" title="Unsaved" />
+          )}
+          {!isDirty && node.gitStatus === 'modified' && (
+            <span className="tree-node-git-status" aria-label="Modified" title="Modified">
+              M
+            </span>
+          )}
         </span>
       </div>
       {hasChildren && expanded && (
@@ -82,6 +93,7 @@ export function TreeRow({
               level={level + 1}
               node={child}
               selectedPath={selectedPath}
+              dirtyPath={dirtyPath}
               onSelect={onSelect}
               onToggle={onToggle}
               onOpenContextMenu={onOpenContextMenu}

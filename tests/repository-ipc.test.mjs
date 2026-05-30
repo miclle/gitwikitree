@@ -67,10 +67,11 @@ function createHarness() {
         relativePath,
         options
       }),
-      saveFile: async (repoPath, relativePath, content) => ({
+      saveFile: async (repoPath, relativePath, content, options) => ({
         repoPath,
         relativePath,
-        content
+        content,
+        options
       }),
       searchRepository: async (repoPath, query, options) => ({
         repoPath,
@@ -158,17 +159,26 @@ test('repository:preview returns a preview for the requested repository path', a
   })
 })
 
-test('repository:save-file saves content for the requested repository path', async () => {
+test('repository:save-file saves content for the requested repository path and context', async () => {
   const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
   const { handlers, dependencies } = createHarness()
 
   registerRepositoryIpcHandlers(dependencies)
-  const result = await handlers.get('repository:save-file')({}, '/repo', 'README.md', '# Hi')
+  const result = await handlers.get('repository:save-file')({}, '/repo', 'README.md', '# Hi', {
+    source: 'worktree',
+    rootPath: '/root',
+    expectedModifiedAt: '2026-05-30T00:00:00.000Z'
+  })
 
   assert.deepEqual(result, {
     repoPath: '/repo',
     relativePath: 'README.md',
-    content: '# Hi'
+    content: '# Hi',
+    options: {
+      source: 'worktree',
+      rootPath: '/root',
+      expectedModifiedAt: '2026-05-30T00:00:00.000Z'
+    }
   })
 })
 

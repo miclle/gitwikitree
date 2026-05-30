@@ -86,6 +86,32 @@ export async function getBranch(repoPath: string): Promise<string> {
   }
 }
 
+export async function getModifiedFiles(repoPath: string): Promise<Set<string>> {
+  const { stdout } = await execFileAsync('git', [
+    '-C',
+    repoPath,
+    'status',
+    '--porcelain=v1',
+    '-z',
+    '--untracked-files=no'
+  ])
+  const modifiedFiles = new Set<string>()
+
+  for (const entry of stdout.split('\0')) {
+    if (!entry) continue
+
+    const indexStatus = entry[0]
+    const worktreeStatus = entry[1]
+    const relativePath = entry.slice(3)
+    if (!relativePath || indexStatus === 'D' || worktreeStatus === 'D') continue
+    if (indexStatus === 'M' || worktreeStatus === 'M') {
+      modifiedFiles.add(relativePath)
+    }
+  }
+
+  return modifiedFiles
+}
+
 export async function getRefs(
   repoPath: string,
   currentBranch: string

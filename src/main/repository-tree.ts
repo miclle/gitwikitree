@@ -16,12 +16,15 @@ export function buildTree(files: string[]): TreeNode[] {
   return buildRepositoryTree(files).tree
 }
 
-export function buildRepositoryTree(files: string[]): RepositoryTree {
+export function buildRepositoryTree(
+  files: string[],
+  modifiedFiles = new Set<string>()
+): RepositoryTree {
   const tree: TreeNode[] = []
   let index: DirectoryIndex | undefined
 
   files.forEach((file) => {
-    const inserted = insertPath(tree, file)
+    const inserted = insertPath(tree, file, modifiedFiles)
     if (inserted) return
 
     const rootIndex = directoryIndexForPath(file)
@@ -49,7 +52,7 @@ function shouldPreferIndex(current: DirectoryIndex | undefined, next: DirectoryI
   )
 }
 
-function insertPath(tree: TreeNode[], filePath: string): boolean {
+function insertPath(tree: TreeNode[], filePath: string, modifiedFiles: Set<string>): boolean {
   const parts = filePath.split('/').filter(Boolean)
   let siblings = tree
   let currentPath = ''
@@ -76,6 +79,9 @@ function insertPath(tree: TreeNode[], filePath: string): boolean {
         name: part,
         path: currentPath,
         type,
+        ...(type === 'file' && modifiedFiles.has(currentPath)
+          ? { gitStatus: 'modified' as const }
+          : {}),
         ...(type === 'directory' ? { children: [] } : {})
       }
       siblings.push(node)

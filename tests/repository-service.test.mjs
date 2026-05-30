@@ -106,6 +106,65 @@ test('getPreview includes file and directory modification timestamps for status 
   }
 })
 
+test('saveFile writes to the selected worktree and preserves preview context', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    const worktreeRepository = await service.openWorktree(repoPath, 'wiki')
+
+    const preview = await service.saveFile(worktreeRepository.path, 'wiki.md', '# Edited\n', {
+      source: worktreeRepository.source,
+      rootPath: worktreeRepository.rootPath
+    })
+
+    assert.equal(await readFile(join(worktreeRepository.path, 'wiki.md'), 'utf8'), '# Edited\n')
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.path, 'wiki.md')
+    assert.equal(preview.content, '# Edited\n')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('saveFile rejects stale edits when the file changed on disk', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const preview = await service.getPreview(repoPath, 'docs/guide.md')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await writeFile(join(repoPath, 'docs', 'guide.md'), '# External\n')
+
+    await assert.rejects(
+      () =>
+        service.saveFile(repoPath, 'docs/guide.md', '# Edited\n', {
+          expectedModifiedAt: preview.modifiedAt
+        }),
+      /changed on disk/i
+    )
+    assert.equal(await readFile(join(repoPath, 'docs', 'guide.md'), 'utf8'), '# External\n')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('loadRepository builds the workspace tree from local files instead of git visibility', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()
@@ -123,6 +182,35 @@ test('loadRepository builds the workspace tree from local files instead of git v
     assert.ok(!paths.includes('.git'))
     assert.ok(!paths.includes('.worktrees'))
     assert.ok(!paths.includes('node_modules'))
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('loadRepository annotates modified Git files in the workspace tree', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['add', 'docs/guide.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'track guide'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await writeFile(join(repoPath, 'docs', 'guide.md'), '# Guide\n\nEdited')
+
+    const repository = await service.loadRepository(repoPath)
+    const docs = repository.tree.find((node) => node.path === 'docs')
+    const guide = docs.children.find((node) => node.path === 'docs/guide.md')
+
+    assert.equal(guide.gitStatus, 'modified')
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

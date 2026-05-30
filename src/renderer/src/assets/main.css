@@ -257,6 +257,14 @@ button:disabled {
   white-space: nowrap;
 }
 
+.main-tab-dirty {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #9a6700;
+}
+
 .main-tab:hover .main-tab-name {
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 6px));
   mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent calc(100% - 6px));
@@ -1021,12 +1029,32 @@ kbd {
   object-fit: contain;
 }
 
-.tree-node-button span:last-child {
+.tree-node-name {
   overflow: hidden;
   font-size: 13px;
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tree-node-dirty {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-right: 4px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #9a6700;
+}
+
+.tree-node-git-status {
+  flex: 0 0 auto;
+  margin-right: 4px;
+  margin-left: auto;
+  color: #9a6700;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
 }
 
 .tree-spacer {
@@ -1145,6 +1173,15 @@ kbd {
   white-space: nowrap;
 }
 
+.breadcrumb-dirty {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #9a6700;
+}
+
 .path-search-button {
   display: grid;
   width: 28px;
@@ -1160,6 +1197,17 @@ kbd {
 .path-search-button[aria-expanded='true'] {
   color: #1f2328;
   background: #f0f3f6;
+}
+
+.path-search-button[aria-pressed='true'] {
+  color: var(--accent);
+  background: #ddf4ff;
+}
+
+.path-search-button:disabled {
+  color: #8c959f;
+  cursor: default;
+  opacity: 0.72;
 }
 
 .preview-search-popover {
@@ -1516,6 +1564,68 @@ kbd {
 
 .preview-body * {
   user-select: text;
+}
+
+.file-editor {
+  height: 100%;
+  min-height: 100%;
+  background: #ffffff;
+}
+
+.file-editor .cm-editor {
+  height: 100%;
+  color: var(--text);
+  background: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.file-editor .cm-scroller {
+  font-family: inherit;
+}
+
+.file-editor .cm-content {
+  padding: 6px 0 24px;
+  caret-color: #0969da;
+}
+
+.file-editor .cm-line {
+  padding: 0 24px;
+}
+
+.file-editor .cm-gutters {
+  border-right: 0;
+  color: #59636e;
+  background: #ffffff;
+}
+
+.file-editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 12px 0 16px;
+  color: #8c959f;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-editor .cm-activeLine,
+.file-editor .cm-activeLineGutter {
+  background: #f6f8fa;
+}
+
+.file-editor .cm-focused {
+  outline: none;
+}
+
+.file-editor .cm-selectionBackground,
+.file-editor .cm-focused .cm-selectionBackground {
+  background: rgba(9, 105, 218, 0.28) !important;
+}
+
+.file-editor .cm-content ::selection {
+  background: rgba(9, 105, 218, 0.28) !important;
+}
+
+.file-editor .cm-selectionMatch {
+  background: rgba(9, 105, 218, 0.14) !important;
 }
 
 .directory-list {

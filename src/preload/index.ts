@@ -4,6 +4,7 @@ import type {
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   RepositoryLoadOptions,
+  SaveFileOptions,
   TreeItemOpenPayload
 } from '../shared/types'
 
@@ -42,8 +43,8 @@ const api = {
       rootPath?: string
     }
   ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
-  saveFile: (repoPath: string, relativePath: string, content: string) =>
-    ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content),
+  saveFile: (repoPath: string, relativePath: string, content: string, options?: SaveFileOptions) =>
+    ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content, options),
   searchRepository: (repoPath: string, query: string, options?: RepositoryLoadOptions) =>
     ipcRenderer.invoke('repository:search', repoPath, query, options),
   getSession: () => ipcRenderer.invoke('session:get'),
@@ -131,6 +132,12 @@ const api = {
     ipcRenderer.on('search:open-global', listener)
 
     return () => ipcRenderer.removeListener('search:open-global', listener)
+  },
+  onSaveCurrentFile: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('file:save-current', listener)
+
+    return () => ipcRenderer.removeListener('file:save-current', listener)
   }
 }
 

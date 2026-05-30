@@ -132,6 +132,10 @@ function openCurrentTabSearch(): void {
   BrowserWindow.getFocusedWindow()?.webContents.send('search:open-current-tab')
 }
 
+function saveCurrentFile(): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('file:save-current')
+}
+
 async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean> {
   try {
     return (
@@ -429,6 +433,7 @@ function createAppMenu(): void {
         openRecentFile: openRecentFileMenuItem,
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
+        saveCurrentFile,
         openCurrentTabSearch,
         openGlobalSearch,
         closeWindow: () => BrowserWindow.getFocusedWindow()?.close()

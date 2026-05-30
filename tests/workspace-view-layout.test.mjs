@@ -43,6 +43,14 @@ async function readPreviewContent() {
   )
 }
 
+async function readFileEditor() {
+  return readFile(new URL('../src/renderer/src/components/FileEditor.tsx', import.meta.url), 'utf8')
+}
+
+async function readTreeRow() {
+  return readFile(new URL('../src/renderer/src/components/TreeRow.tsx', import.meta.url), 'utf8')
+}
+
 test('preview titlebar places file tabs in the titlebar row', async () => {
   const source = await readWorkspaceView()
 
@@ -197,6 +205,78 @@ test('current tab search is available from the app menu event', async () => {
     source,
     /window\.api\.onOpenCurrentTabSearch\(openPreviewSearch\)/,
     'workspace should subscribe to the current-tab search app menu command'
+  )
+})
+
+test('file editor uses a visible selection highlight', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-selectionBackground[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.28\)\s*!important;/,
+    'CodeMirror selections need an explicit high-contrast background in the app theme'
+  )
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-content\s*::selection[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.28\)\s*!important;/,
+    'native text selection inside CodeMirror should match the visible editor selection color'
+  )
+})
+
+test('file editing relies on keyboard save and marks dirty file names', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.doesNotMatch(
+    source,
+    /aria-label="Save file"/,
+    'editing toolbar should not render a dedicated save button'
+  )
+  assert.match(
+    source,
+    /hasUnsavedChanges && isLast[\s\S]*className="breadcrumb-dirty"/,
+    'the current breadcrumb file name should show a dirty indicator for unsaved edits'
+  )
+  assert.match(
+    css,
+    /\.breadcrumb-dirty\s*\{[\s\S]*border-radius:\s*50%;[\s\S]*background:\s*#9a6700;/,
+    'breadcrumb dirty indicator should use the same compact dot treatment as tabs'
+  )
+})
+
+test('file editor styles markdown syntax like a document editor', async () => {
+  const source = await readFileEditor()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /syntaxHighlighting\(markdownEditorHighlightStyle\)/,
+    'Markdown editing should install a dedicated document-style highlight theme'
+  )
+  assert.match(
+    source,
+    /tag:\s*tags\.heading1[\s\S]*color:\s*'#0969da'[\s\S]*fontWeight:\s*'700'/,
+    'top-level Markdown headings should render as strong blue text while editing'
+  )
+  assert.match(
+    source,
+    /tag:\s*tags\.strong[\s\S]*fontWeight:\s*'700'/,
+    'bold Markdown spans should carry visual weight in the editor'
+  )
+  assert.match(
+    source,
+    /tag:\s*\[tags\.link,\s*tags\.url\][\s\S]*color:\s*'#0a4b8f'/,
+    'links and URLs should be blue in Markdown editing mode'
+  )
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-lineNumbers\s+\.cm-gutterElement\s*\{[\s\S]*color:\s*#8c959f;/,
+    'line numbers should stay subtle like a document margin'
+  )
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-gutters\s*\{[\s\S]*border-right:\s*0;/,
+    'editor gutters should not draw a vertical divider beside the line numbers'
   )
 })
 
@@ -692,8 +772,65 @@ test('files tree rows use compact spacing for narrow sidebars', async () => {
   )
   assert.match(
     css,
-    /\.tree-node-button span:last-child\s*\{[\s\S]*?font-size:\s*13px;[\s\S]*?line-height:\s*18px;/,
+    /\.tree-node-name\s*\{[\s\S]*?font-size:\s*13px;[\s\S]*?line-height:\s*18px;/,
     'files tree labels should use compact readable text'
   )
   assert.match(css, /\.tree-spacer\s*\{[\s\S]*?width:\s*17px;/, 'file rows should align compactly')
+})
+
+test('files tree marks the dirty edited file', async () => {
+  const workspaceSource = await readWorkspaceView()
+  const treeRowSource = await readTreeRow()
+  const css = await readMainCss()
+
+  assert.match(
+    workspaceSource,
+    /dirtyPath=\{hasUnsavedChanges \? selectedPath : undefined\}/,
+    'workspace should pass the unsaved file path into the files tree'
+  )
+  assert.match(
+    treeRowSource,
+    /dirtyPath\?: string[\s\S]*const isDirty = dirtyPath === node\.path/,
+    'tree rows should identify the file node with unsaved changes'
+  )
+  assert.match(
+    treeRowSource,
+    /isDirty &&[\s\S]*className="tree-node-dirty"/,
+    'dirty tree rows should render a compact file-name indicator'
+  )
+  assert.match(
+    treeRowSource,
+    /dirtyPath=\{dirtyPath\}/,
+    'dirty file state should propagate through recursive tree rows'
+  )
+  assert.match(
+    css,
+    /\.tree-node-dirty\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*border-radius:\s*50%;[\s\S]*background:\s*#9a6700;/,
+    'tree dirty indicator should align to the right edge while matching the tab and breadcrumb dot'
+  )
+  assert.match(
+    treeRowSource,
+    /!isDirty && node\.gitStatus === 'modified'[\s\S]*className="tree-node-git-status"[\s\S]*M/,
+    'Git-modified files should show an M badge when there are no unsaved editor changes'
+  )
+  assert.match(
+    css,
+    /\.tree-node-git-status\s*\{[\s\S]*margin-left:\s*auto;[\s\S]*color:\s*#9a6700;/,
+    'tree Git status should align to the right edge like VS Code file decorations'
+  )
+})
+
+test('saving an edited file refreshes Git status decorations', async () => {
+  const source = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    source,
+    /if \(!repository \|\| preview\?\.kind !== 'file' \|\| !isEditing \|\| !hasUnsavedChanges\) return/,
+    'saving should no-op when the editor draft has no changes'
+  )
+  assert.match(
+    source,
+    /const nextRepository = await window\.api\.loadRepository\(repository\.path\)[\s\S]*setRepository\(nextRepository\)/,
+    'saving a file should refresh the repository tree so saved Git modifications can show M'
+  )
 })

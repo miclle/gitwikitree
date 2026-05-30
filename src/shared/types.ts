@@ -6,6 +6,7 @@ export type TreeNode = {
   name: string
   path: string
   type: 'file' | 'directory'
+  gitStatus?: 'modified'
   children?: TreeNode[]
   index?: { name: string; path: string }
 }
@@ -163,4 +164,8 @@ export type SessionState = ProjectSessionState & {
 export type RepositoryLoadOptions = {
   source?: RepositorySource
   rootPath?: string
+}
+
+export type SaveFileOptions = RepositoryLoadOptions & {
+  expectedModifiedAt?: string
 }

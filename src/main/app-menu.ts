@@ -15,6 +15,7 @@ type AppMenuTemplateOptions = {
   openRecentFile: (file: RecentFileState, event: MenuClickEvent) => void
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
+  saveCurrentFile: () => void
   openCurrentTabSearch: () => void
   openGlobalSearch: () => void
   closeWindow: () => void
@@ -30,6 +31,7 @@ export function createAppMenuTemplate({
   openRecentFile,
   clearRecent,
   closeCurrentTabOrWindow,
+  saveCurrentFile,
   openCurrentTabSearch,
   openGlobalSearch,
   closeWindow
@@ -90,6 +92,11 @@ export function createAppMenuTemplate({
           submenu: recentItems
         },
         { type: 'separator' },
+        {
+          label: 'Save',
+          accelerator: 'CommandOrControl+S',
+          click: saveCurrentFile
+        },
         {
           label: 'Close Tab',
           accelerator: 'CommandOrControl+W',

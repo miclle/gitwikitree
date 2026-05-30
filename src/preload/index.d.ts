@@ -8,6 +8,7 @@ import type {
   RepositoryLoadOptions,
   RepositoryPayload,
   RepositorySearchResult,
+  SaveFileOptions,
   SessionState,
   TreeItemOpenPayload
 } from '../shared/types'
@@ -29,7 +30,12 @@ export type GitWikitreeAPI = {
       rootPath?: string
     }
   ) => Promise<PreviewPayload>
-  saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
+  saveFile: (
+    repoPath: string,
+    relativePath: string,
+    content: string,
+    options?: SaveFileOptions
+  ) => Promise<PreviewPayload>
   searchRepository: (
     repoPath: string,
     query: string,
@@ -47,6 +53,7 @@ export type GitWikitreeAPI = {
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
   onOpenCurrentTabSearch: (callback: () => void) => () => void
   onOpenGlobalSearch: (callback: () => void) => () => void
+  onSaveCurrentFile: (callback: () => void) => () => void
 }
 
 declare global {

@@ -6,8 +6,10 @@ import {
   ChevronRight,
   ChevronUp,
   Code2,
+  Eye,
   GitBranch,
   Loader2,
+  Pencil,
   Plus,
   Search,
   X
@@ -15,6 +17,7 @@ import {
 import { iconForNode } from '../app-utils'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
 import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-search'
+import { FileEditor } from './FileEditor'
 import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
 import { StatusBar } from './StatusBar'
@@ -30,6 +33,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     loading,
     previewLoading,
     error,
+    isEditing,
+    canEditPreview,
+    draftContent,
+    hasUnsavedChanges,
     isSidebarOpen,
     setIsSidebarOpen,
     openFileTabs,
@@ -56,6 +63,9 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openRepositoryPreview,
     openBreadcrumbPath,
     selectPreviewPath,
+    startEditing,
+    cancelEditing,
+    updateDraftContent,
     pendingMarkdownAnchor,
     clearPendingMarkdownAnchor,
     showMarkdownLinkContextMenu,
@@ -272,6 +282,9 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             <span className="main-tab-corner" aria-hidden="true" />
             {iconForNode({ type: tab.type ?? 'file', name: tab.name })}
             <span className="main-tab-name">{tab.name}</span>
+            {hasUnsavedChanges && active && (
+              <span className="main-tab-dirty" aria-label="Unsaved changes" title="Unsaved" />
+            )}
             <button
               className="main-tab-close"
               type="button"
@@ -521,6 +534,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         level={0}
                         node={node}
                         selectedPath={selectedPath}
+                        dirtyPath={hasUnsavedChanges ? selectedPath : undefined}
                         onSelect={handleSelect}
                         onToggle={toggleDirectory}
                         onOpenContextMenu={showTreeItemContextMenu}
@@ -594,6 +608,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         {isLast ? (
                           <>
                             <strong title={part}>{part}</strong>
+                            {hasUnsavedChanges && isLast && (
+                              <span
+                                className="breadcrumb-dirty"
+                                aria-label="Unsaved changes"
+                                title="Unsaved"
+                              />
+                            )}
                             {directoryReadmeSource && (
                               <span
                                 className="breadcrumb-source"
@@ -628,6 +649,19 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 >
                   <Search size={15} />
                 </button>
+                {canEditPreview && (
+                  <>
+                    <button
+                      className="path-search-button"
+                      type="button"
+                      aria-label={isEditing ? 'Show preview' : 'Edit file'}
+                      aria-pressed={isEditing}
+                      onClick={isEditing ? cancelEditing : startEditing}
+                    >
+                      {isEditing ? <Eye size={15} /> : <Pencil size={15} />}
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="preview-body" ref={previewBodyRef}>
@@ -636,18 +670,27 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     <Loader2 className="spin" size={26} />
                   </div>
                 )}
-                {!previewLoading && preview && (
-                  <PreviewContent
-                    pendingAnchor={pendingMarkdownAnchor}
-                    preview={preview}
-                    searchQuery={appliedSearchQuery}
-                    activeSearchIndex={activeSearchIndex}
-                    onSearchMatchCountChange={handleSearchMatchCountChange}
-                    onPdfPageCountChange={handlePdfPageCountChange}
-                    onSelectPath={selectPreviewPath}
-                    onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
-                    onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                {!previewLoading && preview && isEditing && preview.kind === 'file' ? (
+                  <FileEditor
+                    content={draftContent}
+                    extension={preview.extension}
+                    onChange={updateDraftContent}
                   />
+                ) : (
+                  !previewLoading &&
+                  preview && (
+                    <PreviewContent
+                      pendingAnchor={pendingMarkdownAnchor}
+                      preview={preview}
+                      searchQuery={appliedSearchQuery}
+                      activeSearchIndex={activeSearchIndex}
+                      onSearchMatchCountChange={handleSearchMatchCountChange}
+                      onPdfPageCountChange={handlePdfPageCountChange}
+                      onSelectPath={selectPreviewPath}
+                      onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
+                      onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                    />
+                  )
                 )}
               </div>
               {isSearchOpen && (

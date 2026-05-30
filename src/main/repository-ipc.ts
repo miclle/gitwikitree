@@ -1,5 +1,10 @@
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
-import type { PreviewPayload, RepositoryPayload, RepositorySearchResult } from '../shared/types'
+import type {
+  PreviewPayload,
+  RepositoryPayload,
+  RepositorySearchResult,
+  SaveFileOptions
+} from '../shared/types'
 import type { RepositoryLoadOptions } from '../shared/types'
 
 type OpenDialogResult = {
@@ -23,7 +28,12 @@ type RepositoryIpcDependencies = {
     relativePath?: string,
     options?: RepositoryLoadOptions
   ) => Promise<PreviewPayload>
-  saveFile: (repoPath: string, relativePath: string, content: string) => Promise<PreviewPayload>
+  saveFile: (
+    repoPath: string,
+    relativePath: string,
+    content: string,
+    options?: SaveFileOptions
+  ) => Promise<PreviewPayload>
   searchRepository: (
     repoPath: string,
     query: string,
@@ -95,8 +105,14 @@ export function registerRepositoryIpcHandlers({
 
   ipcMain.handle(
     'repository:save-file',
-    async (_event, repoPath: string, relativePath: string, content: string) => {
-      return saveFile(repoPath, relativePath, content)
+    async (
+      _event,
+      repoPath: string,
+      relativePath: string,
+      content: string,
+      options?: SaveFileOptions
+    ) => {
+      return saveFile(repoPath, relativePath, content, options)
     }
   )
 

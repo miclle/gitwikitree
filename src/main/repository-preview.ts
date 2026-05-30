@@ -6,7 +6,7 @@ import { assertRepositoryPath } from './git-service'
 import { loadRepository } from './repository-loader'
 import { findDirectoryIndex, getNodeAtPath } from './repository-tree'
 import { safeJoin, toPosixPath } from './repository-paths'
-import type { PreviewPayload, RepositoryLoadOptions } from '../shared/types'
+import type { PreviewPayload, RepositoryLoadOptions, SaveFileOptions } from '../shared/types'
 
 const maxTextPreviewBytes = 1024 * 1024
 
@@ -329,12 +329,23 @@ export async function getPreview(
 export async function saveFile(
   repoPath: string,
   relativePath: string,
-  content: string
+  content: string,
+  options: SaveFileOptions = {}
 ): Promise<PreviewPayload> {
-  const rootPath = await assertRepositoryPath(repoPath)
-  const target = safeJoin(rootPath, relativePath)
+  await assertRepositoryPath(repoPath)
+  const repository = await loadRepository(repoPath, options)
+  const target = safeJoin(repository.path, relativePath)
+  const stats = await fs.stat(target)
+
+  if (!stats.isFile()) {
+    throw new Error('Selected path is not a file.')
+  }
+
+  if (options.expectedModifiedAt && stats.mtime.toISOString() !== options.expectedModifiedAt) {
+    throw new Error('File changed on disk. Reload before saving.')
+  }
 
   await fs.mkdir(resolve(target, '..'), { recursive: true })
   await fs.writeFile(target, content, 'utf8')
-  return getPreview(rootPath, relativePath, { source: 'working-tree' })
+  return getPreview(repository.path, relativePath, options)
 }

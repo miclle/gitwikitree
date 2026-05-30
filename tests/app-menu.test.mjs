@@ -23,6 +23,7 @@ function createActions() {
       openRecentFile: (file, event) => calls.push(['openRecentFile', file.filePath, event]),
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
+      saveCurrentFile: () => calls.push(['saveCurrentFile']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
       openGlobalSearch: () => calls.push(['openGlobalSearch']),
       closeWindow: () => calls.push(['closeWindow'])
@@ -54,6 +55,7 @@ test('createAppMenuTemplate builds file menu actions for recent repositories and
   recentMenu.submenu[1].click(undefined, undefined, event)
   recentMenu.submenu[4].click(undefined, undefined, event)
   fileMenu.submenu[3].click()
+  fileMenu.submenu[4].click()
   template.find((item) => item.label === 'Edit').submenu[9].click()
   template.find((item) => item.label === 'Edit').submenu[10].click()
 
@@ -73,6 +75,7 @@ test('createAppMenuTemplate builds file menu actions for recent repositories and
     ['openRepository'],
     ['openRecentRepository', '/repo', event],
     ['openRecentFile', 'README.md', event],
+    ['saveCurrentFile'],
     ['closeCurrentTabOrWindow'],
     ['openCurrentTabSearch'],
     ['openGlobalSearch']
@@ -123,6 +126,22 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
       ['Search Repository...', 'Shift+CommandOrControl+F']
     ]
   )
+})
+
+test('createAppMenuTemplate exposes save in the file menu', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const fileMenu = template.find((item) => item.label === 'File')
+  const saveItem = fileMenu.submenu.find((item) => item.label === 'Save')
+
+  assert.equal(saveItem.accelerator, 'CommandOrControl+S')
 })
 
 test('createAppMenuTemplate disables empty recent menus and adds darwin app menu', async () => {

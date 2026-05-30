@@ -3,6 +3,7 @@ import { realpath } from 'fs/promises'
 import {
   assertRepositoryPath,
   getBranch,
+  getModifiedFiles,
   getRefs,
   getRepositoryRoot,
   getWorktrees
@@ -36,9 +37,12 @@ export async function loadRepository(
     getRefs(resolvedPath, currentBranch)
   ])
   const activeRef = branch
-  const files = await getWorkspaceFiles(resolvedPath)
+  const [files, modifiedFiles] = await Promise.all([
+    getWorkspaceFiles(resolvedPath),
+    getModifiedFiles(resolvedPath)
+  ])
 
-  const repositoryTree = buildRepositoryTree(files)
+  const repositoryTree = buildRepositoryTree(files, modifiedFiles)
 
   return {
     name: basename(resolvedPath),
