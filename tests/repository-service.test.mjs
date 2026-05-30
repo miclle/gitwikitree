@@ -324,6 +324,58 @@ test('checkoutBranch switches to a local branch and reloads the working tree', a
   }
 })
 
+test('checkoutBranch switches the primary workspace when invoked from a linked worktree', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'feature/docs'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'feature.md'), '# Feature\n')
+    await execFileAsync('git', ['add', 'feature.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add feature docs'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    const wikiRepository = await service.openWorktree(repoPath, 'wiki')
+    const realRepoPath = await realpath(repoPath)
+
+    const repository = await service.checkoutBranch(wikiRepository.path, 'feature/docs')
+    const { stdout: wikiBranch } = await execFileAsync('git', ['branch', '--show-current'], {
+      cwd: wikiRepository.path
+    })
+
+    assert.equal(repository.path, realRepoPath)
+    assert.equal(repository.rootPath, realRepoPath)
+    assert.equal(repository.source, 'working-tree')
+    assert.equal(repository.branch, 'feature/docs')
+    assert.equal(wikiBranch.trim(), 'wiki')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('getPreview returns directory readme content and rejects escaping paths', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()

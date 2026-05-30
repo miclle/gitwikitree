@@ -256,8 +256,13 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
-    /Switch local branch here[\s\S]*Files in[\s\S]*the opened directory change in place/,
-    'switching in place should explain that the current folder changes branch'
+    /primaryWorkspaceBranch[\s\S]*repository\?\.refs\.find\([\s\S]*ref\.worktreePath === repository\.rootPath/,
+    'branch action copy should use the primary workspace branch as the source branch'
+  )
+  assert.match(
+    source,
+    /Switch primary workspace from[\s\S]*primaryWorkspaceBranch[\s\S]*selectedBranchAction\.name[\s\S]*Existing worktrees keep their branches/,
+    'switching should explain that the primary workspace changes while worktrees keep their branches'
   )
   assert.match(
     source,

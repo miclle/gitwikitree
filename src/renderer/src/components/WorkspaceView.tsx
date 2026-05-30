@@ -78,6 +78,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [branchQuery, setBranchQuery] = useState('')
   const [branchActionRef, setBranchActionRef] = useState<string | undefined>()
   const selectedBranchAction = repository?.refs.find((ref) => ref.name === branchActionRef)
+  const primaryWorkspaceBranch =
+    repository?.refs.find((ref) => ref.type === 'local' && ref.worktreePath === repository.rootPath)
+      ?.name ??
+    repository?.branch ??
+    'HEAD'
   const branchQueryTerms = branchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
   const visibleRefs =
     repository?.refs.filter((ref) => {
@@ -415,10 +420,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               void checkoutBranch(branch)
                             }}
                           >
-                            <strong>Switch local branch here</strong>
+                            <strong>
+                              Switch primary workspace from {primaryWorkspaceBranch} to{' '}
+                              {selectedBranchAction.name}
+                            </strong>
                             <span>
-                              Switches the current repository folder to this local branch. Files in
-                              the opened directory change in place.
+                              Changes the primary repository folder to {selectedBranchAction.name}.
+                              Existing worktrees keep their branches.
                             </span>
                           </button>
                           <button

@@ -29,9 +29,9 @@ export async function checkoutBranch(repoPath: string, branch: string): Promise<
     })
   }
 
-  await switchLocalBranch(repositoryPath, branch)
-  return loadRepository(repositoryPath, {
-    source: await getWorktreeSource(repositoryPath, rootPath),
+  await switchLocalBranch(rootPath, branch)
+  return loadRepository(rootPath, {
+    source: await getWorktreeSource(rootPath, rootPath),
     rootPath
   })
 }
