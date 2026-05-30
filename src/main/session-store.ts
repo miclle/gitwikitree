@@ -123,10 +123,7 @@ function normalizeRecentFiles(value: unknown): RecentFileState[] {
     const rootPath = asString(record.rootPath)
     const activeRef = asString(record.activeRef)
     const source = record.source
-    const normalizedSource =
-      source === 'git-ref' || source === 'worktree' || source === 'working-tree'
-        ? source
-        : undefined
+    const normalizedSource = source === 'worktree' || source === 'working-tree' ? source : undefined
 
     if (!repoPath || !filePath || !name || !openedAt) continue
 
@@ -168,10 +165,7 @@ function normalizeRecentRepositories(value: unknown): RecentRepositoryState[] {
     const openedAt = asString(record.openedAt)
     const activeRef = asString(record.activeRef)
     const source = record.source
-    const normalizedSource =
-      source === 'git-ref' || source === 'worktree' || source === 'working-tree'
-        ? source
-        : undefined
+    const normalizedSource = source === 'worktree' || source === 'working-tree' ? source : undefined
 
     if (!repoPath || !name || !openedAt || seen.has(repoPath)) continue
 
@@ -253,8 +247,7 @@ function normalizeProjectSessionState(value: unknown): ProjectSessionState {
   const sidebarWidth = normalizeSidebarWidth(record.sidebarWidth)
   const isSidebarOpen = typeof record.isSidebarOpen === 'boolean' ? record.isSidebarOpen : undefined
   const windowState = normalizeWindowState(record.windowState)
-  const normalizedSource =
-    source === 'git-ref' || source === 'worktree' || source === 'working-tree' ? source : undefined
+  const normalizedSource = source === 'worktree' || source === 'working-tree' ? source : undefined
 
   return {
     ...(repositoryPath ? { repositoryPath } : {}),

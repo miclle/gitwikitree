@@ -1,4 +1,4 @@
-export type RepositorySource = 'working-tree' | 'git-ref' | 'worktree'
+export type RepositorySource = 'working-tree' | 'worktree'
 
 export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
 
@@ -158,7 +158,6 @@ export type SessionState = ProjectSessionState & {
 }
 
 export type RepositoryLoadOptions = {
-  ref?: string
   source?: RepositorySource
   rootPath?: string
 }

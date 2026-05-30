@@ -160,7 +160,6 @@ export function useRepositoryWorkspace(): {
 
       try {
         const nextPreview = await window.api.previewPath(repo.path, path, {
-          ref: repo.activeRef,
           source: repo.source,
           rootPath: repo.rootPath
         })

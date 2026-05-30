@@ -28,4 +28,5 @@ Git/repository svc    event subscriptions/IPC       interactions/state hooks
 - Re-validate every repository-relative path received from the renderer on the main side. Do not trust UI state.
 - Preview reads must stay inside the selected repository or worktree root. Reject escape paths such as `../`.
 - The primary workspace should be a local working tree or worktree. Git should be used for explicit version-control actions such as branch checkout, worktree creation, sync, and commit flows.
+- Preview and search should read local workspace files. Do not reintroduce Git object reads for primary workspace content.
 - Open external URLs through `shell.openExternal`; handle Markdown internal links through the app's own context menu and open logic.

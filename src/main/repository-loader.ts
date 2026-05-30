@@ -3,7 +3,6 @@ import {
   assertRepositoryPath,
   getBranch,
   getGitVisibleFiles,
-  getRefFiles,
   getRefs,
   getRepositoryRoot
 } from './git-service'
@@ -24,11 +23,8 @@ export async function loadRepository(
     Promise.resolve(currentBranch),
     getRefs(resolvedPath, currentBranch)
   ])
-  const activeRef = options.ref ?? branch
-  const files =
-    source === 'git-ref'
-      ? await getRefFiles(resolvedPath, activeRef)
-      : await getGitVisibleFiles(resolvedPath)
+  const activeRef = branch
+  const files = await getGitVisibleFiles(resolvedPath)
 
   const repositoryTree = buildRepositoryTree(files)
 
@@ -39,7 +35,7 @@ export async function loadRepository(
     branch,
     activeRef,
     source,
-    editable: source !== 'git-ref',
+    editable: true,
     refs: refs.map((ref) => ({ ...ref, current: ref.name === activeRef })),
     tree: repositoryTree.tree,
     index: repositoryTree.index

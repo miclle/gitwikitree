@@ -25,8 +25,7 @@ export type GitWikitreeAPI = {
     repoPath: string,
     relativePath: string,
     options?: {
-      ref?: string
-      source?: 'working-tree' | 'git-ref' | 'worktree'
+      source?: 'working-tree' | 'worktree'
       rootPath?: string
     }
   ) => Promise<PreviewPayload>

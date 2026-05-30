@@ -9,6 +9,7 @@ Git Wikitree is a desktop workspace for browsing, previewing, and lightly editin
 - Prioritize frequent workflows: opening repositories, browsing the tree, previewing files, switching branches, and returning to recent files.
 - The interface should feel like a productivity tool, not a promotional page: compact, clear, and explicit about state.
 - The user's local repository is the primary content; UI should not compete with it.
+- The workspace should behave like an editor over local files; Git should appear only for version-control operations.
 - Long paths, deep directories, many tabs, and large repositories should remain usable.
 - Error messages should guide the next step, such as inaccessible paths, failed Git commands, occupied ports, or unsupported previews.
 

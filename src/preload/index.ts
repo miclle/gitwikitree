@@ -38,8 +38,7 @@ const api = {
     repoPath: string,
     relativePath: string,
     options?: {
-      ref?: string
-      source?: 'working-tree' | 'git-ref' | 'worktree'
+      source?: 'working-tree' | 'worktree'
       rootPath?: string
     }
   ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
@@ -70,7 +69,7 @@ const api = {
       name: string
       openedAt: string
       activeRef?: string
-      source?: 'working-tree' | 'git-ref' | 'worktree'
+      source?: 'working-tree' | 'worktree'
     }) => void
   ) => {
     const listener = (
@@ -82,7 +81,7 @@ const api = {
         name: string
         openedAt: string
         activeRef?: string
-        source?: 'working-tree' | 'git-ref' | 'worktree'
+        source?: 'working-tree' | 'worktree'
       }
     ): void => callback(payload)
     ipcRenderer.on('repository:open-file', listener)

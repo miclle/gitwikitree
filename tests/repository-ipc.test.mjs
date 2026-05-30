@@ -45,7 +45,6 @@ function createHarness() {
         ...loadedRepository,
         path: repoPath,
         rootPath: options?.rootPath ?? loadedRepository.rootPath,
-        activeRef: options?.ref ?? loadedRepository.activeRef,
         source: options?.source ?? loadedRepository.source
       }),
       checkoutBranch: async (repoPath, branch) => ({
@@ -149,15 +148,13 @@ test('repository:preview returns a preview for the requested repository path', a
   const { handlers, dependencies } = createHarness()
 
   registerRepositoryIpcHandlers(dependencies)
-  const preview = await handlers.get('repository:preview')({}, '/repo', 'docs/index.md', {
-    ref: 'main'
-  })
+  const preview = await handlers.get('repository:preview')({}, '/repo', 'docs/index.md')
 
   assert.deepEqual(preview, {
     kind: 'preview',
     repoPath: '/repo',
     relativePath: 'docs/index.md',
-    options: { ref: 'main' }
+    options: undefined
   })
 })
 
@@ -175,14 +172,13 @@ test('repository:save-file saves content for the requested repository path', asy
   })
 })
 
-test('repository:search searches within the requested repository source', async () => {
+test('repository:search searches within the requested local workspace', async () => {
   const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
   const { handlers, dependencies } = createHarness()
 
   registerRepositoryIpcHandlers(dependencies)
   const result = await handlers.get('repository:search')({}, '/repo', 'alpha', {
-    ref: 'main',
-    source: 'git-ref',
+    source: 'worktree',
     rootPath: '/repo'
   })
 
@@ -190,8 +186,7 @@ test('repository:search searches within the requested repository source', async 
     repoPath: '/repo',
     query: 'alpha',
     options: {
-      ref: 'main',
-      source: 'git-ref',
+      source: 'worktree',
       rootPath: '/repo'
     }
   })

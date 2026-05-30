@@ -12,6 +12,8 @@ surface with branch, worktree, tab, and session-aware navigation.
   internals and worktree metadata.
 - Preview directories through README/index files or compact directory listings.
 - Preview Markdown, HTML, SVG, common image formats, and text-like files.
+- Search and preview workspace content from local files rather than Git object
+  snapshots.
 - Render Markdown with GitHub-flavored Markdown, syntax highlighting, heading
   anchors, copy-code buttons, and intercepted repository links.
 - Choose a branch action explicitly: switch the current local workspace, or open
@@ -99,6 +101,7 @@ npm run format          # Format the repository with Prettier
   save operations cannot escape the selected repository root.
 - The primary workspace is always a local working tree or worktree; Git actions
   such as branch switching and worktree creation are explicit user choices.
+- Preview, save, and search flows operate on the selected local workspace path.
 - Session state tracks repository context through `repoPath`, `rootPath`,
   `activeRef`, and `source`; preserve those fields when changing navigation or
   recent-item behavior.

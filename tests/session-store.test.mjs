@@ -42,30 +42,30 @@ test('recordRecentFile keeps the newest file first and de-duplicates entries', a
   assert.equal(deduped[0].openedAt, '2026-05-27T01:00:00.000Z')
 })
 
-test('recordRecentFile preserves the repository ref context for recent files', async () => {
+test('recordRecentFile preserves the worktree context for recent files', async () => {
   const { recordRecentFile } = await loadSessionStore()
   const recentFiles = recordRecentFile([], {
-    repoPath: '/repo',
+    repoPath: '/repo/.worktrees/feature-docs',
     rootPath: '/repo-root',
     filePath: 'README.md',
     name: 'README.md',
     openedAt: '2026-05-27T00:00:00.000Z',
     activeRef: 'feature/docs',
-    source: 'git-ref'
+    source: 'worktree'
   })
 
   assert.deepEqual(recentFiles[0], {
-    repoPath: '/repo',
+    repoPath: '/repo/.worktrees/feature-docs',
     rootPath: '/repo-root',
     filePath: 'README.md',
     name: 'README.md',
     openedAt: '2026-05-27T00:00:00.000Z',
     activeRef: 'feature/docs',
-    source: 'git-ref'
+    source: 'worktree'
   })
 })
 
-test('getRecentFileOpenPayload preserves the repository ref context', async () => {
+test('getRecentFileOpenPayload drops unsupported git-ref context', async () => {
   const { getRecentFileOpenPayload } = await loadSessionStore()
   const payload = getRecentFileOpenPayload({
     repoPath: '/repo',
@@ -83,8 +83,7 @@ test('getRecentFileOpenPayload preserves the repository ref context', async () =
     filePath: 'README.md',
     name: 'README.md',
     openedAt: '2026-05-27T00:00:00.000Z',
-    activeRef: 'feature/docs',
-    source: 'git-ref'
+    activeRef: 'feature/docs'
   })
 })
 

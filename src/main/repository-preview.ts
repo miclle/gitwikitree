@@ -2,7 +2,7 @@ import { promises as fs } from 'fs'
 import { basename, extname, resolve } from 'path'
 import { Marked, type Token } from 'marked'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
-import { assertRepositoryPath, getRefFileSize, readRefFile } from './git-service'
+import { assertRepositoryPath } from './git-service'
 import { loadRepository } from './repository-loader'
 import { findDirectoryIndex, getNodeAtPath } from './repository-tree'
 import { safeJoin, toPosixPath } from './repository-paths'
@@ -145,16 +145,12 @@ function collectMarkdownImageHrefs(markdown: string): string[] {
 
 async function getMarkdownAssetPreviewData({
   repositoryPath,
-  activeRef,
   sourcePath,
-  markdown,
-  isRefSource
+  markdown
 }: {
   repositoryPath: string
-  activeRef: string
   sourcePath: string
   markdown: string
-  isRefSource: boolean
 }): Promise<MarkdownAssetPreviewData | undefined> {
   const dataUrls: Record<string, string> = {}
   const paths: Record<string, string> = {}
@@ -169,14 +165,10 @@ async function getMarkdownAssetPreviewData({
       if (!['image', 'svg'].includes(detectPreviewType(extension))) continue
 
       try {
-        const buffer = isRefSource
-          ? await readRefFile(repositoryPath, activeRef, assetPath)
-          : await fs.readFile(safeJoin(repositoryPath, assetPath))
+        const buffer = await fs.readFile(safeJoin(repositoryPath, assetPath))
         dataUrls[href] = `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
         paths[href] = assetPath
-        if (!isRefSource) {
-          absolutePaths[href] = safeJoin(repositoryPath, assetPath)
-        }
+        absolutePaths[href] = safeJoin(repositoryPath, assetPath)
         break
       } catch {
         // Missing or unreadable Markdown images should leave the original alt text visible.
@@ -213,23 +205,18 @@ export async function getPreview(
   const repository = await loadRepository(repoPath, options)
   const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined
   const target = safeJoin(repository.path, relativePath)
-  const isRefSource = repository.source === 'git-ref'
-  const stats = isRefSource ? undefined : await fs.stat(target)
+  const stats = await fs.stat(target)
 
-  if ((isRefSource && (!relativePath || node?.type === 'directory')) || stats?.isDirectory()) {
+  if (stats.isDirectory()) {
     const children = relativePath ? (node?.children ?? []) : repository.tree
     const readme = (relativePath ? node?.index : repository.index) ?? findDirectoryIndex(children)
 
     if (readme) {
-      const content = isRefSource
-        ? (await readRefFile(repository.path, repository.activeRef, readme.path)).toString('utf8')
-        : await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
+      const content = await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
       const markdownAssetPreviewData = await getMarkdownAssetPreviewData({
         repositoryPath: repository.path,
-        activeRef: repository.activeRef,
         sourcePath: readme.path,
-        markdown: content,
-        isRefSource
+        markdown: content
       })
       return {
         kind: 'directory',
@@ -261,21 +248,12 @@ export async function getPreview(
     }
   }
 
-  const size = isRefSource
-    ? await getRefFileSize(repository.path, repository.activeRef, relativePath)
-    : (stats?.size ?? 0)
+  const size = stats.size
   const extension = extname(target).toLowerCase()
-  let previewBuffer: Buffer | undefined
   let previewType = detectPreviewType(extension)
 
   if (previewType === 'unsupported' && size <= maxTextPreviewBytes) {
-    const sample = isRefSource
-      ? (previewBuffer = await readRefFile(
-          repository.path,
-          repository.activeRef,
-          relativePath
-        )).subarray(0, textPreviewProbeBytes)
-      : await readFileSample(target, Math.min(size, textPreviewProbeBytes))
+    const sample = await readFileSample(target, Math.min(size, textPreviewProbeBytes))
 
     previewType = detectPreviewType(extension, sample)
   }
@@ -291,9 +269,7 @@ export async function getPreview(
   }
 
   if (previewType === 'image') {
-    const buffer = isRefSource
-      ? await readRefFile(repository.path, repository.activeRef, relativePath)
-      : await fs.readFile(target)
+    const buffer = await fs.readFile(target)
     return {
       ...payload,
       dataUrl: `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
@@ -303,26 +279,18 @@ export async function getPreview(
   if (previewType === 'svg') {
     return {
       ...payload,
-      content: isRefSource
-        ? (await readRefFile(repository.path, repository.activeRef, relativePath)).toString('utf8')
-        : await fs.readFile(target, 'utf8')
+      content: await fs.readFile(target, 'utf8')
     }
   }
 
   if (previewType !== 'unsupported' && size <= maxTextPreviewBytes) {
-    const content = isRefSource
-      ? (
-          previewBuffer ?? (await readRefFile(repository.path, repository.activeRef, relativePath))
-        ).toString('utf8')
-      : await fs.readFile(target, 'utf8')
+    const content = await fs.readFile(target, 'utf8')
     const markdownAssetPreviewData =
       previewType === 'markdown'
         ? await getMarkdownAssetPreviewData({
             repositoryPath: repository.path,
-            activeRef: repository.activeRef,
             sourcePath: toPosixPath(relativePath),
-            markdown: content,
-            isRefSource
+            markdown: content
           })
         : undefined
 

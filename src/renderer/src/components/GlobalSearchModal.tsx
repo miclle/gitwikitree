@@ -50,7 +50,6 @@ export function GlobalSearchModal({
   const trimmedQuery = query.trim()
   const selectedResult = results[selectedIndex]
   const sourceLabel = useMemo(() => {
-    if (repository.source === 'git-ref') return repository.activeRef
     if (repository.source === 'worktree') return `${repository.activeRef} worktree`
     return repository.branch
   }, [repository.activeRef, repository.branch, repository.source])
@@ -96,7 +95,6 @@ export function GlobalSearchModal({
 
       void window.api
         .searchRepository(repository.path, queryToSearch, {
-          ref: repository.activeRef,
           source: repository.source,
           rootPath: repository.rootPath
         })

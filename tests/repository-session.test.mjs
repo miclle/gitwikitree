@@ -17,10 +17,10 @@ test('createRepositorySessionReset returns the clean active repository session s
     name: 'repo',
     path: '/repo',
     rootPath: '/repo-root',
-    branch: 'main',
+    branch: 'feature/docs',
     activeRef: 'feature/docs',
-    source: 'git-ref',
-    editable: false,
+    source: 'worktree',
+    editable: true,
     refs: [],
     tree: []
   })
@@ -29,7 +29,7 @@ test('createRepositorySessionReset returns the clean active repository session s
     repositoryPath: '/repo',
     rootPath: '/repo-root',
     activeRef: 'feature/docs',
-    source: 'git-ref',
+    source: 'worktree',
     selectedPath: '',
     activeFilePath: undefined,
     activeFileTabId: undefined,

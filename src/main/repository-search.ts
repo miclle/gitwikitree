@@ -1,4 +1,3 @@
-import { spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import { basename, extname } from 'path'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
@@ -85,30 +84,6 @@ function createSnippet(content: string, query: string): { snippet: string; lineN
   }
 }
 
-function createLineSnippet(
-  line: string,
-  terms: string[],
-  lineNumber: number
-): { snippet: string; lineNumber: number } {
-  const lowerLine = line.toLocaleLowerCase()
-  const matchedIndex = terms
-    .map((term) => lowerLine.indexOf(term))
-    .filter((index) => index >= 0)
-    .sort((a, b) => a - b)[0]
-  const start = matchedIndex && matchedIndex > 40 ? matchedIndex - 40 : 0
-  const end =
-    matchedIndex !== undefined
-      ? Math.min(line.length, matchedIndex + Math.max(...terms.map((term) => term.length)) + 80)
-      : Math.min(line.length, 160)
-
-  return {
-    snippet: `${start > 0 ? '...' : ''}${line.slice(start, end).trim()}${
-      end < line.length ? '...' : ''
-    }`,
-    lineNumber
-  }
-}
-
 async function readSearchableWorkingTreeFile(
   repository: RepositoryPayload,
   relativePath: string
@@ -135,129 +110,6 @@ async function readSearchableWorkingTreeFile(
   return fs.readFile(target, 'utf8')
 }
 
-function parseGitGrepRecord(
-  record: string,
-  ref: string,
-  terms: string[],
-  candidatesByPath: Map<string, SearchCandidate>,
-  excludedPaths: Set<string>,
-  seenPaths: Set<string>
-): ScoredSearchResult | undefined {
-  const refPrefix = `${ref}:`
-
-  const [pathWithRef, lineNumberText, line] = record.split('\0')
-  if (!pathWithRef || !lineNumberText || line === undefined) return undefined
-
-  const relativePath = pathWithRef.startsWith(refPrefix)
-    ? pathWithRef.slice(refPrefix.length)
-    : pathWithRef
-  if (excludedPaths.has(relativePath) || seenPaths.has(relativePath)) return undefined
-
-  const candidate = candidatesByPath.get(relativePath)
-  if (!candidate || candidate.type !== 'file') return undefined
-
-  const lineNumber = Number(lineNumberText)
-  const snippet = createLineSnippet(line, terms, Number.isFinite(lineNumber) ? lineNumber : 1)
-  seenPaths.add(relativePath)
-  return {
-    path: candidate.path,
-    name: basename(candidate.path),
-    type: 'file',
-    matchType: 'content',
-    snippet: snippet.snippet,
-    lineNumber: snippet.lineNumber,
-    score: 10 + snippet.lineNumber
-  }
-}
-
-async function searchRefContent(
-  repository: RepositoryPayload,
-  terms: string[],
-  candidatesByPath: Map<string, SearchCandidate>,
-  excludedPaths: Set<string>,
-  limit: number
-): Promise<ScoredSearchResult[]> {
-  if (limit <= 0) return []
-
-  const args = ['-C', repository.path, 'grep', '-I', '-n', '-i', '-F', '--null', '-m', '1']
-
-  if (terms.length > 1) {
-    args.push('--all-match')
-  }
-
-  for (const term of terms) {
-    args.push('-e', term)
-  }
-
-  args.push(repository.activeRef, '--', '.')
-
-  return new Promise((resolve, reject) => {
-    const child = spawn('git', args, { stdio: ['ignore', 'pipe', 'pipe'] })
-    const results: ScoredSearchResult[] = []
-    const seenPaths = new Set<string>()
-    let pending = ''
-    let stderr = ''
-    let stoppedAfterLimit = false
-
-    const stopAfterLimit = (): void => {
-      if (results.length < limit || child.killed) return
-      stoppedAfterLimit = true
-      child.kill()
-    }
-
-    child.stdout.setEncoding('utf8')
-    child.stderr.setEncoding('utf8')
-
-    child.stdout.on('data', (chunk: string) => {
-      pending += chunk
-      const records = pending.split('\n')
-      pending = records.pop() ?? ''
-
-      for (const record of records) {
-        const result = parseGitGrepRecord(
-          record,
-          repository.activeRef,
-          terms,
-          candidatesByPath,
-          excludedPaths,
-          seenPaths
-        )
-        if (result) {
-          results.push(result)
-          stopAfterLimit()
-          if (stoppedAfterLimit) break
-        }
-      }
-    })
-
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk
-    })
-
-    child.on('error', reject)
-    child.on('close', (code, signal) => {
-      if (pending && !stoppedAfterLimit) {
-        const result = parseGitGrepRecord(
-          pending,
-          repository.activeRef,
-          terms,
-          candidatesByPath,
-          excludedPaths,
-          seenPaths
-        )
-        if (result) results.push(result)
-      }
-
-      if (code === 0 || code === 1 || stoppedAfterLimit || signal === 'SIGTERM') {
-        resolve(results)
-        return
-      }
-
-      reject(new Error(stderr.trim() || `git grep exited with code ${code ?? signal}`))
-    })
-  })
-}
-
 export async function searchRepository(
   repoPath: string,
   query: string,
@@ -268,7 +120,6 @@ export async function searchRepository(
 
   const repository = await loadRepository(repoPath, options)
   const candidates = flattenTree(repository.tree, repository.index)
-  const candidatesByPath = new Map(candidates.map((candidate) => [candidate.path, candidate]))
   const pathMatchedPaths = new Set<string>()
   const results: ScoredSearchResult[] = []
 
@@ -285,35 +136,24 @@ export async function searchRepository(
     }
   }
 
-  if (repository.source === 'git-ref') {
-    results.push(
-      ...(await searchRefContent(
-        repository,
-        terms,
-        candidatesByPath,
-        pathMatchedPaths,
-        searchResultLimit - results.length
-      ))
-    )
-  } else {
-    for (const candidate of candidates) {
-      if (pathMatchedPaths.has(candidate.path)) continue
-      if (candidate.type !== 'file') continue
+  for (const candidate of candidates) {
+    if (pathMatchedPaths.has(candidate.path)) continue
+    if (candidate.type !== 'file') continue
+    if (results.length >= searchResultLimit) break
 
-      const content = await readSearchableWorkingTreeFile(repository, candidate.path)
-      if (!content || !matchesAllTerms(content, terms)) continue
+    const content = await readSearchableWorkingTreeFile(repository, candidate.path)
+    if (!content || !matchesAllTerms(content, terms)) continue
 
-      const { snippet, lineNumber } = createSnippet(content, query.trim())
-      results.push({
-        path: candidate.path,
-        name: basename(candidate.path),
-        type: 'file',
-        matchType: 'content',
-        snippet,
-        lineNumber,
-        score: 10 + lineNumber
-      })
-    }
+    const { snippet, lineNumber } = createSnippet(content, query.trim())
+    results.push({
+      path: candidate.path,
+      name: basename(candidate.path),
+      type: 'file',
+      matchType: 'content',
+      snippet,
+      lineNumber,
+      score: 10 + lineNumber
+    })
   }
 
   return results

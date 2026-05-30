@@ -2,7 +2,6 @@ import { execFile } from 'child_process'
 import { promises as fs } from 'fs'
 import { resolve } from 'path'
 import { promisify } from 'util'
-import { assertSafeGitRelativePath } from './repository-paths'
 import type { RepositoryPayload } from '../shared/types'
 
 export const execFileAsync = promisify(execFile)
@@ -86,26 +85,6 @@ export async function getGitVisibleFiles(repoPath: string): Promise<string[]> {
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 }
 
-export async function getRefFiles(repoPath: string, ref: string): Promise<string[]> {
-  await assertValidRef(repoPath, ref)
-  const { stdout } = await execFileAsync('git', [
-    '-C',
-    repoPath,
-    '-c',
-    'core.quotepath=false',
-    'ls-tree',
-    '-r',
-    '--name-only',
-    ref
-  ])
-
-  return stdout
-    .split('\n')
-    .map((file) => file.trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-}
-
 export async function assertValidRef(repoPath: string, ref: string): Promise<void> {
   if (!ref || ref.includes('\0') || ref.startsWith('-')) {
     throw new Error('Invalid git ref.')
@@ -125,41 +104,4 @@ export async function assertLocalBranch(repoPath: string, branch: string): Promi
 export async function switchLocalBranch(repoPath: string, branch: string): Promise<void> {
   await assertLocalBranch(repoPath, branch)
   await execFileAsync('git', ['-C', repoPath, 'switch', branch])
-}
-
-export async function readRefFile(
-  repoPath: string,
-  ref: string,
-  relativePath: string
-): Promise<Buffer> {
-  assertSafeGitRelativePath(relativePath)
-
-  await assertValidRef(repoPath, ref)
-  const { stdout } = await execFileAsync(
-    'git',
-    ['-C', repoPath, 'show', `${ref}:${relativePath}`],
-    {
-      encoding: 'buffer',
-      maxBuffer: 20 * 1024 * 1024
-    }
-  )
-
-  return Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout)
-}
-
-export async function getRefFileSize(
-  repoPath: string,
-  ref: string,
-  relativePath: string
-): Promise<number> {
-  assertSafeGitRelativePath(relativePath)
-
-  const { stdout } = await execFileAsync('git', [
-    '-C',
-    repoPath,
-    'cat-file',
-    '-s',
-    `${ref}:${relativePath}`
-  ])
-  return Number(stdout.trim()) || 0
 }
