@@ -75,6 +75,21 @@ test('global search modal preserves query and results when reopened', async () =
   )
 })
 
+test('global search result highlighting follows each search term', async () => {
+  const source = await readGlobalSearchModal()
+
+  assert.match(
+    source,
+    /function getHighlightRanges/,
+    'highlighting should be isolated so multi-term snippets can mark each matching term'
+  )
+  assert.doesNotMatch(
+    source,
+    /const lowerQuery = trimmed\.toLocaleLowerCase\(\)[\s\S]*indexOf\(lowerQuery\)/,
+    'highlighting should not depend on finding the raw query as one contiguous string'
+  )
+})
+
 test('global search close button is pinned to the modal top right', async () => {
   const css = await readMainCss()
 

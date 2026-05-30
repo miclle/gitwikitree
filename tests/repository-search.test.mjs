@@ -145,6 +145,56 @@ test('searchRepository keeps local snippets centered on long-line matches', asyn
   }
 })
 
+test('searchRepository builds snippets from the line matching all query terms', async () => {
+  const { search, tempDir } = await loadRepositorySearch()
+  const repoPath = await createRepository()
+
+  try {
+    await writeFile(
+      join(repoPath, 'multi-term.md'),
+      '# Notes\n\nAlpha appears with useful context before the Beta marker.\n'
+    )
+
+    const results = await search.searchRepository(repoPath, 'alpha beta')
+
+    assert.equal(results[0].path, 'multi-term.md')
+    assert.equal(results[0].lineNumber, 3)
+    assert.match(results[0].snippet, /Alpha/)
+    assert.match(results[0].snippet, /Beta/)
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('searchRepository caches searchable file content by file metadata', async () => {
+  const source = await readFile(
+    new URL('../src/main/repository-search.ts', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(
+    source,
+    /searchContentCache/,
+    'search should keep a workspace-local cache for reusable searchable file content'
+  )
+  assert.match(
+    source,
+    /mtimeMs[\s\S]*size|size[\s\S]*mtimeMs/,
+    'cached file content should be keyed by mtime and size so changed files are refreshed'
+  )
+  assert.match(
+    source,
+    /maxSearchCacheWorkspaces/,
+    'workspace caches should be capped so switching repositories does not leak memory'
+  )
+  assert.match(
+    source,
+    /maxSearchCacheEntriesPerWorkspace/,
+    'per-workspace file content caches should be capped for large repositories'
+  )
+})
+
 test('searchRepository rejects escaped roots and empty queries', async () => {
   const { search, tempDir } = await loadRepositorySearch()
   const repoPath = await createRepository()

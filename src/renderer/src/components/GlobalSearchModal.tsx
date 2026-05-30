@@ -11,22 +11,63 @@ type GlobalSearchModalProps = {
 
 export const GLOBAL_SEARCH_DEBOUNCE_MS = 300
 
-function HighlightText({ text, query }: { text: string; query: string }): React.JSX.Element {
-  const trimmed = query.trim()
-  if (!trimmed) return <>{text}</>
+type HighlightRange = {
+  start: number
+  end: number
+}
+
+function getSearchTerms(query: string): string[] {
+  return Array.from(new Set(query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean))).sort(
+    (first, second) => second.length - first.length
+  )
+}
+
+function getHighlightRanges(text: string, query: string): HighlightRange[] {
+  const terms = getSearchTerms(query)
+  if (terms.length === 0) return []
 
   const lowerText = text.toLocaleLowerCase()
-  const lowerQuery = trimmed.toLocaleLowerCase()
-  const index = lowerText.indexOf(lowerQuery)
-  if (index === -1) return <>{text}</>
+  const ranges: HighlightRange[] = []
+  let cursor = 0
 
-  return (
-    <>
-      {text.slice(0, index)}
-      <mark>{text.slice(index, index + trimmed.length)}</mark>
-      {text.slice(index + trimmed.length)}
-    </>
-  )
+  while (cursor < text.length) {
+    const matchingTerm = terms.find((term) => lowerText.startsWith(term, cursor))
+
+    if (!matchingTerm) {
+      cursor += 1
+      continue
+    }
+
+    ranges.push({ start: cursor, end: cursor + matchingTerm.length })
+    cursor += matchingTerm.length
+  }
+
+  return ranges
+}
+
+function HighlightText({ text, query }: { text: string; query: string }): React.JSX.Element {
+  const ranges = getHighlightRanges(text, query)
+  if (ranges.length === 0) return <>{text}</>
+
+  const parts: React.ReactNode[] = []
+  let cursor = 0
+
+  ranges.forEach((range) => {
+    if (range.start > cursor) {
+      parts.push(text.slice(cursor, range.start))
+    }
+
+    parts.push(
+      <mark key={`${range.start}:${range.end}`}>{text.slice(range.start, range.end)}</mark>
+    )
+    cursor = range.end
+  })
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor))
+  }
+
+  return <>{parts}</>
 }
 
 export function GlobalSearchModal({

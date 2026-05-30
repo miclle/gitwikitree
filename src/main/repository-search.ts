@@ -12,6 +12,8 @@ import type {
 
 const maxSearchBytes = 1024 * 1024
 const searchResultLimit = 100
+const maxSearchCacheWorkspaces = 8
+const maxSearchCacheEntriesPerWorkspace = 1000
 
 type SearchCandidate = {
   path: string
@@ -22,6 +24,16 @@ type SearchCandidate = {
 type ScoredSearchResult = RepositorySearchResult & {
   score: number
 }
+
+type CachedSearchContent = {
+  mtimeMs: number
+  size: number
+  content?: string
+}
+
+type WorkspaceSearchContentCache = Map<string, CachedSearchContent>
+
+const searchContentCache = new Map<string, WorkspaceSearchContentCache>()
 
 function isSearchablePreviewType(type: ReturnType<typeof detectPreviewType>): boolean {
   return type === 'text' || type === 'markdown' || type === 'html' || type === 'svg'
@@ -63,17 +75,103 @@ function pathScore(candidate: SearchCandidate, terms: string[]): number {
   return 4
 }
 
-function createSnippet(content: string, query: string): { snippet: string; lineNumber: number } {
-  const lowerQuery = query.toLocaleLowerCase()
+function getWorkspaceCacheKey(repository: RepositoryPayload): string {
+  return [repository.source, repository.rootPath, repository.path, repository.activeRef].join('\0')
+}
+
+function getWorkspaceSearchContentCache(
+  repository: RepositoryPayload
+): WorkspaceSearchContentCache {
+  const cacheKey = getWorkspaceCacheKey(repository)
+  const existing = searchContentCache.get(cacheKey)
+  if (existing) {
+    searchContentCache.delete(cacheKey)
+    searchContentCache.set(cacheKey, existing)
+    return existing
+  }
+
+  const cache = new Map<string, CachedSearchContent>()
+  searchContentCache.set(cacheKey, cache)
+  pruneSearchContentCache()
+  return cache
+}
+
+function pruneSearchContentCache(): void {
+  while (searchContentCache.size > maxSearchCacheWorkspaces) {
+    const oldestKey = searchContentCache.keys().next().value
+    if (!oldestKey) return
+    searchContentCache.delete(oldestKey)
+  }
+}
+
+function getCachedSearchContent(
+  cache: WorkspaceSearchContentCache,
+  relativePath: string,
+  stats: { mtimeMs: number; size: number }
+): CachedSearchContent | undefined {
+  const cached = cache.get(relativePath)
+
+  if (!cached || cached.mtimeMs !== stats.mtimeMs || cached.size !== stats.size) {
+    return undefined
+  }
+
+  cache.delete(relativePath)
+  cache.set(relativePath, cached)
+  return cached
+}
+
+function setCachedSearchContent(
+  cache: WorkspaceSearchContentCache,
+  relativePath: string,
+  item: CachedSearchContent
+): void {
+  cache.delete(relativePath)
+  cache.set(relativePath, item)
+
+  while (cache.size > maxSearchCacheEntriesPerWorkspace) {
+    const oldestPath = cache.keys().next().value
+    if (!oldestPath) return
+    cache.delete(oldestPath)
+  }
+}
+
+function pruneWorkspaceSearchContentCache(
+  cache: WorkspaceSearchContentCache,
+  candidates: SearchCandidate[]
+): void {
+  const candidatePaths = new Set(
+    candidates.filter((candidate) => candidate.type === 'file').map((candidate) => candidate.path)
+  )
+
+  for (const path of cache.keys()) {
+    if (!candidatePaths.has(path)) {
+      cache.delete(path)
+    }
+  }
+}
+
+function createSnippet(content: string, terms: string[]): { snippet: string; lineNumber: number } {
   const lines = content.split(/\r?\n/)
-  const matchedLineIndex = lines.findIndex((line) => line.toLocaleLowerCase().includes(lowerQuery))
+  const matchedLineIndex = lines.findIndex((line) => matchesAllTerms(line, terms))
   const lineIndex = matchedLineIndex >= 0 ? matchedLineIndex : 0
   const line = lines[lineIndex] ?? ''
-  const matchIndex = line.toLocaleLowerCase().indexOf(lowerQuery)
+  const lowerLine = line.toLocaleLowerCase()
+  const matchIndexes = terms
+    .map((term) => {
+      const index = lowerLine.indexOf(term)
+      return index >= 0 ? { index, length: term.length } : undefined
+    })
+    .filter((match): match is { index: number; length: number } => Boolean(match))
+  const firstMatchIndex = Math.min(...matchIndexes.map((match) => match.index))
+  const lastMatch = matchIndexes.reduce(
+    (last, match) => Math.max(last, match.index + match.length),
+    -1
+  )
+  const matchIndex = Number.isFinite(firstMatchIndex) ? firstMatchIndex : -1
   const start = matchIndex > 40 ? matchIndex - 40 : 0
   const end =
     matchIndex >= 0
-      ? Math.min(line.length, matchIndex + query.length + 80)
+      ? Math.min(line.length, Math.max(lastMatch, matchIndex) + 80)
       : Math.min(line.length, 120)
 
   return {
@@ -86,11 +184,18 @@ function createSnippet(content: string, query: string): { snippet: string; lineN
 
 async function readSearchableWorkingTreeFile(
   repository: RepositoryPayload,
-  relativePath: string
+  relativePath: string,
+  cache: WorkspaceSearchContentCache
 ): Promise<string | undefined> {
   const target = safeJoin(repository.path, relativePath)
   const stats = await fs.stat(target)
-  if (!stats.isFile() || stats.size > maxSearchBytes) return undefined
+  const cached = getCachedSearchContent(cache, relativePath, stats)
+  if (cached) return cached.content
+
+  if (!stats.isFile() || stats.size > maxSearchBytes) {
+    setCachedSearchContent(cache, relativePath, { mtimeMs: stats.mtimeMs, size: stats.size })
+    return undefined
+  }
 
   const file = await fs.open(target, 'r')
   try {
@@ -101,13 +206,16 @@ async function readSearchableWorkingTreeFile(
       sampleBuffer.subarray(0, bytesRead)
     )
     if (!isSearchablePreviewType(previewType)) {
+      setCachedSearchContent(cache, relativePath, { mtimeMs: stats.mtimeMs, size: stats.size })
       return undefined
     }
   } finally {
     await file.close()
   }
 
-  return fs.readFile(target, 'utf8')
+  const content = await fs.readFile(target, 'utf8')
+  setCachedSearchContent(cache, relativePath, { mtimeMs: stats.mtimeMs, size: stats.size, content })
+  return content
 }
 
 export async function searchRepository(
@@ -120,6 +228,8 @@ export async function searchRepository(
 
   const repository = await loadRepository(repoPath, options)
   const candidates = flattenTree(repository.tree, repository.index)
+  const workspaceSearchContentCache = getWorkspaceSearchContentCache(repository)
+  pruneWorkspaceSearchContentCache(workspaceSearchContentCache, candidates)
   const pathMatchedPaths = new Set<string>()
   const results: ScoredSearchResult[] = []
 
@@ -141,10 +251,14 @@ export async function searchRepository(
     if (candidate.type !== 'file') continue
     if (results.length >= searchResultLimit) break
 
-    const content = await readSearchableWorkingTreeFile(repository, candidate.path)
+    const content = await readSearchableWorkingTreeFile(
+      repository,
+      candidate.path,
+      workspaceSearchContentCache
+    )
     if (!content || !matchesAllTerms(content, terms)) continue
 
-    const { snippet, lineNumber } = createSnippet(content, query.trim())
+    const { snippet, lineNumber } = createSnippet(content, terms)
     results.push({
       path: candidate.path,
       name: basename(candidate.path),
