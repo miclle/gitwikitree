@@ -72,8 +72,21 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
+  const [isBranchPickerOpen, setIsBranchPickerOpen] = useState(false)
+  const [branchPickerTab, setBranchPickerTab] = useState<'branches' | 'remotes'>('branches')
+  const [branchQuery, setBranchQuery] = useState('')
   const [branchActionRef, setBranchActionRef] = useState<string | undefined>()
   const selectedBranchAction = repository?.refs.find((ref) => ref.name === branchActionRef)
+  const branchQueryTerms = branchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+  const visibleRefs =
+    repository?.refs.filter((ref) => {
+      if (branchQueryTerms.length === 0) return true
+      const name = ref.name.toLocaleLowerCase()
+      return branchQueryTerms.every((term) => name.includes(term))
+    }) ?? []
+  const localRefs = visibleRefs.filter((ref) => ref.type === 'local')
+  const remoteRefs = visibleRefs.filter((ref) => ref.type === 'remote')
+  const displayedBranchRefs = branchPickerTab === 'branches' ? localRefs : remoteRefs
   const appliedSearchQuery = isSearchOpen ? searchQuery : ''
   const openPreviewSearch = useCallback(() => {
     const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
@@ -156,6 +169,18 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     searchInputRef.current?.focus()
     searchInputRef.current?.select()
   }, [isSearchOpen, searchFocusRequest])
+
+  const openBranchActionModal = (refName: string): void => {
+    setBranchActionRef(refName)
+    setIsBranchPickerOpen(false)
+    setBranchPickerTab('branches')
+    setBranchQuery('')
+  }
+
+  const closeBranchActionModal = (): void => {
+    setBranchActionRef(undefined)
+  }
+
   const fileTabsNav = (
     <nav
       className="main-tabs"
@@ -256,62 +281,156 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 </div>
 
                 <div className="sidebar-controls">
-                  <span className="branch-pill">
-                    <GitBranch size={15} />
-                    <select
-                      aria-label="Branch"
+                  <div className="branch-picker">
+                    <button
+                      className="branch-pill"
+                      type="button"
+                      aria-label="Switch branches"
+                      aria-expanded={isBranchPickerOpen}
                       disabled={loading}
-                      value={repository.activeRef}
-                      onChange={(event) => setBranchActionRef(event.target.value)}
+                      onClick={() => setIsBranchPickerOpen((open) => !open)}
                     >
-                      {repository.refs.map((ref) => (
-                        <option key={`${ref.type}:${ref.name}`} value={ref.name}>
-                          {ref.name}
-                        </option>
-                      ))}
-                    </select>
-                  </span>
+                      <GitBranch size={15} />
+                      <span title={repository.activeRef}>{repository.activeRef}</span>
+                      <ChevronDown size={15} />
+                    </button>
+                    {isBranchPickerOpen && (
+                      <div
+                        className="branch-picker-popover"
+                        role="dialog"
+                        aria-label="Switch branches"
+                      >
+                        <div className="branch-picker-header">
+                          <strong>Switch branches</strong>
+                          <button
+                            type="button"
+                            aria-label="Close branch picker"
+                            onClick={() => setIsBranchPickerOpen(false)}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                        <label className="branch-picker-search">
+                          <Search size={16} />
+                          <input
+                            value={branchQuery}
+                            placeholder="Find a branch..."
+                            onChange={(event) => setBranchQuery(event.target.value)}
+                          />
+                        </label>
+                        <div className="branch-picker-tabs" role="tablist" aria-label="Branch refs">
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={branchPickerTab === 'branches'}
+                            onClick={() => setBranchPickerTab('branches')}
+                          >
+                            Branches
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={branchPickerTab === 'remotes'}
+                            onClick={() => setBranchPickerTab('remotes')}
+                          >
+                            Remotes
+                          </button>
+                        </div>
+                        <div className="branch-picker-list">
+                          {displayedBranchRefs.map((ref) => (
+                            <button
+                              className="branch-picker-row"
+                              type="button"
+                              key={`${ref.type}:${ref.name}`}
+                              onClick={() => openBranchActionModal(ref.name)}
+                            >
+                              <span aria-hidden="true">{ref.current ? '✓' : ''}</span>
+                              <span title={ref.name}>{ref.name}</span>
+                              {ref.current && <strong>current</strong>}
+                            </button>
+                          ))}
+                          {displayedBranchRefs.length === 0 && (
+                            <div className="branch-picker-empty">No branches found</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {selectedBranchAction && (
                     <div
-                      className="branch-action-dialog"
+                      className="branch-action-backdrop"
                       role="dialog"
+                      aria-modal="true"
                       aria-label={`Choose action for ${selectedBranchAction.name}`}
+                      onMouseDown={closeBranchActionModal}
                     >
-                      <div className="branch-action-heading">
-                        <GitBranch size={15} />
-                        <strong title={selectedBranchAction.name}>
-                          {selectedBranchAction.name}
-                        </strong>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={loading || selectedBranchAction.type !== 'local'}
-                        onClick={() => {
-                          const branch = selectedBranchAction.name
-                          setBranchActionRef(undefined)
-                          void checkoutBranch(branch)
-                        }}
+                      <section
+                        className="branch-action-modal"
+                        onMouseDown={(event) => event.stopPropagation()}
                       >
-                        Switch current workspace
-                      </button>
-                      <button
-                        type="button"
-                        disabled={loading}
-                        onClick={() => {
-                          const ref = selectedBranchAction.name
-                          setBranchActionRef(undefined)
-                          void openBranchWorktree(ref)
-                        }}
-                      >
-                        Open as .worktrees worktree
-                      </button>
-                      <button
-                        className="branch-action-cancel"
-                        type="button"
-                        onClick={() => setBranchActionRef(undefined)}
-                      >
-                        Cancel
-                      </button>
+                        <div className="branch-action-heading">
+                          <div>
+                            <span>Selected branch</span>
+                            <strong title={selectedBranchAction.name}>
+                              {selectedBranchAction.name}
+                            </strong>
+                          </div>
+                          <button
+                            type="button"
+                            aria-label="Close branch action"
+                            onClick={closeBranchActionModal}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                        <div className="branch-action-options">
+                          <button
+                            className="branch-action-option"
+                            type="button"
+                            disabled={loading || selectedBranchAction.type !== 'local'}
+                            onClick={() => {
+                              const branch = selectedBranchAction.name
+                              closeBranchActionModal()
+                              void checkoutBranch(branch)
+                            }}
+                          >
+                            <strong>Switch local branch here</strong>
+                            <span>
+                              Switches the current repository folder to this local branch. Files in
+                              the opened directory change in place.
+                            </span>
+                          </button>
+                          <button
+                            className="branch-action-option"
+                            type="button"
+                            disabled={loading}
+                            onClick={() => {
+                              const ref = selectedBranchAction.name
+                              closeBranchActionModal()
+                              void openBranchWorktree(ref)
+                            }}
+                          >
+                            <strong>Create git worktree in .worktrees</strong>
+                            <span>
+                              Creates or opens an isolated working copy under .worktrees while the
+                              current folder keeps its branch.
+                            </span>
+                          </button>
+                        </div>
+                        {selectedBranchAction.type !== 'local' && (
+                          <p className="branch-action-note">
+                            Remote refs can be opened as worktrees. Switching in place requires a
+                            local branch first.
+                          </p>
+                        )}
+                        <button
+                          className="branch-action-cancel"
+                          type="button"
+                          onClick={closeBranchActionModal}
+                        >
+                          Cancel
+                        </button>
+                      </section>
                     </div>
                   )}
                   <button className="sidebar-control-button" type="button" aria-label="Add">

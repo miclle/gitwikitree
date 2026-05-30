@@ -225,6 +225,37 @@ test('global repository search opens reveal the selected file in the tree', asyn
   )
 })
 
+test('branch selection opens an action modal with explanatory choices', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /const \[isBranchPickerOpen, setIsBranchPickerOpen\] = useState\(false\)/,
+    'branch selector should use an app-controlled popover instead of a native select'
+  )
+  assert.match(
+    source,
+    /onClick=\{\(\) => openBranchActionModal\(ref\.name\)\}/,
+    'choosing a branch row should open the follow-up action modal'
+  )
+  assert.match(
+    source,
+    /Switch local branch here[\s\S]*Files in[\s\S]*the opened directory change in place/,
+    'switching in place should explain that the current folder changes branch'
+  )
+  assert.match(
+    source,
+    /Create git worktree in \.worktrees[\s\S]*isolated working copy under \.worktrees/,
+    'worktree creation should explain that a separate local working copy is used'
+  )
+  assert.match(
+    css,
+    /\.branch-action-backdrop\s*\{[\s\S]*position:\s*fixed;[\s\S]*place-items:\s*center;/,
+    'branch actions should be presented as a centered modal'
+  )
+})
+
 test('restored active file tabs reveal their item in the tree', async () => {
   const source = await readRepositoryWorkspaceHook()
 
