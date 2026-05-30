@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs'
 import { join } from 'path'
 
-const excludedDirectoryNames = new Set(['.git', '.worktrees', 'node_modules'])
+const excludedEntryNames = new Set(['.git', '.worktrees', 'node_modules'])
 
 function toRepositoryPath(path: string): string {
   return path
@@ -16,23 +16,21 @@ export async function getWorkspaceFiles(repoPath: string): Promise<string[]> {
   async function visit(directory: string, relativeDirectory = ''): Promise<void> {
     const entries = await fs.readdir(directory, { withFileTypes: true })
 
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (entry.isDirectory() && excludedDirectoryNames.has(entry.name)) return
+    for (const entry of entries) {
+      if (excludedEntryNames.has(entry.name)) continue
 
-        const relativePath = toRepositoryPath(join(relativeDirectory, entry.name))
-        const absolutePath = join(directory, entry.name)
+      const relativePath = toRepositoryPath(join(relativeDirectory, entry.name))
+      const absolutePath = join(directory, entry.name)
 
-        if (entry.isDirectory()) {
-          await visit(absolutePath, relativePath)
-          return
-        }
+      if (entry.isDirectory()) {
+        await visit(absolutePath, relativePath)
+        continue
+      }
 
-        if (entry.isFile()) {
-          files.push(relativePath)
-        }
-      })
-    )
+      if (entry.isFile()) {
+        files.push(relativePath)
+      }
+    }
   }
 
   await visit(repoPath)
