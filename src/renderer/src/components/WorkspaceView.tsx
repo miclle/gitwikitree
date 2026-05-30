@@ -17,6 +17,7 @@ import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
 import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-search'
 import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
+import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 import type { RepositoryRef } from '../../../shared/types'
@@ -306,409 +307,416 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
           </button>
         </section>
       ) : (
-        <section
-          className={isSidebarOpen ? 'repo-layout' : 'repo-layout sidebar-collapsed'}
-          style={{
-            gridTemplateColumns: isSidebarOpen
-              ? `${sidebarWidth}px 1px minmax(0, 1fr)`
-              : 'minmax(0, 1fr)'
-          }}
-        >
-          {isSidebarOpen && (
-            <>
-              <aside className="tree-panel" aria-label="Files">
-                <div className="sidebar-titlebar">
-                  <TitlebarWindowControls />
-                  <div className="titlebar-repository" title={repository.path}>
-                    {repositoryLabel}
+        <>
+          <section
+            className={isSidebarOpen ? 'repo-layout' : 'repo-layout sidebar-collapsed'}
+            style={{
+              gridTemplateColumns: isSidebarOpen
+                ? `${sidebarWidth}px 1px minmax(0, 1fr)`
+                : 'minmax(0, 1fr)'
+            }}
+          >
+            {isSidebarOpen && (
+              <>
+                <aside className="tree-panel" aria-label="Files">
+                  <div className="sidebar-titlebar">
+                    <TitlebarWindowControls />
+                    <div className="titlebar-repository" title={repository.path}>
+                      {repositoryLabel}
+                    </div>
                   </div>
-                </div>
 
-                <div className="sidebar-controls">
-                  <div className="branch-picker" ref={branchPickerRef}>
-                    <button
-                      className="branch-pill"
-                      type="button"
-                      aria-label="Switch branches"
-                      aria-expanded={isBranchPickerOpen}
-                      disabled={loading}
-                      onClick={() => setIsBranchPickerOpen((open) => !open)}
-                    >
-                      <GitBranch size={15} />
-                      <span title={repository.activeRef}>{repository.activeRef}</span>
-                      <ChevronDown size={15} />
-                    </button>
-                    {isBranchPickerOpen && (
-                      <div
-                        className="branch-picker-popover"
-                        role="dialog"
+                  <div className="sidebar-controls">
+                    <div className="branch-picker" ref={branchPickerRef}>
+                      <button
+                        className="branch-pill"
+                        type="button"
                         aria-label="Switch branches"
+                        aria-expanded={isBranchPickerOpen}
+                        disabled={loading}
+                        onClick={() => setIsBranchPickerOpen((open) => !open)}
                       >
-                        <div className="branch-picker-header">
-                          <strong>Switch branches</strong>
-                          <button
-                            type="button"
-                            aria-label="Close branch picker"
-                            onClick={() => setIsBranchPickerOpen(false)}
-                          >
-                            <X size={15} />
-                          </button>
-                        </div>
-                        <label className="branch-picker-search">
-                          <Search size={16} />
-                          <input
-                            value={branchQuery}
-                            placeholder="Find a branch..."
-                            onChange={(event) => setBranchQuery(event.target.value)}
-                          />
-                        </label>
-                        <div className="branch-picker-tabs" role="tablist" aria-label="Branch refs">
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={branchPickerTab === 'branches'}
-                            onClick={() => setBranchPickerTab('branches')}
-                          >
-                            Branches
-                          </button>
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={branchPickerTab === 'remotes'}
-                            onClick={() => setBranchPickerTab('remotes')}
-                          >
-                            Remotes
-                          </button>
-                        </div>
-                        <div className="branch-picker-list">
-                          {displayedBranchRefs.map((ref) => (
+                        <GitBranch size={15} />
+                        <span title={repository.activeRef}>{repository.activeRef}</span>
+                        <ChevronDown size={15} />
+                      </button>
+                      {isBranchPickerOpen && (
+                        <div
+                          className="branch-picker-popover"
+                          role="dialog"
+                          aria-label="Switch branches"
+                        >
+                          <div className="branch-picker-header">
+                            <strong>Switch branches</strong>
                             <button
-                              className="branch-picker-row"
                               type="button"
-                              key={`${ref.type}:${ref.name}`}
-                              onClick={() => handleBranchRefSelect(ref)}
+                              aria-label="Close branch picker"
+                              onClick={() => setIsBranchPickerOpen(false)}
                             >
-                              <span aria-hidden="true">{ref.current ? '✓' : ''}</span>
-                              <span title={ref.name}>{ref.name}</span>
-                              {ref.current && <strong>current</strong>}
-                              {!ref.current && ref.worktreePath && <strong>open</strong>}
+                              <X size={15} />
                             </button>
-                          ))}
-                          {displayedBranchRefs.length === 0 && (
-                            <div className="branch-picker-empty">No branches found</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {selectedBranchAction && (
-                    <div
-                      className="branch-action-backdrop"
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label={`Choose action for ${selectedBranchAction.name}`}
-                      onMouseDown={closeBranchActionModal}
-                    >
-                      <section
-                        className="branch-action-modal"
-                        onMouseDown={(event) => event.stopPropagation()}
-                      >
-                        <div className="branch-action-heading">
-                          <div>
-                            <span>Selected branch</span>
-                            <strong title={selectedBranchAction.name}>
-                              {selectedBranchAction.name}
-                            </strong>
                           </div>
+                          <label className="branch-picker-search">
+                            <Search size={16} />
+                            <input
+                              value={branchQuery}
+                              placeholder="Find a branch..."
+                              onChange={(event) => setBranchQuery(event.target.value)}
+                            />
+                          </label>
+                          <div
+                            className="branch-picker-tabs"
+                            role="tablist"
+                            aria-label="Branch refs"
+                          >
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={branchPickerTab === 'branches'}
+                              onClick={() => setBranchPickerTab('branches')}
+                            >
+                              Branches
+                            </button>
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={branchPickerTab === 'remotes'}
+                              onClick={() => setBranchPickerTab('remotes')}
+                            >
+                              Remotes
+                            </button>
+                          </div>
+                          <div className="branch-picker-list">
+                            {displayedBranchRefs.map((ref) => (
+                              <button
+                                className="branch-picker-row"
+                                type="button"
+                                key={`${ref.type}:${ref.name}`}
+                                onClick={() => handleBranchRefSelect(ref)}
+                              >
+                                <span aria-hidden="true">{ref.current ? '✓' : ''}</span>
+                                <span title={ref.name}>{ref.name}</span>
+                                {ref.current && <strong>current</strong>}
+                                {!ref.current && ref.worktreePath && <strong>open</strong>}
+                              </button>
+                            ))}
+                            {displayedBranchRefs.length === 0 && (
+                              <div className="branch-picker-empty">No branches found</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {selectedBranchAction && (
+                      <div
+                        className="branch-action-backdrop"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Choose action for ${selectedBranchAction.name}`}
+                        onMouseDown={closeBranchActionModal}
+                      >
+                        <section
+                          className="branch-action-modal"
+                          onMouseDown={(event) => event.stopPropagation()}
+                        >
+                          <div className="branch-action-heading">
+                            <div>
+                              <span>Selected branch</span>
+                              <strong title={selectedBranchAction.name}>
+                                {selectedBranchAction.name}
+                              </strong>
+                            </div>
+                            <button
+                              type="button"
+                              aria-label="Close branch action"
+                              onClick={closeBranchActionModal}
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                          <div className="branch-action-options">
+                            <button
+                              className="branch-action-option"
+                              type="button"
+                              disabled={loading || selectedBranchAction.type !== 'local'}
+                              onClick={() => {
+                                const branch = selectedBranchAction.name
+                                closeBranchActionModal()
+                                void checkoutBranch(branch)
+                              }}
+                            >
+                              <strong>
+                                Switch primary workspace from {primaryWorkspaceBranch} to{' '}
+                                {selectedBranchAction.name}
+                              </strong>
+                              <span>
+                                Changes the primary repository folder to {selectedBranchAction.name}
+                                . Existing worktrees keep their branches.
+                              </span>
+                            </button>
+                            <button
+                              className="branch-action-option"
+                              type="button"
+                              disabled={loading}
+                              onClick={() => {
+                                const ref = selectedBranchAction.name
+                                closeBranchActionModal()
+                                void openBranchWorktree(ref)
+                              }}
+                            >
+                              <strong>Create git worktree in .worktrees</strong>
+                              <span>
+                                Creates or opens an isolated working copy under .worktrees while the
+                                current folder keeps its branch.
+                              </span>
+                            </button>
+                          </div>
+                          {selectedBranchAction.type !== 'local' && (
+                            <p className="branch-action-note">
+                              Remote refs can be opened as worktrees. Switching in place requires a
+                              local branch first.
+                            </p>
+                          )}
                           <button
+                            className="branch-action-cancel"
                             type="button"
-                            aria-label="Close branch action"
                             onClick={closeBranchActionModal}
                           >
-                            <X size={15} />
+                            Cancel
                           </button>
-                        </div>
-                        <div className="branch-action-options">
-                          <button
-                            className="branch-action-option"
-                            type="button"
-                            disabled={loading || selectedBranchAction.type !== 'local'}
-                            onClick={() => {
-                              const branch = selectedBranchAction.name
-                              closeBranchActionModal()
-                              void checkoutBranch(branch)
-                            }}
-                          >
-                            <strong>
-                              Switch primary workspace from {primaryWorkspaceBranch} to{' '}
-                              {selectedBranchAction.name}
-                            </strong>
-                            <span>
-                              Changes the primary repository folder to {selectedBranchAction.name}.
-                              Existing worktrees keep their branches.
-                            </span>
-                          </button>
-                          <button
-                            className="branch-action-option"
-                            type="button"
-                            disabled={loading}
-                            onClick={() => {
-                              const ref = selectedBranchAction.name
-                              closeBranchActionModal()
-                              void openBranchWorktree(ref)
-                            }}
-                          >
-                            <strong>Create git worktree in .worktrees</strong>
-                            <span>
-                              Creates or opens an isolated working copy under .worktrees while the
-                              current folder keeps its branch.
-                            </span>
-                          </button>
-                        </div>
-                        {selectedBranchAction.type !== 'local' && (
-                          <p className="branch-action-note">
-                            Remote refs can be opened as worktrees. Switching in place requires a
-                            local branch first.
-                          </p>
-                        )}
-                        <button
-                          className="branch-action-cancel"
-                          type="button"
-                          onClick={closeBranchActionModal}
-                        >
-                          Cancel
-                        </button>
-                      </section>
-                    </div>
+                        </section>
+                      </div>
+                    )}
+                    <button className="sidebar-control-button" type="button" aria-label="Add">
+                      <Plus size={16} />
+                    </button>
+                    <button
+                      className="sidebar-control-button"
+                      type="button"
+                      aria-label="Search files"
+                      aria-expanded={isGlobalSearchOpen}
+                      onClick={() => setIsGlobalSearchOpen(true)}
+                    >
+                      <Search size={16} />
+                    </button>
+                  </div>
+
+                  <div className="tree">
+                    {repository.tree.map((node) => (
+                      <TreeRow
+                        expandedPaths={expandedPaths}
+                        key={node.path}
+                        level={0}
+                        node={node}
+                        selectedPath={selectedPath}
+                        onSelect={handleSelect}
+                        onToggle={toggleDirectory}
+                        onOpenContextMenu={showTreeItemContextMenu}
+                      />
+                    ))}
+                  </div>
+                </aside>
+
+                <div
+                  aria-label="Resize panels"
+                  className="split-resizer"
+                  role="separator"
+                  tabIndex={0}
+                  onMouseDown={startResizing}
+                />
+              </>
+            )}
+
+            <section className="preview-panel">
+              <div className="main-titlebar">
+                {!isSidebarOpen && <TitlebarWindowControls />}
+                <div className="main-titlebar-actions">
+                  <button
+                    className="titlebar-icon-button"
+                    type="button"
+                    aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
+                    aria-expanded={isSidebarOpen}
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  >
+                    {isSidebarOpen ? (
+                      <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
+                    ) : (
+                      <IconLayoutSidebarLeftExpand size={20} stroke={2} />
+                    )}
+                  </button>
+                  <HistoryButtons
+                    canNavigateBack={canNavigateBack}
+                    canNavigateForward={canNavigateForward}
+                    onNavigate={navigateActiveTabHistory}
+                  />
+                </div>
+                {fileTabsNav}
+              </div>
+              <div className="repo-pathbar">
+                <div className="breadcrumb">
+                  <button
+                    type="button"
+                    title={repository.name}
+                    onClick={openRepositoryPreview}
+                    onContextMenu={(event) => showBreadcrumbContextMenu(event, '')}
+                  >
+                    {repository.name}
+                  </button>
+                  {!breadcrumbParts.length && directoryReadmeSource && (
+                    <span
+                      className="breadcrumb-source"
+                      title={directoryReadmeSource.path}
+                      aria-label={`Showing ${directoryReadmeSource.path}`}
+                    >
+                      <span aria-hidden="true">·</span>
+                      {directoryReadmeSource.name}
+                    </span>
                   )}
-                  <button className="sidebar-control-button" type="button" aria-label="Add">
-                    <Plus size={16} />
+                  {breadcrumbParts.map((part, index) => {
+                    const path = breadcrumbParts.slice(0, index + 1).join('/')
+                    const isLast = index === breadcrumbParts.length - 1
+
+                    return (
+                      <span className={isLast ? 'breadcrumb-current' : undefined} key={path}>
+                        <span className="slash">/</span>
+                        {isLast ? (
+                          <>
+                            <strong title={part}>{part}</strong>
+                            {directoryReadmeSource && (
+                              <span
+                                className="breadcrumb-source"
+                                title={directoryReadmeSource.path}
+                                aria-label={`Showing ${directoryReadmeSource.path}`}
+                              >
+                                <span aria-hidden="true">·</span>
+                                {directoryReadmeSource.name}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            title={part}
+                            onClick={() => openBreadcrumbPath(path)}
+                            onContextMenu={(event) => showBreadcrumbContextMenu(event, path)}
+                          >
+                            {part}
+                          </button>
+                        )}
+                      </span>
+                    )
+                  })}
+                </div>
+                <button
+                  className="path-search-button"
+                  type="button"
+                  aria-label="Find in current tab"
+                  aria-expanded={isSearchOpen}
+                  onClick={openPreviewSearch}
+                >
+                  <Search size={15} />
+                </button>
+              </div>
+
+              <div className="preview-body" ref={previewBodyRef}>
+                {previewLoading && (
+                  <div className="loading-state">
+                    <Loader2 className="spin" size={26} />
+                  </div>
+                )}
+                {!previewLoading && preview && (
+                  <PreviewContent
+                    pendingAnchor={pendingMarkdownAnchor}
+                    preview={preview}
+                    searchQuery={appliedSearchQuery}
+                    activeSearchIndex={activeSearchIndex}
+                    onSearchMatchCountChange={handleSearchMatchCountChange}
+                    onSelectPath={selectPreviewPath}
+                    onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
+                    onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                  />
+                )}
+              </div>
+              {isSearchOpen && (
+                <form
+                  className="preview-search-popover"
+                  role="search"
+                  aria-label="Find in current tab"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    stepSearchMatch(1)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      closePreviewSearch()
+                      return
+                    }
+
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      stepSearchMatch(event.shiftKey ? -1 : 1)
+                    }
+                  }}
+                >
+                  <Search className="preview-search-icon" size={15} aria-hidden="true" />
+                  <input
+                    ref={searchInputRef}
+                    aria-label="Find in current tab"
+                    value={searchQuery}
+                    placeholder="Find"
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value)
+                      setActiveSearchIndex(-1)
+                    }}
+                  />
+                  <span className="preview-search-count" aria-live="polite">
+                    {searchQuery.trim()
+                      ? searchMatchCount > 0
+                        ? `${activeSearchIndex + 1}/${searchMatchCount}`
+                        : '0/0'
+                      : '0/0'}
+                  </span>
+                  <button
+                    className="preview-search-button"
+                    type="button"
+                    aria-label="Previous match"
+                    disabled={searchMatchCount === 0}
+                    onClick={() => stepSearchMatch(-1)}
+                  >
+                    <ChevronUp size={15} />
                   </button>
                   <button
-                    className="sidebar-control-button"
+                    className="preview-search-button"
                     type="button"
-                    aria-label="Search files"
-                    aria-expanded={isGlobalSearchOpen}
-                    onClick={() => setIsGlobalSearchOpen(true)}
+                    aria-label="Next match"
+                    disabled={searchMatchCount === 0}
+                    onClick={() => stepSearchMatch(1)}
                   >
-                    <Search size={16} />
+                    <ChevronDown size={15} />
                   </button>
-                </div>
-
-                <div className="tree">
-                  {repository.tree.map((node) => (
-                    <TreeRow
-                      expandedPaths={expandedPaths}
-                      key={node.path}
-                      level={0}
-                      node={node}
-                      selectedPath={selectedPath}
-                      onSelect={handleSelect}
-                      onToggle={toggleDirectory}
-                      onOpenContextMenu={showTreeItemContextMenu}
-                    />
-                  ))}
-                </div>
-              </aside>
-
-              <div
-                aria-label="Resize panels"
-                className="split-resizer"
-                role="separator"
-                tabIndex={0}
-                onMouseDown={startResizing}
-              />
-            </>
-          )}
-
-          <section className="preview-panel">
-            <div className="main-titlebar">
-              {!isSidebarOpen && <TitlebarWindowControls />}
-              <div className="main-titlebar-actions">
-                <button
-                  className="titlebar-icon-button"
-                  type="button"
-                  aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
-                  aria-expanded={isSidebarOpen}
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                >
-                  {isSidebarOpen ? (
-                    <IconLayoutSidebarLeftCollapse size={20} stroke={2} />
-                  ) : (
-                    <IconLayoutSidebarLeftExpand size={20} stroke={2} />
-                  )}
-                </button>
-                <HistoryButtons
-                  canNavigateBack={canNavigateBack}
-                  canNavigateForward={canNavigateForward}
-                  onNavigate={navigateActiveTabHistory}
-                />
-              </div>
-              {fileTabsNav}
-            </div>
-            <div className="repo-pathbar">
-              <div className="breadcrumb">
-                <button
-                  type="button"
-                  title={repository.name}
-                  onClick={openRepositoryPreview}
-                  onContextMenu={(event) => showBreadcrumbContextMenu(event, '')}
-                >
-                  {repository.name}
-                </button>
-                {!breadcrumbParts.length && directoryReadmeSource && (
-                  <span
-                    className="breadcrumb-source"
-                    title={directoryReadmeSource.path}
-                    aria-label={`Showing ${directoryReadmeSource.path}`}
+                  <button
+                    className="preview-search-button"
+                    type="button"
+                    aria-label="Close find"
+                    onClick={closePreviewSearch}
                   >
-                    <span aria-hidden="true">·</span>
-                    {directoryReadmeSource.name}
-                  </span>
-                )}
-                {breadcrumbParts.map((part, index) => {
-                  const path = breadcrumbParts.slice(0, index + 1).join('/')
-                  const isLast = index === breadcrumbParts.length - 1
-
-                  return (
-                    <span className={isLast ? 'breadcrumb-current' : undefined} key={path}>
-                      <span className="slash">/</span>
-                      {isLast ? (
-                        <>
-                          <strong title={part}>{part}</strong>
-                          {directoryReadmeSource && (
-                            <span
-                              className="breadcrumb-source"
-                              title={directoryReadmeSource.path}
-                              aria-label={`Showing ${directoryReadmeSource.path}`}
-                            >
-                              <span aria-hidden="true">·</span>
-                              {directoryReadmeSource.name}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          title={part}
-                          onClick={() => openBreadcrumbPath(path)}
-                          onContextMenu={(event) => showBreadcrumbContextMenu(event, path)}
-                        >
-                          {part}
-                        </button>
-                      )}
-                    </span>
-                  )
-                })}
-              </div>
-              <button
-                className="path-search-button"
-                type="button"
-                aria-label="Find in current tab"
-                aria-expanded={isSearchOpen}
-                onClick={openPreviewSearch}
-              >
-                <Search size={15} />
-              </button>
-            </div>
-
-            <div className="preview-body" ref={previewBodyRef}>
-              {previewLoading && (
-                <div className="loading-state">
-                  <Loader2 className="spin" size={26} />
-                </div>
+                    <X size={15} />
+                  </button>
+                </form>
               )}
-              {!previewLoading && preview && (
-                <PreviewContent
-                  pendingAnchor={pendingMarkdownAnchor}
-                  preview={preview}
-                  searchQuery={appliedSearchQuery}
-                  activeSearchIndex={activeSearchIndex}
-                  onSearchMatchCountChange={handleSearchMatchCountChange}
-                  onSelectPath={selectPreviewPath}
-                  onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
-                  onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
-                />
-              )}
-            </div>
-            {isSearchOpen && (
-              <form
-                className="preview-search-popover"
-                role="search"
-                aria-label="Find in current tab"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  stepSearchMatch(1)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.preventDefault()
-                    closePreviewSearch()
-                    return
-                  }
-
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    stepSearchMatch(event.shiftKey ? -1 : 1)
-                  }
-                }}
-              >
-                <Search className="preview-search-icon" size={15} aria-hidden="true" />
-                <input
-                  ref={searchInputRef}
-                  aria-label="Find in current tab"
-                  value={searchQuery}
-                  placeholder="Find"
-                  onChange={(event) => {
-                    setSearchQuery(event.target.value)
-                    setActiveSearchIndex(-1)
-                  }}
-                />
-                <span className="preview-search-count" aria-live="polite">
-                  {searchQuery.trim()
-                    ? searchMatchCount > 0
-                      ? `${activeSearchIndex + 1}/${searchMatchCount}`
-                      : '0/0'
-                    : '0/0'}
-                </span>
-                <button
-                  className="preview-search-button"
-                  type="button"
-                  aria-label="Previous match"
-                  disabled={searchMatchCount === 0}
-                  onClick={() => stepSearchMatch(-1)}
-                >
-                  <ChevronUp size={15} />
-                </button>
-                <button
-                  className="preview-search-button"
-                  type="button"
-                  aria-label="Next match"
-                  disabled={searchMatchCount === 0}
-                  onClick={() => stepSearchMatch(1)}
-                >
-                  <ChevronDown size={15} />
-                </button>
-                <button
-                  className="preview-search-button"
-                  type="button"
-                  aria-label="Close find"
-                  onClick={closePreviewSearch}
-                >
-                  <X size={15} />
-                </button>
-              </form>
-            )}
+            </section>
+            <GlobalSearchModal
+              open={isGlobalSearchOpen}
+              repository={repository}
+              onOpenChange={setIsGlobalSearchOpen}
+              onOpenResult={(result) => {
+                selectPreviewPath(result.path)
+              }}
+            />
           </section>
-          <GlobalSearchModal
-            open={isGlobalSearchOpen}
-            repository={repository}
-            onOpenChange={setIsGlobalSearchOpen}
-            onOpenResult={(result) => {
-              selectPreviewPath(result.path)
-            }}
-          />
-        </section>
+          <StatusBar repository={repository} preview={preview} />
+        </>
       )}
     </main>
   )

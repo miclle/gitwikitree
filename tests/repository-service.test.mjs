@@ -86,6 +86,26 @@ test('loadRepository builds a working tree from local workspace files', async ()
   }
 })
 
+test('getPreview includes file and directory modification timestamps for status metadata', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const filePreview = await service.getPreview(repoPath, 'docs/guide.md')
+    const directoryPreview = await service.getPreview(repoPath, 'docs')
+
+    assert.equal(filePreview.kind, 'file')
+    assert.equal(directoryPreview.kind, 'directory')
+    assert.equal(typeof filePreview.modifiedAt, 'string')
+    assert.equal(typeof directoryPreview.modifiedAt, 'string')
+    assert.ok(!Number.isNaN(Date.parse(filePreview.modifiedAt)))
+    assert.ok(!Number.isNaN(Date.parse(directoryPreview.modifiedAt)))
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('loadRepository builds the workspace tree from local files instead of git visibility', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()

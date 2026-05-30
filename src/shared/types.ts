@@ -71,6 +71,7 @@ export type RepositorySearchResult = {
 export type DirectoryPreview = {
   kind: 'directory'
   path: string
+  modifiedAt: string
   readme?: {
     path: string
     content: string
@@ -94,6 +95,7 @@ export type FilePreview = {
   markdownAssetPaths?: Record<string, string>
   markdownAssetAbsolutePaths?: Record<string, string>
   size: number
+  modifiedAt: string
 }
 
 export type PreviewPayload = DirectoryPreview | FilePreview

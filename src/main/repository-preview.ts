@@ -210,6 +210,7 @@ export async function getPreview(
   if (stats.isDirectory()) {
     const children = relativePath ? (node?.children ?? []) : repository.tree
     const readme = (relativePath ? node?.index : repository.index) ?? findDirectoryIndex(children)
+    const modifiedAt = stats.mtime.toISOString()
 
     if (readme) {
       const content = await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
@@ -221,6 +222,7 @@ export async function getPreview(
       return {
         kind: 'directory',
         path: toPosixPath(relativePath),
+        modifiedAt,
         readme: {
           path: readme.path,
           content,
@@ -240,6 +242,7 @@ export async function getPreview(
     return {
       kind: 'directory',
       path: toPosixPath(relativePath),
+      modifiedAt,
       entries: children.map((entry) => ({
         name: entry.name,
         path: entry.path,
@@ -265,7 +268,8 @@ export async function getPreview(
     extension,
     previewType,
     editable: repository.editable,
-    size
+    size,
+    modifiedAt: stats.mtime.toISOString()
   }
 
   if (previewType === 'image') {

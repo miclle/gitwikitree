@@ -17,6 +17,7 @@
   --code-bg: #f6f8fa;
   --selected: #ddf4ff;
   --top-bar-height: 40px;
+  --status-bar-height: 28px;
   --top-bar-bg: var(--border);
   --top-bar-hover: #bcc6d0;
   --top-bar-hover-strong: #aeb9c4;
@@ -545,7 +546,7 @@ kbd {
   display: grid;
   flex: 1;
   grid-template-columns: 360px 1px minmax(0, 1fr);
-  height: 100vh;
+  height: auto;
   min-height: 0;
   padding: 0;
 }
@@ -1233,6 +1234,63 @@ kbd {
 .preview-search-match.active {
   background: #f7c948;
   box-shadow: 0 0 0 1px rgba(154, 103, 0, 0.32);
+}
+
+.status-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  min-height: var(--status-bar-height);
+  padding: 0 12px;
+  border-top: 1px solid #c8d1da;
+  color: #3f4854;
+  background: #eef2f6;
+  font-size: 12px;
+  line-height: var(--status-bar-height);
+}
+
+.status-bar-group,
+.status-bar-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.status-bar-group {
+  gap: 12px;
+  overflow: hidden;
+}
+
+.status-bar-facts {
+  justify-content: flex-end;
+}
+
+.status-bar-item {
+  flex: 0 0 auto;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.status-bar-item svg {
+  flex: 0 0 auto;
+  color: #59636e;
+}
+
+.status-bar-path,
+.status-bar-fact {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-bar-path {
+  flex: 1 1 auto;
+  color: #1f2328;
+}
+
+.status-bar-fact {
+  flex: 0 1 auto;
 }
 
 .global-search-backdrop {
