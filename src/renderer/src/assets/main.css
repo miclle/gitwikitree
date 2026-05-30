@@ -609,9 +609,9 @@ kbd {
 .branch-picker-popover {
   position: fixed;
   z-index: 20;
-  top: 84px;
+  top: 88px;
   left: 12px;
-  width: min(460px, calc(100vw - 32px));
+  width: min(320px, calc(100vw - 24px));
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;

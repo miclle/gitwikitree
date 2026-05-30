@@ -246,6 +246,16 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
+    /const branchPickerRef = useRef<HTMLDivElement \| null>\(null\)/,
+    'branch picker should keep a wrapper ref for outside-click handling'
+  )
+  assert.match(
+    source,
+    /pointerdown[\s\S]*branchPickerRef\.current\.contains\(event\.target as Node\)[\s\S]*closeBranchPicker/,
+    'clicking outside the branch picker should close the popover'
+  )
+  assert.match(
+    source,
     /onClick=\{\(\) => handleBranchRefSelect\(ref\)\}/,
     'choosing a branch row should route through the branch selection handler'
   )
@@ -273,6 +283,11 @@ test('branch selection opens an action modal with explanatory choices', async ()
     css,
     /\.branch-action-backdrop\s*\{[\s\S]*position:\s*fixed;[\s\S]*place-items:\s*center;/,
     'branch actions should be presented as a centered modal'
+  )
+  assert.match(
+    css,
+    /\.branch-picker-popover\s*\{[\s\S]*top:\s*88px;[\s\S]*width:\s*min\(320px, calc\(100vw - 24px\)\);/,
+    'branch picker popover should be narrower and sit slightly farther below the branch pill'
   )
 })
 

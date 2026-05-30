@@ -67,6 +67,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const previewBodyRef = useRef<HTMLDivElement | null>(null)
+  const branchPickerRef = useRef<HTMLDivElement | null>(null)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMatchCount, setSearchMatchCount] = useState(0)
@@ -176,11 +177,29 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     searchInputRef.current?.select()
   }, [isSearchOpen, searchFocusRequest])
 
-  const closeBranchPicker = (): void => {
+  const closeBranchPicker = useCallback((): void => {
     setIsBranchPickerOpen(false)
     setBranchPickerTab('branches')
     setBranchQuery('')
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!isBranchPickerOpen) return
+
+    const pointerdownEvent = 'pointerdown'
+    const handlePointerDown = (event: PointerEvent): void => {
+      if (!branchPickerRef.current) {
+        closeBranchPicker()
+        return
+      }
+
+      if (branchPickerRef.current.contains(event.target as Node)) return
+      closeBranchPicker()
+    }
+
+    window.addEventListener(pointerdownEvent, handlePointerDown)
+    return () => window.removeEventListener(pointerdownEvent, handlePointerDown)
+  }, [closeBranchPicker, isBranchPickerOpen])
 
   const openBranchActionModal = (refName: string): void => {
     setBranchActionRef(refName)
@@ -306,7 +325,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 </div>
 
                 <div className="sidebar-controls">
-                  <div className="branch-picker">
+                  <div className="branch-picker" ref={branchPickerRef}>
                     <button
                       className="branch-pill"
                       type="button"
