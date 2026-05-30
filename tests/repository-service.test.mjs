@@ -213,6 +213,42 @@ test('loadRepository annotates local refs that already have a worktree', async (
   }
 })
 
+test('loadRepository ignores prunable worktrees with missing folders', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'stale-worktree'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'stale.md'), '# Stale\n')
+    await execFileAsync('git', ['add', 'stale.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add stale worktree file'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    const staleWorktreePath = join(repoPath, '.worktrees', 'stale-worktree')
+    await execFileAsync('git', ['worktree', 'add', staleWorktreePath, 'stale-worktree'], {
+      cwd: repoPath
+    })
+    await rm(staleWorktreePath, { recursive: true, force: true })
+
+    const repository = await service.loadRepository(repoPath)
+    const staleRef = repository.refs.find((ref) => ref.name === 'stale-worktree')
+
+    assert.equal(repository.branch, 'main')
+    assert.equal(staleRef?.worktreePath, undefined)
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('openWorktree reuses an existing worktree when the target branch is already checked out', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()

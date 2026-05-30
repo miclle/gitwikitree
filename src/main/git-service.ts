@@ -11,6 +11,18 @@ export type GitWorktree = {
   branch?: string
 }
 
+async function getExistingRealPath(filePath: string): Promise<string | undefined> {
+  try {
+    return await fs.realpath(filePath)
+  } catch (error) {
+    if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
 export async function assertRepositoryPath(repoPath: string): Promise<string> {
   const resolved = resolve(repoPath)
   const stats = await fs.stat(resolved)
@@ -48,7 +60,8 @@ export async function getWorktrees(repoPath: string): Promise<GitWorktree[]> {
       if (current) {
         worktrees.push(current)
       }
-      current = { path: await fs.realpath(value.slice('worktree '.length)) }
+      const worktreePath = await getExistingRealPath(value.slice('worktree '.length))
+      current = worktreePath ? { path: worktreePath } : undefined
       continue
     }
 
