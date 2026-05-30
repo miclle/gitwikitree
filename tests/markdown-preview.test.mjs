@@ -106,6 +106,63 @@ test('markdownToHtml renders GitHub flavored markdown and highlighted code block
   assert.match(html, /<span class="hljs-keyword">const<\/span>/)
 })
 
+test('markdownToHtml marks Mermaid code fences for diagram rendering', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('```mermaid\ngraph TD\n  A[Start] --> B[Done]\n```')
+
+  assert.equal(
+    html,
+    '<div class="mermaid-preview" data-mermaid-source="true">graph TD\n  A[Start] --&gt; B[Done]</div>\n'
+  )
+})
+
+test('markdownToHtml normalizes state diagrams with display labels in state references', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml(`\`\`\`mermaid
+stateDiagram
+  direction TB
+
+  [*] --> Preparing（准备中）: 准备中
+  Preparing（准备中） --> Booting（开机中）: 导入镜像/准备网络
+  Booting（开机中） --> Running（运行中）: 开机成功
+  Running（运行中） --> Destroyed（已销毁）: 销毁
+  Destroyed（已销毁） --> [*]
+\`\`\``)
+
+  assert.equal(
+    html,
+    '<div class="mermaid-preview" data-mermaid-source="true">stateDiagram\n' +
+      '  direction TB\n' +
+      '  state &quot;Preparing（准备中）&quot; as Preparing\n' +
+      '  state &quot;Booting（开机中）&quot; as Booting\n' +
+      '  state &quot;Running（运行中）&quot; as Running\n' +
+      '  state &quot;Destroyed（已销毁）&quot; as Destroyed\n' +
+      '\n' +
+      '  [*] --&gt; Preparing: 准备中\n' +
+      '  Preparing --&gt; Booting: 导入镜像/准备网络\n' +
+      '  Booting --&gt; Running: 开机成功\n' +
+      '  Running --&gt; Destroyed: 销毁\n' +
+      '  Destroyed --&gt; [*]</div>\n'
+  )
+})
+
+test('markdownToHtml preserves existing state declarations and transition labels', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml(`\`\`\`mermaid
+stateDiagram
+  state "Running（运行中）" as Running
+  Running --> Shutdown（已关机）: 从 Running（运行中）关机
+\`\`\``)
+
+  assert.equal(
+    html,
+    '<div class="mermaid-preview" data-mermaid-source="true">stateDiagram\n' +
+      '  state &quot;Shutdown（已关机）&quot; as Shutdown\n' +
+      '  state &quot;Running（运行中）&quot; as Running\n' +
+      '  Running --&gt; Shutdown: 从 Running（运行中）关机</div>\n'
+  )
+})
+
 test('markdownHeadingId preserves non-Latin heading text', async () => {
   const { markdownHeadingId } = await loadMarkdownPreview()
 

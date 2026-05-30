@@ -7,6 +7,7 @@ export function detectPreviewType(extension: string, sample?: Buffer): PreviewTy
   if (['.html', '.htm'].includes(extension)) return 'html'
   if (extension === '.svg') return 'svg'
   if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico'].includes(extension)) return 'image'
+  if (extension === '.pdf') return 'pdf'
   if (
     [
       '.txt',

@@ -32,7 +32,9 @@
     "github-markdown-css": "^5.9.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.16.0",
-    "marked": "^18.0.4"
+    "marked": "^18.0.4",
+    "mermaid": "^11.15.0",
+    "pdfjs-dist": "^5.7.284"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

@@ -1708,6 +1708,22 @@ kbd {
   color: #cf222e;
 }
 
+.mermaid-preview {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.mermaid-preview svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .code-preview-shell {
   display: grid;
   grid-template-columns: minmax(56px, max-content) max-content;
@@ -1784,6 +1800,63 @@ kbd {
   min-height: 540px;
   border: 0;
   background: #ffffff;
+}
+
+.pdf-preview {
+  position: relative;
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  background: #f6f8fa;
+}
+
+.pdf-preview-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 260px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pdf-preview-state strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pdf-preview-pages {
+  display: grid;
+  justify-content: center;
+  align-content: start;
+  gap: 18px;
+  overflow: auto;
+  padding: 24px;
+}
+
+.pdf-preview-page {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.pdf-preview-page.pending {
+  min-height: min(78vh, 820px);
+}
+
+.pdf-preview-page-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pdf-preview-page canvas {
+  max-width: 100%;
+  height: auto;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.16);
 }
 
 .image-preview {

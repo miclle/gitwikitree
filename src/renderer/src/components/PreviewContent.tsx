@@ -19,6 +19,7 @@ import { createMarkdownLinkTarget } from '../markdown-link-context'
 import { isPrimaryClick, shouldHandleNavigationClick } from '../mouse-events'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
 import { applyPreviewSearchHighlights } from '../preview-search'
+import { pdfDataUrlToBytes } from '../pdf-preview'
 import {
   clampPreviewImagePan,
   collectPreviewImages,
@@ -30,6 +31,12 @@ import {
   type PreviewImagePan
 } from '../preview-images'
 import type { MarkdownLinkContext, PreviewPayload } from '../../../shared/types'
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
+
+let isMermaidInitialized = false
+let mermaidDiagramId = 0
+const renderingMermaidDiagrams = new WeakSet<HTMLElement>()
 
 function sanitizeMarkdownHtml(html: string): string {
   return DOMPurify.sanitize(html, {
@@ -37,10 +44,70 @@ function sanitizeMarkdownHtml(html: string): string {
       'data-copy-code',
       'data-markdown-link',
       'data-preview-image-src',
-      'data-preview-image-absolute-src'
+      'data-preview-image-absolute-src',
+      'data-mermaid-source'
     ],
     ALLOW_DATA_ATTR: true
   })
+}
+
+async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
+  const diagrams = Array.from(
+    container.querySelectorAll<HTMLElement>('.mermaid-preview[data-mermaid-source="true"]')
+  ).filter(
+    (diagram) =>
+      !diagram.hasAttribute('data-mermaid-rendered') && !renderingMermaidDiagrams.has(diagram)
+  )
+  if (diagrams.length === 0) return
+
+  for (const diagram of diagrams) {
+    renderingMermaidDiagrams.add(diagram)
+    diagram.setAttribute('data-mermaid-rendering', 'true')
+  }
+
+  try {
+    const { default: mermaid } = await import('mermaid')
+
+    if (!isMermaidInitialized) {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'default'
+      })
+      isMermaidInitialized = true
+    }
+
+    await Promise.all(
+      diagrams.map(async (diagram) => {
+        const source = diagram.textContent?.trim()
+        if (!source) return
+
+        const diagramId = `mermaid-preview-${(mermaidDiagramId += 1)}`
+
+        try {
+          const { svg, bindFunctions } = await mermaid.render(diagramId, source)
+          if (!diagram.isConnected) return
+
+          diagram.innerHTML = svg
+          diagram.setAttribute('data-mermaid-rendered', 'true')
+          diagram.removeAttribute('data-mermaid-error')
+          diagram.removeAttribute('title')
+          bindFunctions?.(diagram)
+        } catch (error) {
+          if (!diagram.isConnected) return
+
+          diagram.setAttribute('data-mermaid-error', 'true')
+          diagram.title =
+            error instanceof Error ? error.message : 'Unable to render Mermaid diagram'
+        }
+      })
+    )
+  } finally {
+    for (const diagram of diagrams) {
+      renderingMermaidDiagrams.delete(diagram)
+      diagram.removeAttribute('data-mermaid-rendering')
+    }
+  }
 }
 
 function renderMarkdownHtml(
@@ -81,6 +148,171 @@ function CodePreview({
           dangerouslySetInnerHTML={{ __html: highlightCodeBlock(content, language) || ' ' }}
         />
       </pre>
+    </div>
+  )
+}
+
+type PdfPreviewStatus = 'loading' | 'ready' | 'error'
+
+function createPdfPreviewPage(pageNumber: number): HTMLElement {
+  const pageElement = document.createElement('section')
+  const pageLabel = document.createElement('div')
+
+  pageElement.className = 'pdf-preview-page pending'
+  pageElement.setAttribute('aria-label', `Page ${pageNumber}`)
+  pageElement.dataset.pageNumber = String(pageNumber)
+  pageLabel.className = 'pdf-preview-page-label'
+  pageLabel.textContent = `Page ${pageNumber}`
+  pageElement.append(pageLabel)
+
+  return pageElement
+}
+
+function appendRenderedPdfPage(pageElement: HTMLElement, page: PDFPageProxy): RenderTask {
+  const viewport = page.getViewport({ scale: 1.25 })
+  const outputScale = window.devicePixelRatio || 1
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+
+  if (!context) throw new Error('Canvas rendering is unavailable')
+
+  canvas.width = Math.floor(viewport.width * outputScale)
+  canvas.height = Math.floor(viewport.height * outputScale)
+  canvas.style.width = `${viewport.width}px`
+  context.setTransform(outputScale, 0, 0, outputScale, 0, 0)
+  pageElement.append(canvas)
+  pageElement.classList.remove('pending')
+
+  return page.render({ canvas, canvasContext: context, viewport })
+}
+
+function PdfPreview({
+  dataUrl,
+  name,
+  rootRef,
+  onPageCountChange
+}: {
+  dataUrl: string
+  name: string
+  rootRef: (element: HTMLElement | null) => void
+  onPageCountChange: (count: number | undefined) => void
+}): React.JSX.Element {
+  const pagesRef = useRef<HTMLDivElement | null>(null)
+  const [status, setStatus] = useState<PdfPreviewStatus>('loading')
+  const setPdfPreviewRoot = (element: HTMLDivElement | null): void => {
+    pagesRef.current = element?.querySelector<HTMLDivElement>('.pdf-preview-pages') ?? null
+    rootRef(element)
+  }
+
+  useEffect(() => {
+    const pagesContainer = pagesRef.current
+    if (!pagesContainer) return
+
+    let isCancelled = false
+    const renderTasks: RenderTask[] = []
+    let loadingTask:
+      | { promise: Promise<PDFDocumentProxy>; destroy: () => Promise<void> }
+      | undefined
+    let pageObserver: IntersectionObserver | undefined
+    pagesContainer.replaceChildren()
+    setStatus('loading')
+    onPageCountChange(undefined)
+
+    const renderPdf = async (): Promise<void> => {
+      try {
+        const pdfjs = await import('pdfjs-dist')
+        if (isCancelled) return
+
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+        const bytes = pdfDataUrlToBytes(dataUrl)
+        loadingTask = pdfjs.getDocument({ data: bytes })
+        const pdf = await loadingTask.promise
+        if (isCancelled) return
+
+        onPageCountChange(pdf.numPages)
+
+        const renderedPages = new Set<number>()
+        const renderPage = async (pageNumber: number, pageElement: HTMLElement): Promise<void> => {
+          if (isCancelled || renderedPages.has(pageNumber)) return
+
+          renderedPages.add(pageNumber)
+          const page = await pdf.getPage(pageNumber)
+          if (isCancelled) return
+
+          const renderTask = appendRenderedPdfPage(pageElement, page)
+          renderTasks.push(renderTask)
+          await renderTask.promise
+          if (!isCancelled && pageNumber === 1) setStatus('ready')
+        }
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          if (isCancelled) return
+
+          const pageElement = createPdfPreviewPage(pageNumber)
+          pagesContainer.append(pageElement)
+
+          if (pageNumber === 1) {
+            await renderPage(pageNumber, pageElement)
+          }
+        }
+
+        if (isCancelled) return
+
+        pageObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) continue
+
+              const pageNumber = Number(entry.target.dataset.pageNumber)
+              pageObserver?.unobserve(entry.target)
+              void renderPage(pageNumber, entry.target)
+            }
+          },
+          { root: pagesContainer, rootMargin: '900px 0px' }
+        )
+
+        for (const pageElement of pagesContainer.querySelectorAll<HTMLElement>(
+          '.pdf-preview-page.pending'
+        )) {
+          pageObserver.observe(pageElement)
+        }
+      } catch {
+        if (!isCancelled) {
+          pagesContainer.replaceChildren()
+          onPageCountChange(undefined)
+          setStatus('error')
+        }
+      }
+    }
+
+    void renderPdf()
+
+    return () => {
+      isCancelled = true
+      for (const renderTask of renderTasks) {
+        renderTask.cancel()
+      }
+      pageObserver?.disconnect()
+      void loadingTask?.destroy()
+    }
+  }, [dataUrl, onPageCountChange])
+
+  return (
+    <div ref={setPdfPreviewRoot} className="pdf-preview" aria-label={`PDF preview: ${name}`}>
+      {status === 'loading' && (
+        <div className="pdf-preview-state">
+          <FileText size={32} />
+          <strong>Loading PDF</strong>
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="pdf-preview-state">
+          <FileText size={32} />
+          <strong>Preview unavailable</strong>
+          <span>This PDF could not be rendered.</span>
+        </div>
+      )}
+      <div className="pdf-preview-pages" />
     </div>
   )
 }
@@ -291,6 +523,7 @@ export function PreviewContent({
   searchQuery,
   activeSearchIndex,
   onSearchMatchCountChange,
+  onPdfPageCountChange,
   onSelectPath,
   onOpenMarkdownLinkContextMenu,
   onMarkdownAnchorHandled
@@ -300,6 +533,7 @@ export function PreviewContent({
   searchQuery: string
   activeSearchIndex: number
   onSearchMatchCountChange: (count: number) => void
+  onPdfPageCountChange: (count: number | undefined) => void
   onSelectPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
   onOpenMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   onMarkdownAnchorHandled: (token: number) => void
@@ -318,6 +552,10 @@ export function PreviewContent({
   const setMarkdownPreviewRoot = (element: HTMLElement | null): void => {
     markdownBodyRef.current = element
     previewSearchRootRef.current = element
+
+    if (element) {
+      void renderMermaidDiagrams(element)
+    }
   }
   const setHtmlPreviewRoot = (element: HTMLIFrameElement | null): void => {
     previewSearchRootRef.current = element?.contentDocument?.body ?? null
@@ -409,6 +647,20 @@ export function PreviewContent({
     scrollToMarkdownAnchor(pendingAnchor.hash, markdownBodyRef.current)
     onMarkdownAnchorHandled(pendingAnchor.token)
   }, [onMarkdownAnchorHandled, pendingAnchor, preview.path])
+
+  useEffect(() => {
+    const container = markdownBodyRef.current
+    if (!container) return
+
+    let isCancelled = false
+    void renderMermaidDiagrams(container).then(() => {
+      if (!isCancelled) setSearchRootVersion((version) => version + 1)
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [preview])
 
   useEffect(() => {
     const container = previewSearchRootRef.current
@@ -636,6 +888,17 @@ export function PreviewContent({
           setHtmlPreviewRoot(event.currentTarget)
           setSearchRootVersion((version) => version + 1)
         }}
+      />
+    )
+  }
+
+  if (preview.previewType === 'pdf' && preview.dataUrl) {
+    return withImageLightbox(
+      <PdfPreview
+        dataUrl={preview.dataUrl}
+        name={preview.name}
+        rootRef={setPreviewSearchRoot}
+        onPageCountChange={onPdfPageCountChange}
       />
     )
   }

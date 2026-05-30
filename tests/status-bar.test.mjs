@@ -75,6 +75,32 @@ test('getStatusBarFileFacts summarizes directories and non-text files without fa
   }
 })
 
+test('getStatusBarFileFacts includes rendered PDF page count when available', async () => {
+  const { module, tempDir } = await loadStatusBar()
+
+  try {
+    assert.deepEqual(
+      module.getStatusBarFileFacts(
+        {
+          kind: 'file',
+          path: 'assets/spec.pdf',
+          name: 'spec.pdf',
+          extension: '.pdf',
+          previewType: 'pdf',
+          editable: false,
+          dataUrl: 'data:application/pdf;base64,AA==',
+          size: 4096,
+          modifiedAt: '2026-05-30T08:00:00.000Z'
+        },
+        { pdfPageCount: 25 }
+      ),
+      ['25 pages', '4 KB', 'Modified May 30, 2026, 16:00']
+    )
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('getStatusBarPath points at the rendered directory index file when one is shown', async () => {
   const { module, tempDir } = await loadStatusBar()
 

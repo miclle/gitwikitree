@@ -30,3 +30,9 @@ test('detectPreviewType keeps binary-looking unknown content unsupported', async
 
   assert.equal(detectPreviewType('.bin', Buffer.from([0x89, 0x00, 0xff, 0x10])), 'unsupported')
 })
+
+test('detectPreviewType treats PDF files as PDF previews', async () => {
+  const { detectPreviewType } = await loadPreviewDetection()
+
+  assert.equal(detectPreviewType('.pdf'), 'pdf')
+})

@@ -146,6 +146,11 @@ function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
 
   renderer.code = function ({ text, lang }: Tokens.Code): string {
     const language = lang?.match(/^\S+/)?.[0]
+
+    if (language?.toLowerCase() === 'mermaid') {
+      return `<div class="mermaid-preview" data-mermaid-source="true">${escapeHtml(normalizeMermaidSource(text))}</div>\n`
+    }
+
     return `<div class="markdown-code-block"><button type="button" class="markdown-code-copy" data-copy-code="true" aria-label="Copy code" title="Copy code">Copy</button><pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlightCodeBlock(
       text,
       language
@@ -153,6 +158,74 @@ function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
   }
 
   return renderer
+}
+
+function normalizeMermaidSource(source: string): string {
+  const trimmedStart = source.trimStart()
+
+  if (!trimmedStart.startsWith('stateDiagram')) return source
+
+  return normalizeMermaidStateDiagramSource(source)
+}
+
+function normalizeMermaidStateDiagramSource(source: string): string {
+  const stateLabels = new Map<string, string>()
+  const lines = source.split('\n')
+  const declaredStateIds = new Set(
+    lines
+      .map((line) => line.match(/^\s*state\s+"[^"]+"\s+as\s+([A-Za-z_][A-Za-z0-9_-]*)\s*$/)?.[1])
+      .filter((stateId): stateId is string => stateId !== undefined)
+  )
+  const stateEndpointPattern = String.raw`\[\*\]|[A-Za-z_][A-Za-z0-9_-]*(?:（[^）\n]+）)?`
+  const transitionPattern = new RegExp(
+    `(${stateEndpointPattern})(\\s*-->\\s*)(${stateEndpointPattern})`
+  )
+  const normalizedLines = lines.map((line) =>
+    line.replace(
+      transitionPattern,
+      (_match: string, sourceState: string, arrow: string, targetState: string) =>
+        `${normalizeMermaidStateEndpoint(sourceState, stateLabels, declaredStateIds)}${arrow}${normalizeMermaidStateEndpoint(targetState, stateLabels, declaredStateIds)}`
+    )
+  )
+
+  if (stateLabels.size === 0) return source
+
+  const insertIndex = getMermaidStateDeclarationInsertIndex(normalizedLines)
+  const declarations = [...stateLabels]
+    .map(([stateId, label]) => `  state "${label}" as ${stateId}`)
+    .join('\n')
+
+  return [
+    ...normalizedLines.slice(0, insertIndex),
+    declarations,
+    ...normalizedLines.slice(insertIndex)
+  ].join('\n')
+}
+
+function normalizeMermaidStateEndpoint(
+  state: string,
+  stateLabels: Map<string, string>,
+  declaredStateIds: Set<string>
+): string {
+  const match = state.match(/^([A-Za-z_][A-Za-z0-9_-]*)(（[^）\n]+）)$/)
+  if (!match) return state
+
+  const [, stateId, labelSuffix] = match
+  if (!declaredStateIds.has(stateId)) {
+    stateLabels.set(stateId, `${stateId}${labelSuffix}`)
+  }
+
+  return stateId
+}
+
+function getMermaidStateDeclarationInsertIndex(lines: string[]): number {
+  let insertIndex = 1
+
+  while (/^\s*direction\s+\S+\s*$/.test(lines[insertIndex] ?? '')) {
+    insertIndex += 1
+  }
+
+  return insertIndex
 }
 
 export function markdownToHtml(markdown: string, options: MarkdownRenderOptions = {}): string {

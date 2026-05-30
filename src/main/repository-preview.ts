@@ -31,6 +31,8 @@ function mimeForExtension(extension: string): string {
       return 'image/x-icon'
     case '.svg':
       return 'image/svg+xml'
+    case '.pdf':
+      return 'application/pdf'
     default:
       return 'application/octet-stream'
   }
@@ -284,6 +286,14 @@ export async function getPreview(
     return {
       ...payload,
       content: await fs.readFile(target, 'utf8')
+    }
+  }
+
+  if (previewType === 'pdf') {
+    const buffer = await fs.readFile(target)
+    return {
+      ...payload,
+      dataUrl: `data:${mimeForExtension(extension)};base64,${buffer.toString('base64')}`
     }
   }
 

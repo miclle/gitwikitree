@@ -75,6 +75,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
+  const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
   const [isBranchPickerOpen, setIsBranchPickerOpen] = useState(false)
   const [branchPickerTab, setBranchPickerTab] = useState<'branches' | 'remotes'>('branches')
   const [branchQuery, setBranchQuery] = useState('')
@@ -96,6 +97,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const remoteRefs = visibleRefs.filter((ref) => ref.type === 'remote')
   const displayedBranchRefs = branchPickerTab === 'branches' ? localRefs : remoteRefs
   const appliedSearchQuery = isSearchOpen ? searchQuery : ''
+  const activePdfPath =
+    preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
+  const activePdfPageCount =
+    pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
   const openPreviewSearch = useCallback(() => {
     const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
     if (selectedText) {
@@ -130,6 +135,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       return Math.min(currentIndex, count - 1)
     })
   }, [])
+  const handlePdfPageCountChange = useCallback(
+    (count: number | undefined): void => {
+      if (!activePdfPath) return
+      setPdfPageCount({ path: activePdfPath, count })
+    },
+    [activePdfPath]
+  )
   const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
     void openBreadcrumbContextMenu(path)
@@ -631,6 +643,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     searchQuery={appliedSearchQuery}
                     activeSearchIndex={activeSearchIndex}
                     onSearchMatchCountChange={handleSearchMatchCountChange}
+                    onPdfPageCountChange={handlePdfPageCountChange}
                     onSelectPath={selectPreviewPath}
                     onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
                     onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
@@ -715,7 +728,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               }}
             />
           </section>
-          <StatusBar repository={repository} preview={preview} />
+          <StatusBar repository={repository} preview={preview} pdfPageCount={activePdfPageCount} />
         </>
       )}
     </main>

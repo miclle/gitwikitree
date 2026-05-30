@@ -361,6 +361,139 @@ test('html previews register their iframe body as searchable content', async () 
   )
 })
 
+test('Mermaid previews render diagrams directly without stale processed markers', async () => {
+  const source = await readPreviewContent()
+
+  assert.match(
+    source,
+    /await mermaid\.render\(diagramId, source\)/,
+    'Mermaid previews should render each diagram directly to SVG'
+  )
+  assert.doesNotMatch(
+    source,
+    /mermaid\.run\(/,
+    'Mermaid previews should not use run because it marks nodes processed before SVG replacement'
+  )
+  assert.match(
+    source,
+    /const setMarkdownPreviewRoot = \(element: HTMLElement \| null\): void => \{[\s\S]*void renderMermaidDiagrams\(element\)/,
+    'Mermaid rendering should be requested as soon as the markdown root is attached'
+  )
+})
+
+test('PDF previews render in-app without Electron PDF viewer frames', async () => {
+  const source = await readPreviewContent()
+
+  assert.match(
+    source,
+    /<PdfPreview[\s\S]*dataUrl=\{preview\.dataUrl\}/,
+    'PDF previews should render through the app-owned PDF preview component'
+  )
+  assert.doesNotMatch(
+    source,
+    /preview\.previewType === 'pdf'[\s\S]*<iframe/,
+    'PDF previews should avoid iframe-based Electron PDF viewer loading'
+  )
+})
+
+test('PDF preview canvas keeps page aspect ratio when constrained', async () => {
+  const source = await readPreviewContent()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /canvas\.style\.width = `\$\{viewport\.width\}px`/,
+    'PDF pages should keep their intended display width before CSS constrains them'
+  )
+  assert.doesNotMatch(
+    source,
+    /canvas\.style\.height = `\$\{viewport\.height\}px`/,
+    'PDF pages should not pin CSS height because max-width constraints would distort wide pages'
+  )
+  assert.match(
+    css,
+    /\.pdf-preview-page canvas\s*\{[\s\S]*?max-width:\s*100%;[\s\S]*?height:\s*auto;/,
+    'PDF page canvases should shrink proportionally when wider than the preview panel'
+  )
+})
+
+test('PDF preview lazily renders pages near the visible viewport', async () => {
+  const source = await readPreviewContent()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /new IntersectionObserver\(/,
+    'PDF preview should use an observer to render pages only as they approach the viewport'
+  )
+  assert.match(
+    source,
+    /if \(pageNumber === 1\) \{[\s\S]*await renderPage\(pageNumber, pageElement\)/,
+    'PDF preview should still render the first page immediately'
+  )
+  assert.doesNotMatch(
+    source,
+    /for \(let pageNumber = 1; pageNumber <= pdf\.numPages; pageNumber \+= 1\)[\s\S]*await renderTask\.promise[\s\S]*\}/,
+    'PDF preview should not synchronously render every page in the document'
+  )
+  assert.match(
+    css,
+    /\.pdf-preview-page\.pending\s*\{[\s\S]*?min-height:/,
+    'PDF page placeholders should reserve scroll space before their canvases are rendered'
+  )
+})
+
+test('PDF loading state clears after the first page renders', async () => {
+  const source = await readPreviewContent()
+
+  assert.match(
+    source,
+    /await renderTask\.promise[\s\S]*if \(!isCancelled && pageNumber === 1\) setStatus\('ready'\)/,
+    'PDF loading state should disappear as soon as the first page is visible'
+  )
+  assert.doesNotMatch(
+    source,
+    /if \(!isCancelled\) setStatus\('ready'\)/,
+    'PDF loading state should not wait for every page to finish rendering'
+  )
+})
+
+test('PDF preview reports page count to the status bar instead of overlaying it', async () => {
+  const previewSource = await readPreviewContent()
+  const workspaceSource = await readWorkspaceView()
+  const statusBarSource = await readFile(
+    new URL('../src/renderer/src/components/StatusBar.tsx', import.meta.url),
+    'utf8'
+  )
+  const css = await readMainCss()
+
+  assert.match(
+    previewSource,
+    /onPageCountChange\(pdf\.numPages\)/,
+    'PDF preview should report the parsed total page count'
+  )
+  assert.match(
+    workspaceSource,
+    /<StatusBar repository=\{repository\} preview=\{preview\} pdfPageCount=\{activePdfPageCount\} \/>/,
+    'Workspace should pass PDF page count to the status bar'
+  )
+  assert.match(
+    statusBarSource,
+    /getStatusBarFileFacts\(preview, \{ pdfPageCount \}\)/,
+    'Status bar should include PDF page count in file facts'
+  )
+  assert.doesNotMatch(
+    previewSource,
+    /pdf-preview-count/,
+    'PDF preview should not render a page count overlay in the preview surface'
+  )
+  assert.doesNotMatch(
+    css,
+    /\.pdf-preview-count/,
+    'PDF preview should not reserve CSS for an overlay page count'
+  )
+})
+
 test('image preview lightbox supports click, keyboard, and adjacent image navigation', async () => {
   const source = await readPreviewContent()
   const css = await readMainCss()

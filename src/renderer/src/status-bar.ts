@@ -20,7 +20,14 @@ export function getStatusBarWorkspaceLabel(repository: RepositoryPayload): strin
   return repository.source === 'worktree' ? 'Worktree' : 'Working tree'
 }
 
-export function getStatusBarFileFacts(preview: PreviewPayload): string[] {
+type StatusBarFileFactsOptions = {
+  pdfPageCount?: number
+}
+
+export function getStatusBarFileFacts(
+  preview: PreviewPayload,
+  options: StatusBarFileFactsOptions = {}
+): string[] {
   const facts: string[] = []
 
   if (preview.kind === 'directory') {
@@ -33,6 +40,10 @@ export function getStatusBarFileFacts(preview: PreviewPayload): string[] {
       const lineCount = countLines(preview.content)
       facts.push(`${wordCount} ${wordCount === 1 ? 'word' : 'words'}`)
       facts.push(`${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`)
+    }
+
+    if (preview.previewType === 'pdf' && options.pdfPageCount !== undefined) {
+      facts.push(`${options.pdfPageCount} ${options.pdfPageCount === 1 ? 'page' : 'pages'}`)
     }
 
     facts.push(formatFileSize(preview.size))

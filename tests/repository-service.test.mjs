@@ -497,6 +497,25 @@ test('getPreview includes data URLs for markdown image assets', async () => {
   }
 })
 
+test('getPreview includes data URLs for PDF files', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const pdfBytes = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n')
+    await writeFile(join(repoPath, 'docs', 'guide.pdf'), pdfBytes)
+
+    const preview = await service.getPreview(repoPath, 'docs/guide.pdf')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.previewType, 'pdf')
+    assert.equal(preview.dataUrl, `data:application/pdf;base64,${pdfBytes.toString('base64')}`)
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('getPreview reads markdown assets from the local workspace', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()

@@ -1,6 +1,6 @@
 export type RepositorySource = 'working-tree' | 'worktree'
 
-export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'text' | 'unsupported'
+export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'pdf' | 'text' | 'unsupported'
 
 export type TreeNode = {
   name: string

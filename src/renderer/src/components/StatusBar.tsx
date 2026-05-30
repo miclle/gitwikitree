@@ -5,13 +5,15 @@ import type { PreviewPayload, RepositoryPayload } from '../../../shared/types'
 
 export function StatusBar({
   repository,
-  preview
+  preview,
+  pdfPageCount
 }: {
   repository: RepositoryPayload
   preview: PreviewPayload | undefined
+  pdfPageCount?: number
 }): React.JSX.Element {
   const activePath = preview ? getStatusBarPath(repository, preview) : repository.path
-  const facts = preview ? getStatusBarFileFacts(preview) : []
+  const facts = preview ? getStatusBarFileFacts(preview, { pdfPageCount }) : []
 
   return (
     <footer className="status-bar" aria-label="Workspace status">
