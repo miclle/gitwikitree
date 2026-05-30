@@ -720,6 +720,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               )}
             </section>
             <GlobalSearchModal
+              key={`${repository.path}:${repository.rootPath ?? ''}:${repository.source}:${repository.activeRef}`}
               open={isGlobalSearchOpen}
               repository={repository}
               onOpenChange={setIsGlobalSearchOpen}

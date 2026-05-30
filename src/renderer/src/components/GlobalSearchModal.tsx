@@ -58,11 +58,6 @@ export function GlobalSearchModal({
     if (!open) return
 
     requestAnimationFrame(() => {
-      setQuery('')
-      setResults([])
-      setSelectedIndex(0)
-      setIsSearching(false)
-      setError(undefined)
       inputRef.current?.focus()
     })
   }, [open])

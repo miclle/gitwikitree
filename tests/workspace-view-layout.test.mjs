@@ -225,6 +225,16 @@ test('global repository search is available from the sidebar and keyboard shortc
   )
 })
 
+test('global repository search resets when the active branch changes', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /<GlobalSearchModal[\s\S]*key=\{`[^`]*\$\{repository\.activeRef\}[^`]*`\}/,
+    'global search state should reset when the same workspace switches branches'
+  )
+})
+
 test('global repository search opens reveal the selected file in the tree', async () => {
   const source = await readRepositoryWorkspaceHook()
 

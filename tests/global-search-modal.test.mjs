@@ -59,6 +59,22 @@ test('global search modal debounces repository searches through a named delay', 
   )
 })
 
+test('global search modal preserves query and results when reopened', async () => {
+  const source = await readGlobalSearchModal()
+  const openEffectMatch = source.match(
+    /useEffect\(\(\) => \{[\s\S]*?if \(!open\) return[\s\S]*?\}, \[open\]\)/
+  )
+
+  assert.ok(openEffectMatch, 'modal should keep an open effect for focusing the search input')
+  assert.doesNotMatch(openEffectMatch[0], /setQuery\(''\)/)
+  assert.doesNotMatch(openEffectMatch[0], /setResults\(\[\]\)/)
+  assert.match(
+    openEffectMatch[0],
+    /inputRef\.current\?\.focus\(\)/,
+    'reopening the modal should still focus the existing search input'
+  )
+})
+
 test('global search close button is pinned to the modal top right', async () => {
   const css = await readMainCss()
 
