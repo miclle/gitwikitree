@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { Code2, Columns2, Eye, Loader2, Pencil, Plus, Settings } from 'lucide-react'
@@ -15,9 +15,9 @@ import { TreeRow } from './TreeRow'
 import { HistoryButtons, TitlebarWindowControls } from './WindowControls'
 import { useFileViewMode } from '../hooks/useFileViewMode'
 import { usePreviewSearchControls } from '../hooks/usePreviewSearchControls'
+import { usePreviewStatusMetadata } from '../hooks/usePreviewStatusMetadata'
 import { useSplitEditorResize } from '../hooks/useSplitEditorResize'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
-import type { EditorStatusBarState } from '../status-bar'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const { t } = useTranslation()
@@ -91,12 +91,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     stepSearchMatch,
     handleSearchMatchCountChange
   } = usePreviewSearchControls()
-  const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
-  const [editorStatus, setEditorStatus] = useState<EditorStatusBarState | undefined>()
-  const activePdfPath =
-    preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
-  const activePdfPageCount =
-    pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
   const {
     editablePreviewTarget,
     effectiveFileViewMode,
@@ -121,23 +115,17 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     handleSplitResizerPointerDown,
     handleSplitResizerKeyDown
   } = useSplitEditorResize(effectiveFileViewMode === 'split')
-  const editorStatusWithFileMetadata =
-    editorStatus && editablePreviewTarget
-      ? {
-          ...editorStatus,
-          encoding: editablePreviewTarget.encoding ?? editorStatus.encoding,
-          modifiedAt: editablePreviewTarget.modifiedAt,
-          lastChange: editablePreviewTarget.lastChange
-        }
-      : editorStatus
-  const handlePdfPageCountChange = useCallback(
-    (count: number | undefined): void => {
-      if (!activePdfPath) return
-      setPdfPageCount({ path: activePdfPath, count })
-    },
-    [activePdfPath]
-  )
-  const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
+  const {
+    activePdfPageCount,
+    editorStatusForStatusBar,
+    setEditorStatus,
+    handlePdfPageCountChange
+  } = usePreviewStatusMetadata({
+    preview,
+    editablePreviewTarget,
+    showsEditor
+  })
+  const showBreadcrumbContextMenu = (event: MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
     void openBreadcrumbContextMenu(path)
   }
@@ -443,7 +431,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             repository={repository}
             preview={preview}
             pdfPageCount={activePdfPageCount}
-            editorStatus={showsEditor ? editorStatusWithFileMetadata : undefined}
+            editorStatus={editorStatusForStatusBar}
             language={settings.language}
           />
         </>

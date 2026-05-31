@@ -89,6 +89,13 @@ async function readFileViewModeHook() {
   return readFile(new URL('../src/renderer/src/hooks/useFileViewMode.ts', import.meta.url), 'utf8')
 }
 
+async function readPreviewStatusMetadataHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/usePreviewStatusMetadata.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
@@ -1049,6 +1056,7 @@ test('PDF loading state clears after the first page renders', async () => {
 test('PDF preview reports page count to the status bar instead of overlaying it', async () => {
   const previewSource = await readPdfPreview()
   const workspaceSource = await readWorkspaceView()
+  const previewStatusMetadataHook = await readPreviewStatusMetadataHook()
   const statusBarSource = await readFile(
     new URL('../src/renderer/src/components/StatusBar.tsx', import.meta.url),
     'utf8'
@@ -1064,6 +1072,11 @@ test('PDF preview reports page count to the status bar instead of overlaying it'
     workspaceSource,
     /<StatusBar[\s\S]*repository=\{repository\}[\s\S]*preview=\{preview\}[\s\S]*pdfPageCount=\{activePdfPageCount\}/,
     'Workspace should pass PDF page count to the status bar'
+  )
+  assert.match(
+    previewStatusMetadataHook,
+    /activePdfPageCount[\s\S]*pdfPageCount && pdfPageCount\.path === activePdfPath/,
+    'preview status metadata should scope cached PDF page count to the active PDF path'
   )
   assert.match(
     statusBarSource,
@@ -1338,6 +1351,7 @@ test('saving an edited file refreshes Git status decorations', async () => {
 
 test('editing mode routes editor state into the status bar', async () => {
   const workspaceSource = await readWorkspaceView()
+  const previewStatusMetadataHook = await readPreviewStatusMetadataHook()
   const fileEditorSource = await readFileEditor()
   const statusBarSource = await readFile(
     new URL('../src/renderer/src/components/StatusBar.tsx', import.meta.url),
@@ -1355,9 +1369,9 @@ test('editing mode routes editor state into the status bar', async () => {
     'FileEditor should observe CodeMirror updates for status bar changes'
   )
   assert.match(
-    workspaceSource,
+    previewStatusMetadataHook,
     /const \[editorStatus, setEditorStatus\]/,
-    'Workspace should keep the latest editor status while editing'
+    'preview status metadata should keep the latest editor status while editing'
   )
   assert.match(
     workspaceSource,
@@ -1381,13 +1395,18 @@ test('editing mode routes editor state into the status bar', async () => {
   )
   assert.match(
     workspaceSource,
-    /editorStatus=\{showsEditor \? editorStatusWithFileMetadata : undefined\}/,
+    /editorStatus=\{editorStatusForStatusBar\}/,
     'StatusBar should switch to editor facts only when the editor pane is visible'
   )
   assert.match(
-    workspaceSource,
+    previewStatusMetadataHook,
     /const editorStatusWithFileMetadata =[\s\S]*modifiedAt: editablePreviewTarget\.modifiedAt/,
-    'Workspace should keep editor status metadata in sync with the latest preview after saving'
+    'preview status metadata should stay in sync with the latest preview after saving'
+  )
+  assert.match(
+    previewStatusMetadataHook,
+    /const editorStatusForStatusBar = showsEditor \? editorStatusWithFileMetadata : undefined/,
+    'preview status metadata should expose editor facts only when the editor pane is visible'
   )
   assert.match(
     statusBarSource,
