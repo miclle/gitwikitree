@@ -14,6 +14,13 @@ async function readWorkspaceHook() {
   )
 }
 
+async function readLaunchIntentsHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useRepositoryLaunchIntents.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 test('preload caches an initial tree item open event before React subscribes', async () => {
   const source = await readPreload()
 
@@ -30,10 +37,16 @@ test('preload caches an initial tree item open event before React subscribes', a
 })
 
 test('workspace registers launch listeners before restoring session', async () => {
-  const source = await readWorkspaceHook()
+  const workspaceSource = await readWorkspaceHook()
+  const source = await readLaunchIntentsHook()
   const listenerIndex = source.indexOf('window.api.onOpenTreeItem((item)')
   const restoreIndex = source.indexOf('window.api.getSession().then')
 
+  assert.match(
+    workspaceSource,
+    /useRepositoryLaunchIntents\(\{[\s\S]*loadRepositoryPath,[\s\S]*openFilePath,[\s\S]*openTreeItem,[\s\S]*openRepository,[\s\S]*loadRepositoryWithSession/,
+    'workspace should delegate launch intent and session restore wiring to a focused hook'
+  )
   assert.notEqual(listenerIndex, -1, 'workspace should listen for tree item open intents')
   assert.notEqual(restoreIndex, -1, 'workspace should restore persisted session state')
   assert.ok(

@@ -8,6 +8,7 @@ import {
 } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
 import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
+import { useRepositoryLaunchIntents } from './useRepositoryLaunchIntents'
 import { useRepositoryPreviewLoader } from './useRepositoryPreviewLoader'
 import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
@@ -210,8 +211,6 @@ export function useRepositoryWorkspace(): {
   canNavigateBack: boolean
   canNavigateForward: boolean
 } {
-  const didRestoreSession = useRef(false)
-  const didReceiveOpenIntent = useRef(false)
   const nextTabId = useRef(0)
   const nextAnchorToken = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
@@ -549,41 +548,13 @@ export function useRepositoryWorkspace(): {
     [createNextTabId, discardEditingIfAllowed, loadPreview, setError]
   )
 
-  useEffect(() => {
-    const removeOpenPathListener = window.api.onOpenRepositoryPath((repoPath) => {
-      didReceiveOpenIntent.current = true
-      void loadRepositoryPath(repoPath)
-    })
-    const removeOpenFileListener = window.api.onOpenFilePath((file) => {
-      didReceiveOpenIntent.current = true
-      void openFilePath(file)
-    })
-    const removeOpenTreeItemListener = window.api.onOpenTreeItem((item) => {
-      didReceiveOpenIntent.current = true
-      void openTreeItem(item)
-    })
-    const removeOpenRequestListener = window.api.onOpenRepositoryRequest(() => {
-      void openRepository()
-    })
-
-    return () => {
-      removeOpenPathListener()
-      removeOpenFileListener()
-      removeOpenTreeItemListener()
-      removeOpenRequestListener()
-    }
-  }, [loadRepositoryPath, openFilePath, openRepository, openTreeItem])
-
-  useEffect(() => {
-    if (didRestoreSession.current) return
-    didRestoreSession.current = true
-    if (didReceiveOpenIntent.current) return
-
-    void window.api.getSession().then((session) => {
-      if (didReceiveOpenIntent.current || !session.repositoryPath) return
-      void loadRepositoryWithSession(session)
-    })
-  }, [loadRepositoryWithSession])
+  useRepositoryLaunchIntents({
+    loadRepositoryPath,
+    openFilePath,
+    openTreeItem,
+    openRepository,
+    loadRepositoryWithSession
+  })
 
   useSessionPersistence({
     repository,
