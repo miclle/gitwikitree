@@ -85,6 +85,10 @@ async function readPreviewSearchControlsHook() {
   )
 }
 
+async function readFileViewModeHook() {
+  return readFile(new URL('../src/renderer/src/hooks/useFileViewMode.ts', import.meta.url), 'utf8')
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
@@ -530,12 +534,13 @@ test('file editing relies on keyboard save and marks dirty file names', async ()
 
 test('file view modes expose preview, code, and split editing without discarding drafts', async () => {
   const source = await readWorkspaceView()
+  const fileViewModeHook = await readFileViewModeHook()
   const css = await readMainCss()
 
   assert.match(
-    source,
-    /const \[fileViewModeState, setFileViewModeState\] = useState<\{[\s\S]*editing: boolean[\s\S]*mode: FileViewMode[\s\S]*path\?: string[\s\S]*\}>\(\{ editing: false, mode: 'preview' \}\)/,
-    'workspace should keep a simple GitHub-like file view mode scoped to the active edit session'
+    fileViewModeHook,
+    /const \[fileViewModeState, setFileViewModeState\] = useState<FileViewModeState>\(\{[\s\S]*editing: false,[\s\S]*mode: 'preview'[\s\S]*\}\)/,
+    'file view controls should keep a simple GitHub-like mode scoped to the active edit session'
   )
   assert.match(
     source,
@@ -543,7 +548,7 @@ test('file view modes expose preview, code, and split editing without discarding
     'file view controls should present preview, code, and split as one obvious choice'
   )
   assert.match(
-    source,
+    fileViewModeHook,
     /previewForDisplay[\s\S]*applyDraftToPreview\(preview,\s*draftContent\)/,
     'live Markdown preview should render the current draft instead of the last saved file'
   )
@@ -609,6 +614,7 @@ test('split editing lets users drag the editor and preview divider', async () =>
 test('directory index previews reuse file editing controls and drafts', async () => {
   const source = await readWorkspaceView()
   const hookSource = await readRepositoryWorkspaceHook()
+  const fileViewModeHook = await readFileViewModeHook()
 
   assert.match(
     hookSource,
@@ -616,9 +622,9 @@ test('directory index previews reuse file editing controls and drafts', async ()
     'workspace state should derive an editable source from file previews and directory index previews'
   )
   assert.match(
-    source,
+    fileViewModeHook,
     /const editablePreviewTarget = getEditablePreviewTarget\(preview\)/,
-    'workspace view should use a shared editable target for files and directory indexes'
+    'file view controls should use a shared editable target for files and directory indexes'
   )
   assert.match(
     source,
@@ -626,14 +632,14 @@ test('directory index previews reuse file editing controls and drafts', async ()
     'directory index metadata should flow into the same editor as normal files'
   )
   assert.match(
-    source,
+    fileViewModeHook,
     /previewForDisplay[\s\S]*applyDraftToPreview\(preview,\s*draftContent\)/,
     'live directory index Markdown preview should render the current draft'
   )
 })
 
 test('stale code mode falls back to preview after editing ends', async () => {
-  const source = await readWorkspaceView()
+  const source = await readFileViewModeHook()
 
   assert.match(
     source,
@@ -709,12 +715,13 @@ test('preview content delegates pure preview surfaces to focused components', as
 
 test('file preview keeps the editing CodeMirror instance mounted for undo history', async () => {
   const source = await readWorkspaceView()
+  const fileViewModeHook = await readFileViewModeHook()
   const css = await readMainCss()
 
   assert.match(
-    source,
+    fileViewModeHook,
     /isEditorMounted = Boolean\(\s*editablePreviewTarget && isEditing\s*\)/,
-    'editing should keep the editor mounted across file view mode changes'
+    'file view controls should keep the editor mounted across file view mode changes'
   )
   assert.match(
     source,

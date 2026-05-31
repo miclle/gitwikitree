@@ -13,13 +13,11 @@ import { SettingsDialog } from './SettingsDialog'
 import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
 import { HistoryButtons, TitlebarWindowControls } from './WindowControls'
+import { useFileViewMode } from '../hooks/useFileViewMode'
 import { usePreviewSearchControls } from '../hooks/usePreviewSearchControls'
-import { applyDraftToPreview, getEditablePreviewTarget } from '../hooks/useRepositoryWorkspace'
 import { useSplitEditorResize } from '../hooks/useSplitEditorResize'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 import type { EditorStatusBarState } from '../status-bar'
-
-type FileViewMode = 'preview' | 'code' | 'split'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const { t } = useTranslation()
@@ -93,53 +91,36 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     stepSearchMatch,
     handleSearchMatchCountChange
   } = usePreviewSearchControls()
-  const [fileViewModeState, setFileViewModeState] = useState<{
-    editing: boolean
-    mode: FileViewMode
-    path?: string
-  }>({ editing: false, mode: 'preview' })
   const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
   const [editorStatus, setEditorStatus] = useState<EditorStatusBarState | undefined>()
   const activePdfPath =
     preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
   const activePdfPageCount =
     pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
-  const editablePreviewTarget = getEditablePreviewTarget(preview)
-  const fileViewMode =
-    fileViewModeState.path === editablePreviewTarget?.path &&
-    fileViewModeState.editing === isEditing
-      ? fileViewModeState.mode
-      : 'preview'
-  const canSplitPreview = Boolean(
-    canEditPreview &&
-    editablePreviewTarget &&
-    ['.md', '.markdown', '.mdx'].includes(editablePreviewTarget.extension.toLocaleLowerCase())
-  )
-  const effectiveFileViewMode =
-    fileViewMode === 'split' && !canSplitPreview
-      ? 'code'
-      : fileViewMode === 'code' && (!canEditPreview || !isEditing)
-        ? 'preview'
-        : fileViewMode
-  const isEditorMounted = Boolean(editablePreviewTarget && isEditing)
-  const showsEditor = Boolean(
-    editablePreviewTarget &&
-    isEditing &&
-    (effectiveFileViewMode === 'code' || effectiveFileViewMode === 'split')
-  )
-  const showsPreview = Boolean(preview && effectiveFileViewMode !== 'code')
-  const previewForDisplay =
-    editablePreviewTarget && isEditing ? applyDraftToPreview(preview, draftContent) : preview
-  const fileWorkspaceClassName =
-    effectiveFileViewMode === 'split' ? 'file-workspace split' : 'file-workspace'
+  const {
+    editablePreviewTarget,
+    effectiveFileViewMode,
+    canSplitPreview,
+    isEditorMounted,
+    showsEditor,
+    showsPreview,
+    previewForDisplay,
+    fileWorkspaceClassName,
+    editorPaneClassName,
+    selectFileViewMode
+  } = useFileViewMode({
+    preview,
+    draftContent,
+    isEditing,
+    canEditPreview,
+    startEditing
+  })
   const {
     splitEditorPaneWidthPct,
     splitWorkspaceStyle,
     handleSplitResizerPointerDown,
     handleSplitResizerKeyDown
   } = useSplitEditorResize(effectiveFileViewMode === 'split')
-  const editorPaneClassName =
-    effectiveFileViewMode === 'split' ? 'file-editor-pane split' : 'file-editor-pane'
   const editorStatusWithFileMetadata =
     editorStatus && editablePreviewTarget
       ? {
@@ -159,17 +140,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
     void openBreadcrumbContextMenu(path)
-  }
-  const selectFileViewMode = (mode: FileViewMode): void => {
-    if ((mode === 'code' || mode === 'split') && canEditPreview && !isEditing) {
-      startEditing()
-    }
-
-    setFileViewModeState({
-      editing: Boolean(mode !== 'preview'),
-      mode,
-      path: editablePreviewTarget?.path
-    })
   }
   const previewContentElement =
     showsPreview && previewForDisplay ? (
