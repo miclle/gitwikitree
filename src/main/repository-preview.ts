@@ -219,7 +219,12 @@ export async function getPreview(
     const modifiedAt = stats.mtime.toISOString()
 
     if (readme) {
-      const content = await fs.readFile(safeJoin(repository.path, readme.path), 'utf8')
+      const readmeTarget = safeJoin(repository.path, readme.path)
+      const [readmeStats, readmeLastChange, content] = await Promise.all([
+        fs.stat(readmeTarget),
+        getLastChange(repository.path, toPosixPath(readme.path)),
+        fs.readFile(readmeTarget, 'utf8')
+      ])
       const markdownAssetPreviewData = await getMarkdownAssetPreviewData({
         repositoryPath: repository.path,
         sourcePath: readme.path,
@@ -232,7 +237,13 @@ export async function getPreview(
         ...(lastChange ? { lastChange } : {}),
         readme: {
           path: readme.path,
+          name: basename(readmeTarget),
+          extension: extname(readmeTarget).toLowerCase(),
+          editable: repository.editable,
           content,
+          encoding: textPreviewEncoding,
+          modifiedAt: readmeStats.mtime.toISOString(),
+          ...(readmeLastChange ? { lastChange: readmeLastChange } : {}),
           ...(markdownAssetPreviewData
             ? {
                 markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,

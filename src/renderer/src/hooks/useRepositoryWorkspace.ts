@@ -12,6 +12,7 @@ import { useTabPopover } from './useTabPopover'
 import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
 import type {
+  GitLastChange,
   NavigationTarget,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
@@ -26,6 +27,84 @@ import type {
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
+
+export type EditablePreviewTarget = {
+  path: string
+  name: string
+  extension: string
+  editable: boolean
+  content: string
+  encoding?: string
+  modifiedAt: string
+  lastChange?: GitLastChange
+}
+
+function extensionFromPath(path: string): string {
+  const name = fileNameFromPath(path)
+  const dotIndex = name.lastIndexOf('.')
+
+  return dotIndex > 0 ? name.slice(dotIndex).toLocaleLowerCase() : ''
+}
+
+export function getEditablePreviewTarget(
+  preview: PreviewPayload | undefined
+): EditablePreviewTarget | undefined {
+  if (!preview) return undefined
+
+  if (preview.kind === 'file') {
+    if (!preview.editable || preview.content === undefined) return undefined
+
+    return {
+      path: preview.path,
+      name: preview.name,
+      extension: preview.extension,
+      editable: preview.editable,
+      content: preview.content,
+      encoding: preview.encoding,
+      modifiedAt: preview.modifiedAt,
+      lastChange: preview.lastChange
+    }
+  }
+
+  if (!preview.readme?.editable) return undefined
+
+  return {
+    path: preview.readme.path,
+    name: preview.readme.name,
+    extension: preview.readme.extension || extensionFromPath(preview.readme.path),
+    editable: preview.readme.editable,
+    content: preview.readme.content,
+    encoding: preview.readme.encoding,
+    modifiedAt: preview.readme.modifiedAt,
+    lastChange: preview.readme.lastChange
+  }
+}
+
+export function applyDraftToPreview(
+  preview: PreviewPayload | undefined,
+  draftContent: string
+): PreviewPayload | undefined {
+  if (!preview) return undefined
+
+  if (preview.kind === 'file') {
+    if (preview.content === undefined) return preview
+
+    return {
+      ...preview,
+      content: draftContent
+    }
+  }
+
+  if (!preview.readme) return preview
+
+  return {
+    ...preview,
+    readme: {
+      ...preview.readme,
+      content: draftContent
+    }
+  }
+}
 
 type RepositoryLoadContext = {
   repoPath: string
@@ -153,12 +232,18 @@ export function useRepositoryWorkspace(): {
     hideTabPopover,
     handleTitlebarTabsPointerLeave
   } = useTabPopover()
-  const isEditing = Boolean(preview?.kind === 'file' && editingPath === preview.path)
-  const canEditPreview = Boolean(
-    preview?.kind === 'file' && preview.editable && preview.content !== undefined
-  )
+  const editablePreviewTarget = getEditablePreviewTarget(preview)
+  const isEditing = Boolean(editablePreviewTarget && editingPath === editablePreviewTarget.path)
+  const canEditPreview = Boolean(editablePreviewTarget)
   const hasUnsavedChanges = Boolean(
-    isEditing && preview?.kind === 'file' && draftContent !== (preview.content ?? '')
+    isEditing && editablePreviewTarget && draftContent !== editablePreviewTarget.content
+  )
+
+  const isEditingTargetPath = useCallback(
+    (path: string): boolean =>
+      path === editingPath ||
+      Boolean(isEditing && preview?.kind === 'directory' && path === preview.path),
+    [editingPath, isEditing, preview]
   )
 
   const clearEditing = useCallback((): void => {
@@ -506,7 +591,7 @@ export function useRepositoryWorkspace(): {
 
   const handleSelect = useCallback(
     async (node: TreeNode, options: { openInNewTab?: boolean } = {}): Promise<void> => {
-      if (node.path !== editingPath && !discardEditingIfAllowed()) return
+      if (!isEditingTargetPath(node.path) && !discardEditingIfAllowed()) return
 
       setSelectedPath(node.path)
 
@@ -549,7 +634,7 @@ export function useRepositoryWorkspace(): {
       activeFileTabId,
       createNextTabId,
       discardEditingIfAllowed,
-      editingPath,
+      isEditingTargetPath,
       loadPreview,
       openFileTabs
     ]
@@ -602,20 +687,20 @@ export function useRepositoryWorkspace(): {
 
   const selectFileTab = useCallback(
     async (tab: OpenFileTab): Promise<void> => {
-      if (tab.path !== editingPath && !discardEditingIfAllowed()) return
+      if (!isEditingTargetPath(tab.path) && !discardEditingIfAllowed()) return
 
       setActiveFileTabId(tab.id)
       setActiveFilePath(tab.type === 'directory' ? undefined : tab.path)
       setSelectedPath(tab.path)
       await loadPreview(tab.path)
     },
-    [discardEditingIfAllowed, editingPath, loadPreview]
+    [discardEditingIfAllowed, isEditingTargetPath, loadPreview]
   )
 
   const closeFileTab = useCallback(
     (id: string): void => {
       const closingTab = openFileTabs.find((tab) => tab.id === id)
-      if (closingTab?.path === editingPath && !discardEditingIfAllowed()) return
+      if (closingTab && isEditingTargetPath(closingTab.path) && !discardEditingIfAllowed()) return
 
       const tabIndex = openFileTabs.findIndex((tab) => tab.id === id)
       const nextTabs = openFileTabs.filter((tab) => tab.id !== id)
@@ -637,7 +722,7 @@ export function useRepositoryWorkspace(): {
         void loadPreview('')
       }
     },
-    [activeFileTabId, discardEditingIfAllowed, editingPath, loadPreview, openFileTabs]
+    [activeFileTabId, discardEditingIfAllowed, isEditingTargetPath, loadPreview, openFileTabs]
   )
 
   const closeCurrentTabOrWindow = useCallback((): void => {
@@ -658,14 +743,14 @@ export function useRepositoryWorkspace(): {
     async (delta: -1 | 1): Promise<void> => {
       const result = moveActiveTabHistory(openFileTabs, activeFileTabId, delta)
       if (!result.target) return
-      if (result.target.path !== editingPath && !discardEditingIfAllowed()) return
+      if (!isEditingTargetPath(result.target.path) && !discardEditingIfAllowed()) return
 
       setOpenFileTabs(result.tabs)
       setActiveFilePath(result.target.type === 'directory' ? undefined : result.target.path)
       setSelectedPath(result.target.path)
       await loadPreview(result.target.path)
     },
-    [activeFileTabId, discardEditingIfAllowed, editingPath, loadPreview, openFileTabs]
+    [activeFileTabId, discardEditingIfAllowed, isEditingTargetPath, loadPreview, openFileTabs]
   )
 
   useEffect(() => {
@@ -727,7 +812,7 @@ export function useRepositoryWorkspace(): {
 
   const openRepositoryPreview = useCallback((): void => {
     if (!repository) return
-    if (editingPath !== '' && !discardEditingIfAllowed()) return
+    if (!isEditingTargetPath('') && !discardEditingIfAllowed()) return
 
     const resolved = resolveRepositoryNavigationTarget(repository, '')
     if (!resolved) return
@@ -748,7 +833,7 @@ export function useRepositoryWorkspace(): {
     activeFileTabId,
     createNextTabId,
     discardEditingIfAllowed,
-    editingPath,
+    isEditingTargetPath,
     loadPreview,
     openFileTabs,
     repository
@@ -757,7 +842,7 @@ export function useRepositoryWorkspace(): {
   const openBreadcrumbPath = useCallback(
     (path: string): void => {
       if (!repository) return
-      if (path !== editingPath && !discardEditingIfAllowed()) return
+      if (!isEditingTargetPath(path) && !discardEditingIfAllowed()) return
 
       const resolved = resolveRepositoryNavigationTarget(repository, path)
       if (resolved?.node) {
@@ -784,8 +869,8 @@ export function useRepositoryWorkspace(): {
       activeFileTabId,
       createNextTabId,
       discardEditingIfAllowed,
-      editingPath,
       handleSelect,
+      isEditingTargetPath,
       loadPreview,
       openFileTabs,
       repository
@@ -794,7 +879,7 @@ export function useRepositoryWorkspace(): {
 
   const selectPreviewPath = useCallback(
     (path: string, openInNewTab = false, hash?: string): boolean => {
-      if (path !== editingPath && !discardEditingIfAllowed()) return false
+      if (!isEditingTargetPath(path) && !discardEditingIfAllowed()) return false
 
       const resolved = repository ? resolveRepositoryNavigationTarget(repository, path) : undefined
       if (resolved?.node) {
@@ -847,8 +932,8 @@ export function useRepositoryWorkspace(): {
       activeFileTabId,
       createNextTabId,
       discardEditingIfAllowed,
-      editingPath,
       handleSelect,
+      isEditingTargetPath,
       loadPreview,
       openFileTabs,
       repository
@@ -894,13 +979,13 @@ export function useRepositoryWorkspace(): {
   )
 
   const startEditing = useCallback((): void => {
-    if (preview?.kind !== 'file' || !preview.editable || preview.content === undefined) return
+    if (!editablePreviewTarget) return
 
-    setEditingPath(preview.path)
-    setDraftContent(preview.content)
-    setDraftModifiedAt(preview.modifiedAt)
+    setEditingPath(editablePreviewTarget.path)
+    setDraftContent(editablePreviewTarget.content)
+    setDraftModifiedAt(editablePreviewTarget.modifiedAt)
     setError(undefined)
-  }, [preview])
+  }, [editablePreviewTarget])
 
   const cancelEditing = useCallback((): void => {
     if (!discardEditingIfAllowed()) return
@@ -913,31 +998,56 @@ export function useRepositoryWorkspace(): {
   }, [])
 
   const saveCurrentFile = useCallback(async (): Promise<void> => {
-    if (!repository || preview?.kind !== 'file' || !isEditing || !hasUnsavedChanges) return
+    if (!repository || !preview || !editablePreviewTarget || !isEditing || !hasUnsavedChanges) {
+      return
+    }
 
     setIsSaving(true)
     setError(undefined)
 
     try {
-      const nextPreview = await window.api.saveFile(repository.path, preview.path, draftContent, {
+      const saveOptions = {
         source: repository.source,
         rootPath: repository.rootPath,
         expectedModifiedAt: draftModifiedAt
-      })
+      }
+      const nextPreview = await window.api.saveFile(
+        repository.path,
+        editablePreviewTarget.path,
+        draftContent,
+        saveOptions
+      )
       const nextRepository = await window.api.loadRepository(repository.path)
+      const refreshedPreview =
+        preview.kind === 'directory'
+          ? await window.api.previewPath(repository.path, preview.path, {
+              source: repository.source,
+              rootPath: repository.rootPath
+            })
+          : nextPreview
+      const nextEditableTarget = getEditablePreviewTarget(refreshedPreview)
+
       setRepository(nextRepository)
-      setPreview(nextPreview)
-      if (nextPreview.kind === 'file') {
-        setEditingPath(nextPreview.path)
-        setDraftContent(nextPreview.content ?? draftContent)
-        setDraftModifiedAt(nextPreview.modifiedAt)
+      setPreview(refreshedPreview)
+      if (nextEditableTarget) {
+        setEditingPath(nextEditableTarget.path)
+        setDraftContent(nextEditableTarget.content)
+        setDraftModifiedAt(nextEditableTarget.modifiedAt)
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
       setIsSaving(false)
     }
-  }, [draftContent, draftModifiedAt, hasUnsavedChanges, isEditing, preview, repository])
+  }, [
+    draftContent,
+    draftModifiedAt,
+    editablePreviewTarget,
+    hasUnsavedChanges,
+    isEditing,
+    preview,
+    repository
+  ])
 
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {

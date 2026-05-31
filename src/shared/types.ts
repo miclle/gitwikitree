@@ -84,7 +84,13 @@ export type DirectoryPreview = {
   lastChange?: GitLastChange
   readme?: {
     path: string
+    name: string
+    extension: string
+    editable: boolean
     content: string
+    encoding: string
+    modifiedAt: string
+    lastChange?: GitLastChange
     markdownAssetDataUrls?: Record<string, string>
     markdownAssetPaths?: Record<string, string>
     markdownAssetAbsolutePaths?: Record<string, string>

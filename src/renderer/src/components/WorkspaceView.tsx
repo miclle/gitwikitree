@@ -23,6 +23,7 @@ import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
 import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
+import { applyDraftToPreview, getEditablePreviewTarget } from '../hooks/useRepositoryWorkspace'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 import type { EditorStatusBarState } from '../status-bar'
 import type { RepositoryRef } from '../../../shared/types'
@@ -120,15 +121,16 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
   const activePdfPageCount =
     pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
-  const filePreview = preview?.kind === 'file' ? preview : undefined
+  const editablePreviewTarget = getEditablePreviewTarget(preview)
   const fileViewMode =
-    fileViewModeState.path === filePreview?.path && fileViewModeState.editing === isEditing
+    fileViewModeState.path === editablePreviewTarget?.path &&
+    fileViewModeState.editing === isEditing
       ? fileViewModeState.mode
       : 'preview'
   const canSplitPreview = Boolean(
     canEditPreview &&
-    filePreview &&
-    ['.md', '.markdown', '.mdx'].includes(filePreview.extension.toLocaleLowerCase())
+    editablePreviewTarget &&
+    ['.md', '.markdown', '.mdx'].includes(editablePreviewTarget.extension.toLocaleLowerCase())
   )
   const effectiveFileViewMode =
     fileViewMode === 'split' && !canSplitPreview
@@ -136,31 +138,26 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       : fileViewMode === 'code' && (!canEditPreview || !isEditing)
         ? 'preview'
         : fileViewMode
-  const isEditorMounted = Boolean(filePreview && isEditing)
+  const isEditorMounted = Boolean(editablePreviewTarget && isEditing)
   const showsEditor = Boolean(
-    filePreview &&
+    editablePreviewTarget &&
     isEditing &&
     (effectiveFileViewMode === 'code' || effectiveFileViewMode === 'split')
   )
   const showsPreview = Boolean(preview && effectiveFileViewMode !== 'code')
   const previewForDisplay =
-    filePreview && isEditing && filePreview.content !== undefined
-      ? {
-          ...filePreview,
-          content: draftContent
-        }
-      : preview
+    editablePreviewTarget && isEditing ? applyDraftToPreview(preview, draftContent) : preview
   const fileWorkspaceClassName =
     effectiveFileViewMode === 'split' ? 'file-workspace split' : 'file-workspace'
   const editorPaneClassName =
     effectiveFileViewMode === 'split' ? 'file-editor-pane split' : 'file-editor-pane'
   const editorStatusWithFileMetadata =
-    editorStatus && preview?.kind === 'file'
+    editorStatus && editablePreviewTarget
       ? {
           ...editorStatus,
-          encoding: preview.encoding ?? editorStatus.encoding,
-          modifiedAt: preview.modifiedAt,
-          lastChange: preview.lastChange
+          encoding: editablePreviewTarget.encoding ?? editorStatus.encoding,
+          modifiedAt: editablePreviewTarget.modifiedAt,
+          lastChange: editablePreviewTarget.lastChange
         }
       : editorStatus
   const openPreviewSearch = useCallback(() => {
@@ -213,7 +210,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       startEditing()
     }
 
-    setFileViewModeState({ editing: Boolean(mode !== 'preview'), mode, path: filePreview?.path })
+    setFileViewModeState({
+      editing: Boolean(mode !== 'preview'),
+      mode,
+      path: editablePreviewTarget?.path
+    })
   }
 
   useEffect(() => {
@@ -699,7 +700,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     )
                   })}
                 </div>
-                {preview?.kind === 'file' && (
+                {(preview?.kind === 'file' || editablePreviewTarget) && (
                   <div className="file-view-tabs" role="tablist" aria-label="File view">
                     <button
                       type="button"
@@ -742,14 +743,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 )}
                 {!previewLoading && preview && (
                   <div className={fileWorkspaceClassName}>
-                    {isEditorMounted && filePreview && (
+                    {isEditorMounted && editablePreviewTarget && (
                       <div className={editorPaneClassName} hidden={!showsEditor}>
                         <FileEditor
                           content={draftContent}
-                          encoding={filePreview.encoding}
-                          extension={filePreview.extension}
-                          lastChange={filePreview.lastChange}
-                          modifiedAt={filePreview.modifiedAt}
+                          encoding={editablePreviewTarget.encoding}
+                          extension={editablePreviewTarget.extension}
+                          lastChange={editablePreviewTarget.lastChange}
+                          modifiedAt={editablePreviewTarget.modifiedAt}
                           onChange={updateDraftContent}
                           onStatusChange={setEditorStatus}
                         />

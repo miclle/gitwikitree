@@ -280,7 +280,7 @@ test('file view modes expose preview, code, and split editing without discarding
   )
   assert.match(
     source,
-    /previewForDisplay[\s\S]*content:\s*draftContent/,
+    /previewForDisplay[\s\S]*applyDraftToPreview\(preview,\s*draftContent\)/,
     'live Markdown preview should render the current draft instead of the last saved file'
   )
   assert.match(
@@ -292,6 +292,32 @@ test('file view modes expose preview, code, and split editing without discarding
     css,
     /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*1fr\)\s*minmax\(260px,\s*1fr\);/,
     'split editing should keep both panes usable at desktop widths'
+  )
+})
+
+test('directory index previews reuse file editing controls and drafts', async () => {
+  const source = await readWorkspaceView()
+  const hookSource = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    hookSource,
+    /getEditablePreviewTarget\(preview\)/,
+    'workspace state should derive an editable source from file previews and directory index previews'
+  )
+  assert.match(
+    source,
+    /const editablePreviewTarget = getEditablePreviewTarget\(preview\)/,
+    'workspace view should use a shared editable target for files and directory indexes'
+  )
+  assert.match(
+    source,
+    /<FileEditor[\s\S]*encoding=\{editablePreviewTarget\.encoding\}[\s\S]*extension=\{editablePreviewTarget\.extension\}[\s\S]*modifiedAt=\{editablePreviewTarget\.modifiedAt\}/,
+    'directory index metadata should flow into the same editor as normal files'
+  )
+  assert.match(
+    source,
+    /previewForDisplay[\s\S]*applyDraftToPreview\(preview,\s*draftContent\)/,
+    'live directory index Markdown preview should render the current draft'
   )
 })
 
@@ -310,7 +336,7 @@ test('stale code mode falls back to preview after editing ends', async () => {
   )
   assert.match(
     source,
-    /setFileViewModeState\(\{ editing: Boolean\(mode !== 'preview'\), mode, path: filePreview\?\.path \}\)/,
+    /setFileViewModeState\(\{[\s\S]*editing: Boolean\(mode !== 'preview'\),[\s\S]*mode,[\s\S]*path: editablePreviewTarget\?\.path[\s\S]*\}\)/,
     'view mode state should record whether it belongs to an active edit session'
   )
 })
@@ -321,12 +347,12 @@ test('file preview keeps the editing CodeMirror instance mounted for undo histor
 
   assert.match(
     source,
-    /isEditorMounted = Boolean\(\s*filePreview && isEditing\s*\)/,
+    /isEditorMounted = Boolean\(\s*editablePreviewTarget && isEditing\s*\)/,
     'editing should keep the editor mounted across file view mode changes'
   )
   assert.match(
     source,
-    /isEditorMounted && filePreview[\s\S]*<div className=\{editorPaneClassName\} hidden=\{!showsEditor\}[\s\S]*<FileEditor/,
+    /isEditorMounted && editablePreviewTarget[\s\S]*<div className=\{editorPaneClassName\} hidden=\{!showsEditor\}[\s\S]*<FileEditor/,
     'preview mode should hide, not unmount, the editor pane so CodeMirror keeps undo history'
   )
   assert.match(
@@ -922,7 +948,7 @@ test('saving an edited file refreshes Git status decorations', async () => {
 
   assert.match(
     source,
-    /if \(!repository \|\| preview\?\.kind !== 'file' \|\| !isEditing \|\| !hasUnsavedChanges\) return/,
+    /if \(!repository \|\| !preview \|\| !editablePreviewTarget \|\| !isEditing \|\| !hasUnsavedChanges\) \{[\s\S]*return[\s\S]*\}/,
     'saving should no-op when the editor draft has no changes'
   )
   assert.match(
@@ -962,17 +988,17 @@ test('editing mode routes editor state into the status bar', async () => {
   )
   assert.match(
     workspaceSource,
-    /encoding=\{filePreview\.encoding\}/,
+    /encoding=\{editablePreviewTarget\.encoding\}/,
     'Workspace should pass the preview encoding into the editor status'
   )
   assert.match(
     workspaceSource,
-    /modifiedAt=\{filePreview\.modifiedAt\}/,
+    /modifiedAt=\{editablePreviewTarget\.modifiedAt\}/,
     'Workspace should pass the preview modified time into the editor status'
   )
   assert.match(
     workspaceSource,
-    /lastChange=\{filePreview\.lastChange\}/,
+    /lastChange=\{editablePreviewTarget\.lastChange\}/,
     'Workspace should pass the preview Git author metadata into the editor status'
   )
   assert.match(
@@ -982,7 +1008,7 @@ test('editing mode routes editor state into the status bar', async () => {
   )
   assert.match(
     workspaceSource,
-    /const editorStatusWithFileMetadata =[\s\S]*modifiedAt: preview\.modifiedAt/,
+    /const editorStatusWithFileMetadata =[\s\S]*modifiedAt: editablePreviewTarget\.modifiedAt/,
     'Workspace should keep editor status metadata in sync with the latest preview after saving'
   )
   assert.match(

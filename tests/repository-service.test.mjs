@@ -562,29 +562,44 @@ test('getPreview returns directory readme content and rejects escaping paths', a
   try {
     const rootPreview = await service.getPreview(repoPath)
     assert.equal(rootPreview.kind, 'directory')
-    assert.deepEqual(rootPreview.readme, {
-      path: 'README.md',
-      content: '# Root\n\nHello'
-    })
+    assert.equal(rootPreview.readme.path, 'README.md')
+    assert.equal(rootPreview.readme.content, '# Root\n\nHello')
 
     const docsPreview = await service.getPreview(repoPath, 'docs')
     assert.equal(docsPreview.kind, 'directory')
-    assert.deepEqual(docsPreview.readme, {
-      path: 'docs/index.md',
-      content: '# Docs\n\nWelcome'
-    })
+    assert.equal(docsPreview.readme.path, 'docs/index.md')
+    assert.equal(docsPreview.readme.content, '# Docs\n\nWelcome')
 
     const sectionPreview = await service.getPreview(repoPath, 'section')
     assert.equal(sectionPreview.kind, 'directory')
-    assert.deepEqual(sectionPreview.readme, {
-      path: 'section/_index.md',
-      content: '# Section\n\nOverview'
-    })
+    assert.equal(sectionPreview.readme.path, 'section/_index.md')
+    assert.equal(sectionPreview.readme.content, '# Section\n\nOverview')
 
     await assert.rejects(
       () => service.getPreview(repoPath, '../outside.md'),
       /Path is outside the selected repository/
     )
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview returns editable metadata for directory index files', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const preview = await service.getPreview(repoPath, 'docs')
+
+    assert.equal(preview.kind, 'directory')
+    assert.equal(preview.readme.path, 'docs/index.md')
+    assert.equal(preview.readme.name, 'index.md')
+    assert.equal(preview.readme.extension, '.md')
+    assert.equal(preview.readme.editable, true)
+    assert.equal(preview.readme.encoding, 'UTF-8')
+    assert.equal(typeof preview.readme.modifiedAt, 'string')
+    assert.ok(!Number.isNaN(Date.parse(preview.readme.modifiedAt)))
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
