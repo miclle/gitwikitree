@@ -1351,12 +1351,12 @@ test('files sidebar layout resets for projects without saved session state', asy
   )
   assert.match(
     workspaceSource,
-    /const openRepository = useCallback[\s\S]*if \(projectSession\)[\s\S]*return[\s\S]*resetRepositoryLayout\(\)/,
+    /const openRepository = useCallback[\s\S]*if \(projectSession\)[\s\S]*return[\s\S]*openRepositoryRoot\(nextRepository, \{ resetLayout: true \}\)/,
     'repository picker should reset layout when no project session exists'
   )
   assert.match(
     workspaceSource,
-    /const loadRepositoryPath = useCallback[\s\S]*if \(normalizedProjectSession\)[\s\S]*return[\s\S]*resetRepositoryLayout\(\)/,
+    /const loadRepositoryPath = useCallback[\s\S]*if \(normalizedProjectSession\)[\s\S]*return[\s\S]*openRepositoryRoot\(nextRepository, \{ resetLayout: true \}\)/,
     'repository path opens should reset layout when no project session exists'
   )
 })

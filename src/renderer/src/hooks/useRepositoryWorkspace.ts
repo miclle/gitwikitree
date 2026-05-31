@@ -229,6 +229,36 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     setIsSidebarOpen(true)
   }, [setSidebarWidth])
 
+  const runRepositoryLoading = useCallback(
+    async (task: () => Promise<void>): Promise<void> => {
+      setLoading(true)
+      setError(undefined)
+
+      try {
+        await task()
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [setError]
+  )
+
+  const openRepositoryRoot = useCallback(
+    async (
+      nextRepository: RepositoryPayload,
+      options: { resetLayout?: boolean } = {}
+    ): Promise<void> => {
+      setRepository(nextRepository)
+      if (options.resetLayout) resetRepositoryLayout()
+      setExpandedPaths(defaultExpanded)
+      applyNavigationPatch(createResetNavigationPatch())
+      await loadPreview('', nextRepository)
+    },
+    [applyNavigationPatch, loadPreview, resetRepositoryLayout]
+  )
+
   const restoreRepositorySession = useCallback(
     async (nextRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
       const restoredSession = createRestoredRepositorySession(nextRepository, session)
@@ -248,52 +278,38 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     [loadPreview, setSidebarWidth]
   )
 
+  const restoreProjectSession = useCallback(
+    async (fallbackRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
+      await restoreRepositorySession(
+        await loadRepositoryForProjectSession(fallbackRepository, session),
+        session
+      )
+    },
+    [restoreRepositorySession]
+  )
+
   const openRepository = useCallback(async (): Promise<void> => {
     if (!discardEditingIfAllowed()) return
 
-    setLoading(true)
-    setError(undefined)
-
-    try {
+    await runRepositoryLoading(async () => {
       const nextRepository = await window.api.pickRepository()
       if (!nextRepository) return
 
       const projectSession = await window.api.getProjectSession(nextRepository.path)
       if (projectSession) {
-        await restoreRepositorySession(
-          await loadRepositoryForProjectSession(nextRepository, projectSession),
-          projectSession
-        )
+        await restoreProjectSession(nextRepository, projectSession)
         return
       }
 
-      setRepository(nextRepository)
-      resetRepositoryLayout()
-      setExpandedPaths(defaultExpanded)
-      applyNavigationPatch(createResetNavigationPatch())
-      await loadPreview('', nextRepository)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setLoading(false)
-    }
-  }, [
-    applyNavigationPatch,
-    discardEditingIfAllowed,
-    loadPreview,
-    resetRepositoryLayout,
-    restoreRepositorySession,
-    setError
-  ])
+      await openRepositoryRoot(nextRepository, { resetLayout: true })
+    })
+  }, [discardEditingIfAllowed, openRepositoryRoot, restoreProjectSession, runRepositoryLoading])
 
   const loadRepositoryPath = useCallback(
     async (repoPath: string): Promise<void> => {
       if (!discardEditingIfAllowed()) return
 
-      setLoading(true)
-      setError(undefined)
-
-      try {
+      await runRepositoryLoading(async () => {
         const projectSession = await window.api.getProjectSession(repoPath)
         if (projectSession) {
           const nextRepository = await loadRepositoryFromContext({
@@ -309,66 +325,45 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
         const nextRepository = await window.api.loadRepository(repoPath)
         const normalizedProjectSession = await window.api.getProjectSession(nextRepository.path)
         if (normalizedProjectSession) {
-          await restoreRepositorySession(
-            await loadRepositoryForProjectSession(nextRepository, normalizedProjectSession),
-            normalizedProjectSession
-          )
+          await restoreProjectSession(nextRepository, normalizedProjectSession)
           return
         }
 
-        setRepository(nextRepository)
-        resetRepositoryLayout()
-        setExpandedPaths(defaultExpanded)
-        applyNavigationPatch(createResetNavigationPatch())
-        await loadPreview('', nextRepository)
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      } finally {
-        setLoading(false)
-      }
+        await openRepositoryRoot(nextRepository, { resetLayout: true })
+      })
     },
     [
-      applyNavigationPatch,
       discardEditingIfAllowed,
-      loadPreview,
-      resetRepositoryLayout,
+      openRepositoryRoot,
+      restoreProjectSession,
       restoreRepositorySession,
-      setError
+      runRepositoryLoading
     ]
   )
 
   const loadRepositoryWithSession = useCallback(
     async (session: SessionState): Promise<void> => {
-      if (!session.repositoryPath) return
+      const repositoryPath = session.repositoryPath
+      if (!repositoryPath) return
 
-      setLoading(true)
-      setError(undefined)
-
-      try {
+      await runRepositoryLoading(async () => {
         const nextRepository = await loadRepositoryFromContext({
-          repoPath: session.repositoryPath,
+          repoPath: repositoryPath,
           rootPath: session.rootPath,
           activeRef: session.activeRef,
           source: session.source
         })
         await restoreRepositorySession(nextRepository, session)
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      } finally {
-        setLoading(false)
-      }
+      })
     },
-    [restoreRepositorySession, setError]
+    [restoreRepositorySession, runRepositoryLoading]
   )
 
   const openFilePath = useCallback(
     async (file: RecentFileState): Promise<void> => {
       if (!discardEditingIfAllowed()) return
 
-      setLoading(true)
-      setError(undefined)
-
-      try {
+      await runRepositoryLoading(async () => {
         const nextRepository = await loadRepositoryFromContext(file)
         const filePath = file.filePath
         const resolved = resolveRepositoryNavigationTarget(nextRepository, filePath)
@@ -397,23 +392,23 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
           await loadPreview('', nextRepository)
           setError(`${fileNameFromPath(filePath)} is no longer available in this repository.`)
         }
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      } finally {
-        setLoading(false)
-      }
+      })
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview, repository, setError]
+    [
+      createNextTabId,
+      discardEditingIfAllowed,
+      loadPreview,
+      repository,
+      runRepositoryLoading,
+      setError
+    ]
   )
 
   const openTreeItem = useCallback(
     async (item: TreeItemOpenPayload): Promise<void> => {
       if (!discardEditingIfAllowed()) return
 
-      setLoading(true)
-      setError(undefined)
-
-      try {
+      await runRepositoryLoading(async () => {
         const nextRepository = await loadRepositoryFromContext(item)
         const resolved = resolveRepositoryNavigationTarget(nextRepository, item.path)
 
@@ -433,11 +428,7 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
         }
         applyNavigationPatch(createSingleFileTabPatch(target, createNextTabId()))
         await loadPreview(target.path, nextRepository)
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      } finally {
-        setLoading(false)
-      }
+      })
     },
     [
       applyNavigationPatch,
@@ -445,6 +436,7 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
       discardEditingIfAllowed,
       loadPreview,
       queuePendingMarkdownAnchor,
+      runRepositoryLoading,
       setError
     ]
   )
@@ -627,12 +619,9 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
 
   const replaceRepositoryWorkspace = useCallback(
     async (nextRepository: RepositoryPayload): Promise<void> => {
-      setRepository(nextRepository)
-      setExpandedPaths(defaultExpanded)
-      applyNavigationPatch(createResetNavigationPatch())
-      await loadPreview('', nextRepository)
+      await openRepositoryRoot(nextRepository)
     },
-    [applyNavigationPatch, loadPreview]
+    [openRepositoryRoot]
   )
 
   const checkoutBranch = useCallback(
