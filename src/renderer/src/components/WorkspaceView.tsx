@@ -23,6 +23,7 @@ import { PreviewContent } from './PreviewContent'
 import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
+import type { EditorStatusBarState } from '../status-bar'
 import type { RepositoryRef } from '../../../shared/types'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
@@ -86,6 +87,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
   const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
+  const [editorStatus, setEditorStatus] = useState<EditorStatusBarState | undefined>()
   const [isBranchPickerOpen, setIsBranchPickerOpen] = useState(false)
   const [branchPickerTab, setBranchPickerTab] = useState<'branches' | 'remotes'>('branches')
   const [branchQuery, setBranchQuery] = useState('')
@@ -111,6 +113,15 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
   const activePdfPageCount =
     pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
+  const editorStatusWithFileMetadata =
+    editorStatus && preview?.kind === 'file'
+      ? {
+          ...editorStatus,
+          encoding: preview.encoding ?? editorStatus.encoding,
+          modifiedAt: preview.modifiedAt,
+          lastChange: preview.lastChange
+        }
+      : editorStatus
   const openPreviewSearch = useCallback(() => {
     const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
     if (selectedText) {
@@ -673,8 +684,12 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 {!previewLoading && preview && isEditing && preview.kind === 'file' ? (
                   <FileEditor
                     content={draftContent}
+                    encoding={preview.encoding}
                     extension={preview.extension}
+                    lastChange={preview.lastChange}
+                    modifiedAt={preview.modifiedAt}
                     onChange={updateDraftContent}
+                    onStatusChange={setEditorStatus}
                   />
                 ) : (
                   !previewLoading &&
@@ -772,7 +787,12 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
               }}
             />
           </section>
-          <StatusBar repository={repository} preview={preview} pdfPageCount={activePdfPageCount} />
+          <StatusBar
+            repository={repository}
+            preview={preview}
+            pdfPageCount={activePdfPageCount}
+            editorStatus={isEditing ? editorStatusWithFileMetadata : undefined}
+          />
         </>
       )}
     </main>

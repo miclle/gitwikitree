@@ -2,13 +2,14 @@ import { promises as fs } from 'fs'
 import { basename, extname, resolve } from 'path'
 import { Marked, type Token } from 'marked'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
-import { assertRepositoryPath } from './git-service'
+import { assertRepositoryPath, getLastChange } from './git-service'
 import { loadRepository } from './repository-loader'
 import { findDirectoryIndex, getNodeAtPath } from './repository-tree'
 import { safeJoin, toPosixPath } from './repository-paths'
 import type { PreviewPayload, RepositoryLoadOptions, SaveFileOptions } from '../shared/types'
 
 const maxTextPreviewBytes = 1024 * 1024
+const textPreviewEncoding = 'UTF-8'
 
 type MarkdownAssetPreviewData = {
   dataUrls: Record<string, string>
@@ -207,7 +208,10 @@ export async function getPreview(
   const repository = await loadRepository(repoPath, options)
   const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined
   const target = safeJoin(repository.path, relativePath)
-  const stats = await fs.stat(target)
+  const [stats, lastChange] = await Promise.all([
+    fs.stat(target),
+    getLastChange(repository.path, toPosixPath(relativePath))
+  ])
 
   if (stats.isDirectory()) {
     const children = relativePath ? (node?.children ?? []) : repository.tree
@@ -225,6 +229,7 @@ export async function getPreview(
         kind: 'directory',
         path: toPosixPath(relativePath),
         modifiedAt,
+        ...(lastChange ? { lastChange } : {}),
         readme: {
           path: readme.path,
           content,
@@ -245,6 +250,7 @@ export async function getPreview(
       kind: 'directory',
       path: toPosixPath(relativePath),
       modifiedAt,
+      ...(lastChange ? { lastChange } : {}),
       entries: children.map((entry) => ({
         name: entry.name,
         path: entry.path,
@@ -271,7 +277,8 @@ export async function getPreview(
     previewType,
     editable: repository.editable,
     size,
-    modifiedAt: stats.mtime.toISOString()
+    modifiedAt: stats.mtime.toISOString(),
+    ...(lastChange ? { lastChange } : {})
   }
 
   if (previewType === 'image') {
@@ -285,7 +292,8 @@ export async function getPreview(
   if (previewType === 'svg') {
     return {
       ...payload,
-      content: await fs.readFile(target, 'utf8')
+      content: await fs.readFile(target, 'utf8'),
+      encoding: textPreviewEncoding
     }
   }
 
@@ -311,6 +319,7 @@ export async function getPreview(
     return {
       ...payload,
       content,
+      encoding: textPreviewEncoding,
       ...(markdownAssetPreviewData
         ? {
             markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,

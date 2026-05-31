@@ -69,10 +69,19 @@ export type RepositorySearchResult = {
   lineNumber?: number
 }
 
+export type GitLastChange = {
+  authorName: string
+  authorEmail: string
+  committedAt: string
+  shortHash: string
+  subject: string
+}
+
 export type DirectoryPreview = {
   kind: 'directory'
   path: string
   modifiedAt: string
+  lastChange?: GitLastChange
   readme?: {
     path: string
     content: string
@@ -91,12 +100,14 @@ export type FilePreview = {
   previewType: PreviewType
   editable: boolean
   content?: string
+  encoding?: string
   dataUrl?: string
   markdownAssetDataUrls?: Record<string, string>
   markdownAssetPaths?: Record<string, string>
   markdownAssetAbsolutePaths?: Record<string, string>
   size: number
   modifiedAt: string
+  lastChange?: GitLastChange
 }
 
 export type PreviewPayload = DirectoryPreview | FilePreview

@@ -16,7 +16,7 @@ async function loadStatusBar() {
   return { module, tempDir }
 }
 
-test('getStatusBarFileFacts summarizes text previews with words, lines, size, and modified time', async () => {
+test('getStatusBarFileFacts summarizes text previews with words, lines, size, modified time, and Git author', async () => {
   const { module, tempDir } = await loadStatusBar()
 
   try {
@@ -29,10 +29,18 @@ test('getStatusBarFileFacts summarizes text previews with words, lines, size, an
         previewType: 'markdown',
         editable: true,
         content: '# Guide\n\nHello brave new workspace\n',
+        encoding: 'UTF-8',
         size: 1234,
-        modifiedAt: '2026-05-30T10:15:00.000Z'
+        modifiedAt: '2026-05-30T10:15:00.000Z',
+        lastChange: {
+          authorName: 'Miclle Zheng',
+          authorEmail: 'miclle@example.com',
+          committedAt: '2026-05-27T06:59:00.000Z',
+          shortHash: '60a7b50',
+          subject: 'feat(app): add custom titlebar tabs'
+        }
       }),
-      ['5 words', '3 lines', '1.2 KB', 'Modified May 30, 2026, 18:15']
+      ['5 words', '3 lines', '1.2 KB', 'UTF-8', 'Miclle Zheng, May 27, 2026, 14:59']
     )
   } finally {
     await rm(tempDir, { recursive: true, force: true })
@@ -95,6 +103,58 @@ test('getStatusBarFileFacts includes rendered PDF page count when available', as
         { pdfPageCount: 25 }
       ),
       ['25 pages', '4 KB', 'Modified May 30, 2026, 16:00']
+    )
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getStatusBarEditorFacts summarizes cursor, selection, characters, and indentation', async () => {
+  const { module, tempDir } = await loadStatusBar()
+
+  try {
+    assert.deepEqual(
+      module.getStatusBarEditorFacts({
+        line: 12,
+        column: 5,
+        selectionCount: 2,
+        selectedCharacters: 9,
+        characterCount: 128,
+        indentStyle: 'space',
+        indentSize: 2,
+        encoding: 'UTF-8',
+        modifiedAt: '2026-05-30T10:15:00.000Z',
+        lastChange: {
+          authorName: 'Miclle Zheng',
+          authorEmail: 'miclle@example.com',
+          committedAt: '2026-05-27T06:59:00.000Z',
+          shortHash: '60a7b50',
+          subject: 'feat(app): add custom titlebar tabs'
+        }
+      }),
+      [
+        'Ln 12, Col 5',
+        '2 selections (9 chars)',
+        '128 chars',
+        'Spaces: 2',
+        'UTF-8',
+        'Miclle Zheng, May 27, 2026, 14:59'
+      ]
+    )
+
+    assert.deepEqual(
+      module.getStatusBarEditorFacts({
+        line: 3,
+        column: 1,
+        selectionCount: 0,
+        selectedCharacters: 0,
+        characterCount: 42,
+        indentStyle: 'tab',
+        indentSize: 4,
+        encoding: 'UTF-8',
+        modifiedAt: '2026-05-30T10:15:00.000Z'
+      }),
+      ['Ln 3, Col 1', '42 chars', 'Tab Size: 4', 'UTF-8', 'Modified May 30, 2026, 18:15']
     )
   } finally {
     await rm(tempDir, { recursive: true, force: true })

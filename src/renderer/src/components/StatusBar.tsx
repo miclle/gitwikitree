@@ -1,19 +1,31 @@
 import type React from 'react'
 import { FileText, Folder, GitBranch, GitFork } from 'lucide-react'
-import { getStatusBarFileFacts, getStatusBarPath, getStatusBarWorkspaceLabel } from '../status-bar'
+import {
+  getStatusBarEditorFacts,
+  getStatusBarFileFacts,
+  getStatusBarPath,
+  getStatusBarWorkspaceLabel
+} from '../status-bar'
 import type { PreviewPayload, RepositoryPayload } from '../../../shared/types'
+import type { EditorStatusBarState } from '../status-bar'
 
 export function StatusBar({
   repository,
   preview,
-  pdfPageCount
+  pdfPageCount,
+  editorStatus
 }: {
   repository: RepositoryPayload
   preview: PreviewPayload | undefined
   pdfPageCount?: number
+  editorStatus?: EditorStatusBarState
 }): React.JSX.Element {
   const activePath = preview ? getStatusBarPath(repository, preview) : repository.path
-  const facts = preview ? getStatusBarFileFacts(preview, { pdfPageCount }) : []
+  const facts = editorStatus
+    ? getStatusBarEditorFacts(editorStatus)
+    : preview
+      ? getStatusBarFileFacts(preview, { pdfPageCount })
+      : []
 
   return (
     <footer className="status-bar" aria-label="Workspace status">

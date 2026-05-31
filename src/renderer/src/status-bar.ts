@@ -1,4 +1,17 @@
-import type { PreviewPayload, RepositoryPayload } from '../../shared/types'
+import type { GitLastChange, PreviewPayload, RepositoryPayload } from '../../shared/types'
+
+export type EditorStatusBarState = {
+  line: number
+  column: number
+  selectionCount: number
+  selectedCharacters: number
+  characterCount: number
+  indentStyle: 'space' | 'tab'
+  indentSize: number
+  encoding: string
+  modifiedAt: string
+  lastChange?: GitLastChange
+}
 
 const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
@@ -47,10 +60,38 @@ export function getStatusBarFileFacts(
     }
 
     facts.push(formatFileSize(preview.size))
+    if (preview.encoding) facts.push(preview.encoding)
   }
 
-  facts.push(`Modified ${formatModifiedAt(preview.modifiedAt)}`)
+  facts.push(formatChangeTime(preview.modifiedAt, preview.lastChange))
   return facts
+}
+
+export function getStatusBarEditorFacts(status: EditorStatusBarState): string[] {
+  const facts = [`Ln ${status.line}, Col ${status.column}`]
+
+  if (status.selectionCount > 0) {
+    facts.push(
+      `${status.selectionCount} ${status.selectionCount === 1 ? 'selection' : 'selections'} (${status.selectedCharacters} ${status.selectedCharacters === 1 ? 'char' : 'chars'})`
+    )
+  }
+
+  facts.push(`${status.characterCount} ${status.characterCount === 1 ? 'char' : 'chars'}`)
+  facts.push(
+    status.indentStyle === 'tab' ? `Tab Size: ${status.indentSize}` : `Spaces: ${status.indentSize}`
+  )
+  facts.push(status.encoding)
+  facts.push(formatChangeTime(status.modifiedAt, status.lastChange))
+
+  return facts
+}
+
+function formatChangeTime(modifiedAt: string, lastChange?: GitLastChange): string {
+  return lastChange ? formatLastChange(lastChange) : `Modified ${formatModifiedAt(modifiedAt)}`
+}
+
+function formatLastChange(lastChange: GitLastChange): string {
+  return `${lastChange.authorName}, ${formatModifiedAt(lastChange.committedAt)}`
 }
 
 function countWords(content: string): number {

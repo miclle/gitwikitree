@@ -2,7 +2,7 @@ import { execFile } from 'child_process'
 import { promises as fs } from 'fs'
 import { resolve } from 'path'
 import { promisify } from 'util'
-import type { RepositoryPayload } from '../shared/types'
+import type { GitLastChange, RepositoryPayload } from '../shared/types'
 
 export const execFileAsync = promisify(execFile)
 
@@ -110,6 +110,38 @@ export async function getModifiedFiles(repoPath: string): Promise<Set<string>> {
   }
 
   return modifiedFiles
+}
+
+export async function getLastChange(
+  repoPath: string,
+  relativePath: string
+): Promise<GitLastChange | undefined> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C',
+      repoPath,
+      'log',
+      '-1',
+      '--format=%an%x00%ae%x00%aI%x00%h%x00%s',
+      '--',
+      relativePath || '.'
+    ])
+    const trimmed = stdout.trim()
+    if (!trimmed) return undefined
+
+    const [authorName, authorEmail, committedAt, shortHash, subject] = trimmed.split('\0')
+    if (!authorName || !committedAt || !shortHash) return undefined
+
+    return {
+      authorName,
+      authorEmail,
+      committedAt,
+      shortHash,
+      subject
+    }
+  } catch {
+    return undefined
+  }
 }
 
 export async function getRefs(

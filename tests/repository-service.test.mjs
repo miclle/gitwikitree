@@ -98,8 +98,43 @@ test('getPreview includes file and directory modification timestamps for status 
     assert.equal(directoryPreview.kind, 'directory')
     assert.equal(typeof filePreview.modifiedAt, 'string')
     assert.equal(typeof directoryPreview.modifiedAt, 'string')
+    assert.equal(filePreview.encoding, 'UTF-8')
     assert.ok(!Number.isNaN(Date.parse(filePreview.modifiedAt)))
     assert.ok(!Number.isNaN(Date.parse(directoryPreview.modifiedAt)))
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getPreview includes the latest Git author for status metadata', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await writeFile(join(repoPath, 'docs', 'guide.md'), '# Guide\n\nUpdated by Miclle\n')
+    await execFileAsync('git', ['add', 'docs/guide.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'docs: update guide'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Miclle Zheng',
+        GIT_AUTHOR_EMAIL: 'miclle@example.com',
+        GIT_AUTHOR_DATE: '2026-05-27T06:59:00Z',
+        GIT_COMMITTER_NAME: 'Miclle Zheng',
+        GIT_COMMITTER_EMAIL: 'miclle@example.com',
+        GIT_COMMITTER_DATE: '2026-05-27T06:59:00Z'
+      }
+    })
+
+    const preview = await service.getPreview(repoPath, 'docs/guide.md')
+
+    assert.equal(preview.kind, 'file')
+    assert.equal(preview.lastChange.authorName, 'Miclle Zheng')
+    assert.equal(preview.lastChange.authorEmail, 'miclle@example.com')
+    assert.equal(preview.lastChange.committedAt, '2026-05-27T06:59:00Z')
+    assert.match(preview.lastChange.shortHash, /^[a-f0-9]{7,}$/)
+    assert.equal(preview.lastChange.subject, 'docs: update guide')
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

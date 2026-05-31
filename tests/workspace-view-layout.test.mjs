@@ -569,7 +569,7 @@ test('PDF preview reports page count to the status bar instead of overlaying it'
   )
   assert.match(
     workspaceSource,
-    /<StatusBar repository=\{repository\} preview=\{preview\} pdfPageCount=\{activePdfPageCount\} \/>/,
+    /<StatusBar[\s\S]*repository=\{repository\}[\s\S]*preview=\{preview\}[\s\S]*pdfPageCount=\{activePdfPageCount\}/,
     'Workspace should pass PDF page count to the status bar'
   )
   assert.match(
@@ -837,5 +837,80 @@ test('saving an edited file refreshes Git status decorations', async () => {
     source,
     /const nextRepository = await window\.api\.loadRepository\(repository\.path\)[\s\S]*setRepository\(nextRepository\)/,
     'saving a file should refresh the repository tree so saved Git modifications can show M'
+  )
+})
+
+test('editing mode routes editor state into the status bar', async () => {
+  const workspaceSource = await readWorkspaceView()
+  const fileEditorSource = await readFileEditor()
+  const statusBarSource = await readFile(
+    new URL('../src/renderer/src/components/StatusBar.tsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(
+    fileEditorSource,
+    /onStatusChange: \(status: EditorStatusBarState\) => void/,
+    'FileEditor should expose cursor, selection, character, and indentation status changes'
+  )
+  assert.match(
+    fileEditorSource,
+    /EditorView\.updateListener\.of/,
+    'FileEditor should observe CodeMirror updates for status bar changes'
+  )
+  assert.match(
+    workspaceSource,
+    /const \[editorStatus, setEditorStatus\]/,
+    'Workspace should keep the latest editor status while editing'
+  )
+  assert.match(
+    workspaceSource,
+    /onStatusChange=\{setEditorStatus\}/,
+    'Workspace should receive status updates from the editor'
+  )
+  assert.match(
+    workspaceSource,
+    /encoding=\{preview\.encoding\}/,
+    'Workspace should pass the preview encoding into the editor status'
+  )
+  assert.match(
+    workspaceSource,
+    /modifiedAt=\{preview\.modifiedAt\}/,
+    'Workspace should pass the preview modified time into the editor status'
+  )
+  assert.match(
+    workspaceSource,
+    /lastChange=\{preview\.lastChange\}/,
+    'Workspace should pass the preview Git author metadata into the editor status'
+  )
+  assert.match(
+    workspaceSource,
+    /editorStatus=\{isEditing \? editorStatusWithFileMetadata : undefined\}/,
+    'StatusBar should switch to editor facts only while edit mode is active'
+  )
+  assert.match(
+    workspaceSource,
+    /const editorStatusWithFileMetadata =[\s\S]*modifiedAt: preview\.modifiedAt/,
+    'Workspace should keep editor status metadata in sync with the latest preview after saving'
+  )
+  assert.match(
+    statusBarSource,
+    /getStatusBarEditorFacts\(editorStatus\)/,
+    'StatusBar should render editor-specific facts when editor status is available'
+  )
+})
+
+test('editor status does not rescan indentation on cursor-only changes', async () => {
+  const fileEditorSource = await readFileEditor()
+
+  assert.doesNotMatch(
+    fileEditorSource,
+    /indentation = detectIndentation\(state\.doc\.toString\(\), state\.tabSize\)/,
+    'getEditorStatus should not default to a full document indentation scan'
+  )
+  assert.match(
+    fileEditorSource,
+    /update\.docChanged[\s\S]*\? detectIndentation\(update\.state\.doc\.toString\(\), update\.state\.tabSize\)[\s\S]*: contentIndentation/,
+    'FileEditor should rescan indentation only when the document changes'
   )
 })

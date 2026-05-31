@@ -1,4 +1,5 @@
 import CodeMirror from '@uiw/react-codemirror'
+import { useCallback, useMemo } from 'react'
 import { css } from '@codemirror/lang-css'
 import { html } from '@codemirror/lang-html'
 import { javascript } from '@codemirror/lang-javascript'
@@ -7,7 +8,9 @@ import { markdown } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import type { Extension } from '@codemirror/state'
+import type { EditorState, Extension } from '@codemirror/state'
+import type { GitLastChange } from '../../../shared/types'
+import type { EditorStatusBarState } from '../status-bar'
 
 const markdownEditorHighlightStyle = HighlightStyle.define([
   {
@@ -67,15 +70,138 @@ function editorExtensions(extension: string): Extension[] {
   return extensions
 }
 
+function getEditorStatus({
+  state,
+  encoding,
+  modifiedAt,
+  lastChange,
+  indentation
+}: {
+  state: EditorState
+  encoding: string
+  modifiedAt: string
+  lastChange?: GitLastChange
+  indentation: ReturnType<typeof detectIndentation>
+}): EditorStatusBarState {
+  const head = state.selection.main.head
+  const line = state.doc.lineAt(head)
+  const selectedRanges = state.selection.ranges.filter((range) => !range.empty)
+  const selectedCharacters = selectedRanges.reduce(
+    (total, range) => total + Math.abs(range.to - range.from),
+    0
+  )
+
+  return {
+    line: line.number,
+    column: head - line.from + 1,
+    selectionCount: selectedRanges.length,
+    selectedCharacters,
+    characterCount: state.doc.length,
+    indentStyle: indentation.style,
+    indentSize: indentation.size,
+    encoding,
+    modifiedAt,
+    ...(lastChange ? { lastChange } : {})
+  }
+}
+
+function detectIndentation(
+  content: string,
+  tabSize: number
+): { style: EditorStatusBarState['indentStyle']; size: number } {
+  const spaceIndents = new Map<number, number>()
+  let tabIndents = 0
+
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue
+
+    const indent = line.match(/^[\t ]+/)?.[0]
+    if (!indent) continue
+
+    if (indent.includes('\t')) {
+      tabIndents += 1
+      continue
+    }
+
+    const size = indent.length
+    spaceIndents.set(size, (spaceIndents.get(size) ?? 0) + 1)
+  }
+
+  if (tabIndents > 0 && tabIndents >= getTotalIndentSamples(spaceIndents)) {
+    return { style: 'tab', size: tabSize }
+  }
+
+  return { style: 'space', size: getMostLikelySpaceIndent(spaceIndents) }
+}
+
+function getTotalIndentSamples(samples: Map<number, number>): number {
+  return Array.from(samples.values()).reduce((total, count) => total + count, 0)
+}
+
+function getMostLikelySpaceIndent(samples: Map<number, number>): number {
+  let bestSize = 2
+  let bestCount = 0
+
+  for (const [size, count] of samples) {
+    if (count > bestCount || (count === bestCount && size < bestSize)) {
+      bestSize = size
+      bestCount = count
+    }
+  }
+
+  return bestSize
+}
+
 export function FileEditor({
   content,
+  encoding = 'UTF-8',
   extension,
-  onChange
+  modifiedAt,
+  lastChange,
+  onChange,
+  onStatusChange
 }: {
   content: string
+  encoding?: string
   extension: string
+  modifiedAt: string
+  lastChange?: GitLastChange
   onChange: (content: string) => void
+  onStatusChange: (status: EditorStatusBarState) => void
 }): React.JSX.Element {
+  const contentIndentation = useMemo(() => detectIndentation(content, 4), [content])
+  const extensions = useMemo(
+    () => [
+      ...editorExtensions(extension),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged || update.selectionSet) {
+          const indentation = update.docChanged
+            ? detectIndentation(update.state.doc.toString(), update.state.tabSize)
+            : contentIndentation
+
+          onStatusChange(
+            getEditorStatus({ state: update.state, encoding, modifiedAt, lastChange, indentation })
+          )
+        }
+      })
+    ],
+    [contentIndentation, encoding, extension, lastChange, modifiedAt, onStatusChange]
+  )
+  const handleCreateEditor = useCallback(
+    (view: EditorView): void => {
+      onStatusChange(
+        getEditorStatus({
+          state: view.state,
+          encoding,
+          modifiedAt,
+          lastChange,
+          indentation: detectIndentation(view.state.doc.toString(), view.state.tabSize)
+        })
+      )
+    },
+    [encoding, lastChange, modifiedAt, onStatusChange]
+  )
+
   return (
     <CodeMirror
       className="file-editor"
@@ -87,8 +213,9 @@ export function FileEditor({
         foldGutter: true,
         autocompletion: true
       }}
-      extensions={editorExtensions(extension)}
+      extensions={extensions}
       onChange={onChange}
+      onCreateEditor={handleCreateEditor}
     />
   )
 }
