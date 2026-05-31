@@ -50,6 +50,13 @@ async function readRepositoryWorkspaceHook() {
   )
 }
 
+async function readWorkspaceSessionRestore() {
+  return readFile(
+    new URL('../src/renderer/src/workspace-session-restore.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readWorkspaceEditingHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/useWorkspaceEditing.ts', import.meta.url),
@@ -974,11 +981,11 @@ test('branch selection opens an action modal with explanatory choices', async ()
 })
 
 test('restored active file tabs reveal their item in the tree', async () => {
-  const source = await readRepositoryWorkspaceHook()
+  const source = await readWorkspaceSessionRestore()
 
   assert.match(
     source,
-    /restoreRepositorySession[\s\S]*setExpandedPaths\([\s\S]*new Set\(\[[\s\S]*\.\.\.\(session\.expandedPaths\.length \? session\.expandedPaths : \[''\]\),[\s\S]*\.\.\.parentPaths\(nextSelectedPath\)[\s\S]*\]\)[\s\S]*\)/,
+    /expandedPaths:\s*new Set\(\[[\s\S]*\.\.\.\(session\.expandedPaths\.length \? session\.expandedPaths : \[''\]\),[\s\S]*\.\.\.parentPaths\(nextSelectedPath\)[\s\S]*\]\)/,
     'restoring a window should expand ancestor folders for the active tab'
   )
 })
@@ -1313,7 +1320,7 @@ test('files sidebar width is saved and restored with the project session', async
   )
   assert.match(
     workspaceSource,
-    /restoreRepositorySession[\s\S]*if \(session\.sidebarWidth\) setSidebarWidth\(session\.sidebarWidth\)/,
+    /restoreRepositorySession[\s\S]*createRestoredRepositorySession\(nextRepository, session\)[\s\S]*if \(session\.sidebarWidth\) setSidebarWidth\(session\.sidebarWidth\)/,
     'workspace should restore the saved sidebar width when a project session loads'
   )
 })
@@ -1329,7 +1336,7 @@ test('files sidebar collapsed state is saved and restored with the project sessi
   )
   assert.match(
     workspaceSource,
-    /restoreRepositorySession[\s\S]*if \(typeof session\.isSidebarOpen === 'boolean'\) \{[\s\S]*setIsSidebarOpen\(session\.isSidebarOpen\)/,
+    /restoreRepositorySession[\s\S]*createRestoredRepositorySession\(nextRepository, session\)[\s\S]*if \(typeof session\.isSidebarOpen === 'boolean'\) \{[\s\S]*setIsSidebarOpen\(session\.isSidebarOpen\)/,
     'workspace should restore saved sidebar visibility when a project session loads'
   )
 })

@@ -20,6 +20,19 @@ async function loadWorkspaceNavigation() {
   return { module, tempDir }
 }
 
+async function loadWorkspaceSessionRestore() {
+  const { module, tempDir } = await loadTranspiledModule({
+    entry: 'src/renderer/src/workspace-session-restore.ts',
+    modules: [
+      'src/renderer/src/workspace-session-restore.ts',
+      'src/renderer/src/workspace-paths.ts',
+      'src/renderer/src/repository-navigation.ts',
+      'src/shared/types.ts'
+    ]
+  })
+  return { module, tempDir }
+}
+
 test('navigateFileTabs replaces the active tab for ordinary navigation and records history', async () => {
   const { navigateFileTabs } = await loadAppNavigation()
   const initialTabs = [
@@ -206,4 +219,66 @@ test('mergeOpenedFileTab preserves current tabs while replacing duplicate paths'
     module.mergeOpenedFileTab(currentTabs, openedTab).map((tab) => tab.id),
     ['tab-docs', 'tab-new-readme']
   )
+})
+
+test('createRestoredRepositorySession resolves tabs and expands active ancestors', async () => {
+  const { module } = await loadWorkspaceSessionRestore()
+  const repository = {
+    name: 'wiki',
+    path: '/repo',
+    rootPath: '/repo',
+    branch: 'main',
+    activeRef: 'main',
+    source: 'working-tree',
+    editable: true,
+    refs: [],
+    tree: [
+      {
+        name: 'docs',
+        path: 'docs',
+        type: 'directory',
+        children: [{ name: 'guide.md', path: 'docs/guide.md', type: 'file' }]
+      }
+    ]
+  }
+  const session = {
+    selectedPath: 'missing.md',
+    activeFilePath: 'docs/guide.md',
+    activeFileTabId: 'guide-tab',
+    expandedPaths: [],
+    openFileTabs: [
+      {
+        id: 'missing-tab',
+        path: 'missing.md',
+        name: 'missing.md',
+        history: [{ path: 'missing.md', name: 'missing.md', type: 'file' }],
+        historyIndex: 0
+      },
+      {
+        id: 'guide-tab',
+        path: 'docs/guide.md',
+        name: 'old-name.md',
+        history: [
+          { path: 'README.md', name: 'README.md', type: 'file' },
+          { path: 'docs/guide.md', name: 'old-name.md', type: 'file' }
+        ],
+        historyIndex: 1
+      }
+    ]
+  }
+
+  const restored = module.createRestoredRepositorySession(repository, session)
+
+  assert.equal(restored.selectedPath, 'docs/guide.md')
+  assert.equal(restored.activeFilePath, 'docs/guide.md')
+  assert.equal(restored.activeFileTabId, 'guide-tab')
+  assert.deepEqual(
+    restored.openFileTabs.map((tab) => tab.path),
+    ['docs/guide.md']
+  )
+  assert.deepEqual(
+    restored.openFileTabs[0].history.map((item) => item.path),
+    ['README.md', 'docs/guide.md']
+  )
+  assert.deepEqual([...restored.expandedPaths], ['', 'docs'])
 })

@@ -9,8 +9,10 @@ import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
 import { useWorkspaceEditing } from './useWorkspaceEditing'
 import { useWorkspaceSettings } from './useWorkspaceSettings'
-import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
+import { getRepositoryLabel } from '../repository-label'
+import { fileNameFromPath, parentPaths } from '../workspace-paths'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
+import { createRestoredRepositorySession } from '../workspace-session-restore'
 import {
   createCloseFileTabPatch,
   createHistoryNavigationPatch,
@@ -21,7 +23,6 @@ import {
   type WorkspaceNavigationPatch
 } from '../workspace-navigation'
 import type {
-  NavigationTarget,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   PreviewPayload,
@@ -61,15 +62,6 @@ async function loadRepositoryForProjectSession(
     rootPath: session.rootPath,
     activeRef: session.activeRef,
     source: session.source
-  })
-}
-
-function resolveHistoryTargets(
-  repository: RepositoryPayload,
-  history: NavigationTarget[] | undefined
-): NavigationTarget[] | undefined {
-  return history?.map((target) => {
-    return resolveRepositoryNavigationTarget(repository, target.path)?.target ?? target
   })
 }
 
@@ -239,47 +231,19 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
 
   const restoreRepositorySession = useCallback(
     async (nextRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
-      const restoredTabs = session.openFileTabs
-        .map((tab) => {
-          const resolved = resolveRepositoryNavigationTarget(nextRepository, tab.path)
-          if (!resolved) return undefined
-
-          return {
-            ...tab,
-            ...resolved.target,
-            history: resolveHistoryTargets(nextRepository, tab.history)
-          }
-        })
-        .filter((tab): tab is NonNullable<typeof tab> => Boolean(tab))
-        .map((tab, index) => hydrateOpenFileTab(tab, index))
-      const restoredActiveTab =
-        restoredTabs.find((tab) => tab.id === session.activeFileTabId) ?? restoredTabs[0]
-      const restoredActiveTabId =
-        restoredActiveTab?.id ??
-        restoredTabs.find((tab) => tab.path === session.activeFilePath)?.id ??
-        restoredTabs[0]?.id
-      const restoredActiveFile =
-        restoredActiveTab?.type === 'directory' ? undefined : restoredActiveTab?.path
-      const selectedPath = restoredActiveTab?.path ?? session.selectedPath ?? ''
-      const selectedTarget = resolveRepositoryNavigationTarget(nextRepository, selectedPath)
-      const nextSelectedPath = selectedTarget?.target.path ?? ''
+      const restoredSession = createRestoredRepositorySession(nextRepository, session)
 
       setRepository(nextRepository)
-      setExpandedPaths(
-        new Set([
-          ...(session.expandedPaths.length ? session.expandedPaths : ['']),
-          ...parentPaths(nextSelectedPath)
-        ])
-      )
-      setOpenFileTabs(restoredTabs)
-      setActiveFilePath(restoredActiveFile)
-      setActiveFileTabId(restoredActiveTabId)
-      setSelectedPath(nextSelectedPath)
+      setExpandedPaths(restoredSession.expandedPaths)
+      setOpenFileTabs(restoredSession.openFileTabs)
+      setActiveFilePath(restoredSession.activeFilePath)
+      setActiveFileTabId(restoredSession.activeFileTabId)
+      setSelectedPath(restoredSession.selectedPath)
       if (session.sidebarWidth) setSidebarWidth(session.sidebarWidth)
       if (typeof session.isSidebarOpen === 'boolean') {
         setIsSidebarOpen(session.isSidebarOpen)
       }
-      await loadPreview(nextSelectedPath, nextRepository)
+      await loadPreview(restoredSession.selectedPath, nextRepository)
     },
     [loadPreview, setSidebarWidth]
   )
