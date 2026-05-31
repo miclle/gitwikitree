@@ -24,6 +24,7 @@ function createActions() {
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
       saveCurrentFile: () => calls.push(['saveCurrentFile']),
+      openSettings: () => calls.push(['openSettings']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
       openGlobalSearch: () => calls.push(['openGlobalSearch']),
       closeWindow: () => calls.push(['closeWindow'])
@@ -108,6 +109,8 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
       'separator',
       'Find',
       'Search Repository...',
+      'separator',
+      'Settings...',
       'selectAll'
     ]
   )
@@ -140,6 +143,42 @@ test('createAppMenuTemplate exposes save in the file menu', async () => {
   const saveItem = fileMenu.submenu.find((item) => item.label === 'Save')
 
   assert.equal(saveItem.accelerator, 'CommandOrControl+S')
+})
+
+test('createAppMenuTemplate exposes settings from the app menu on macOS', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions, calls } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'darwin',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const appMenu = template.find((item) => item.label === 'Git Wikitree')
+  const settingsItem = appMenu.submenu.find((item) => item.label === 'Settings...')
+
+  assert.equal(settingsItem.accelerator, 'CommandOrControl+,')
+  settingsItem.click()
+  assert.deepEqual(calls, [['openSettings']])
+})
+
+test('createAppMenuTemplate exposes settings from the edit menu off macOS', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions, calls } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const editMenu = template.find((item) => item.label === 'Edit')
+  const settingsItem = editMenu.submenu.find((item) => item.label === 'Settings...')
+
+  assert.equal(settingsItem.accelerator, 'CommandOrControl+,')
+  settingsItem.click()
+  assert.deepEqual(calls, [['openSettings']])
 })
 
 test('createAppMenuTemplate disables empty recent menus and adds darwin app menu', async () => {

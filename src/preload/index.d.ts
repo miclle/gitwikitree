@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  AppSettings,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   PreviewPayload,
@@ -41,6 +42,8 @@ export type GitWikitreeAPI = {
     query: string,
     options?: RepositoryLoadOptions
   ) => Promise<RepositorySearchResult[]>
+  getSettings: () => Promise<AppSettings>
+  saveSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>
   getSession: () => Promise<SessionState>
   getProjectSession: (repoPath: string) => Promise<ProjectSessionState | undefined>
   saveSession: (session: Partial<SessionState>) => Promise<SessionState>
@@ -54,6 +57,7 @@ export type GitWikitreeAPI = {
   onOpenCurrentTabSearch: (callback: () => void) => () => void
   onOpenGlobalSearch: (callback: () => void) => () => void
   onSaveCurrentFile: (callback: () => void) => () => void
+  onOpenSettings: (callback: () => void) => () => void
 }
 
 declare global {

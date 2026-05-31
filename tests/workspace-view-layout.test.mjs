@@ -47,6 +47,13 @@ async function readFileEditor() {
   return readFile(new URL('../src/renderer/src/components/FileEditor.tsx', import.meta.url), 'utf8')
 }
 
+async function readSettingsDialog() {
+  return readFile(
+    new URL('../src/renderer/src/components/SettingsDialog.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readTreeRow() {
   return readFile(new URL('../src/renderer/src/components/TreeRow.tsx', import.meta.url), 'utf8')
 }
@@ -110,6 +117,140 @@ test('preview titlebar keeps preview controls tight before tabs', async () => {
     css,
     /\.main-titlebar-actions\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?gap:\s*0;/,
     'preview titlebar actions should stay tight before the tab strip'
+  )
+})
+
+test('settings dialog applies changes immediately without a save action', async () => {
+  const source = await readSettingsDialog()
+  const workspaceHook = await readRepositoryWorkspaceHook()
+
+  assert.doesNotMatch(source, /onSubmit=|type="submit"|>\s*Save\s*</)
+  assert.doesNotMatch(source, /settings-actions|>\s*Done\s*</)
+  assert.match(
+    source,
+    /addEventListener\('keydown', handleKeyDown\)[\s\S]*removeEventListener\('keydown', handleKeyDown\)/,
+    'settings dialog should close from Escape and clean up its key listener'
+  )
+  assert.match(
+    source,
+    /if \(event\.key === 'Escape'\) \{[\s\S]*onClose\(\)/,
+    'settings dialog should close when Escape is pressed'
+  )
+  assert.match(
+    source,
+    /const applySetting = <Key extends keyof AppSettings>[\s\S]*void onSave\(\{ \[key\]: value \}/,
+    'settings controls should persist individual changes from their onChange handlers'
+  )
+  assert.match(
+    source,
+    /onChange=\{\(event\) =>[\s\S]*applySetting\('appearance'/,
+    'appearance changes should apply immediately'
+  )
+  assert.match(
+    source,
+    /onChange=\{\(event\) =>[\s\S]*applyHomeFileNames/,
+    'home file candidate edits should apply without an extra save click'
+  )
+  const saveSettingsBlock = workspaceHook.match(
+    /const saveSettings = useCallback\([\s\S]*?\n {2}\)\n\n {2}useEffect/
+  )
+  assert.ok(saveSettingsBlock, 'workspace should expose a saveSettings callback')
+  assert.doesNotMatch(
+    saveSettingsBlock[0],
+    /setIsSettingsOpen\(false\)/,
+    'saving settings should not close the modal after each immediate change'
+  )
+  assert.match(
+    workspaceHook,
+    /homeFilePreviewReloadTimeoutRef = useRef<number \| undefined>\(undefined\)/,
+    'home file candidate edits should use a debounced directory preview reload'
+  )
+  assert.doesNotMatch(
+    saveSettingsBlock[0],
+    /reloadCurrentRepository|loadRepository/,
+    'home file candidate edits should not reload the repository or affect file previews'
+  )
+  assert.match(
+    workspaceHook,
+    /if \(preview\?\.kind !== 'directory'\) return[\s\S]*homeFilePreviewReloadTimeoutRef\.current = window\.setTimeout\(\(\) => \{[\s\S]*void loadPreview\(directoryPath\)/,
+    'home file candidate edits should only coalesce reloads for the current directory preview'
+  )
+  assert.match(
+    workspaceHook,
+    /if \(preview\?\.kind === 'directory' && preview\.path === selectedPath\) return[\s\S]*clearHomeFileDirectoryPreviewReload\(\)/,
+    'pending home file preview reloads should be canceled after navigating away from the directory'
+  )
+})
+
+test('dark appearance uses theme variables for shell chrome and settings controls', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /:root\[data-app-appearance='dark'\]\s*\{[\s\S]*--chrome-bg:[\s\S]*--tab-active-bg:[\s\S]*--control-bg:/,
+    'dark mode should define dedicated chrome, tab, and control variables'
+  )
+  assert.match(
+    css,
+    /\.tree-panel\s*\{[\s\S]*background:\s*var\(--sidebar-bg\);/,
+    'sidebar should not keep the light theme background in dark mode'
+  )
+  assert.match(
+    css,
+    /\.main-tab\.active\s*\{[\s\S]*color:\s*var\(--tab-active-text\);[\s\S]*background:\s*var\(--tab-active-bg\);/,
+    'active tabs should use theme variables'
+  )
+  assert.match(
+    css,
+    /\.breadcrumb strong\s*\{[\s\S]*color:\s*var\(--text\);/,
+    'breadcrumb current item should be readable in dark mode'
+  )
+  assert.match(
+    css,
+    /\.settings-section\s*\{[\s\S]*border:\s*1px solid var\(--border-muted\);[\s\S]*background:\s*var\(--settings-section-bg\);/,
+    'settings sections should be visually grouped with theme-aware surfaces'
+  )
+  assert.match(
+    css,
+    /\.settings-control\s*\{[\s\S]*border:\s*1px solid var\(--control-border\);[\s\S]*background:\s*var\(--control-bg\);/,
+    'settings form controls should use the same theme-aware control surface as the app chrome'
+  )
+  assert.match(
+    css,
+    /\.settings-control\s*\{[^}]*min-height:\s*32px;[^}]*border-radius:\s*8px;/,
+    'settings controls should match the compact desktop control density'
+  )
+  assert.match(
+    css,
+    /select\.settings-control\s*\{[^}]*appearance:\s*none;[^}]*background-image:\s*url\("data:image\/svg\+xml,/,
+    'settings selects should use the app-styled chevron instead of the native platform control'
+  )
+  assert.match(
+    css,
+    /select\.settings-control\s*\{[^}]*padding:\s*0 34px 0 12px;/,
+    'settings selects should reserve the same compact trailing space as app controls'
+  )
+  const markdownCodeBlock = css.match(/\.markdown-body pre code\s*\{[^}]*\}/)
+  assert.ok(markdownCodeBlock, 'markdown code block rule should exist')
+  assert.match(
+    markdownCodeBlock[0],
+    /color:\s*var\(--text\);/,
+    'markdown code block text should stay readable in dark mode'
+  )
+  assert.match(
+    css,
+    /--table-bg:[\s\S]*--table-header-bg:[\s\S]*--table-row-alt-bg:[\s\S]*--table-border:[\s\S]*--table-text:/,
+    'markdown table surfaces should use theme variables'
+  )
+  assert.match(
+    css,
+    /\.markdown-body th,\s*\.markdown-body td\s*\{[^}]*color:\s*var\(--table-text\);[^}]*background:\s*var\(--table-bg\);/,
+    'markdown table cells should not inherit light table colors in dark mode'
+  )
+  assert.match(
+    css,
+    /:root\[data-app-appearance='dark'\] \.markdown-body th,[\s\S]*:root\[data-app-appearance='dark'\] \.markdown-body td\s*\{[^}]*color:\s*var\(--table-text\) !important;[^}]*background:\s*var\(--table-bg\) !important;/,
+    'dark mode should override copied HTML table inline light colors'
   )
 })
 

@@ -5,11 +5,11 @@ import { html } from '@codemirror/lang-html'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
 import { markdown } from '@codemirror/lang-markdown'
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { HighlightStyle, indentUnit, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import type { EditorState, Extension } from '@codemirror/state'
-import type { GitLastChange } from '../../../shared/types'
+import { EditorState, type Extension } from '@codemirror/state'
+import type { AppSettings, GitLastChange } from '../../../shared/types'
 import type { EditorStatusBarState } from '../status-bar'
 
 const markdownEditorHighlightStyle = HighlightStyle.define([
@@ -158,6 +158,7 @@ export function FileEditor({
   extension,
   modifiedAt,
   lastChange,
+  settings,
   onChange,
   onStatusChange
 }: {
@@ -166,13 +167,21 @@ export function FileEditor({
   extension: string
   modifiedAt: string
   lastChange?: GitLastChange
+  settings: AppSettings
   onChange: (content: string) => void
   onStatusChange: (status: EditorStatusBarState) => void
 }): React.JSX.Element {
-  const contentIndentation = useMemo(() => detectIndentation(content, 4), [content])
+  const contentIndentation = useMemo(
+    () => detectIndentation(content, settings.editorIndentSize),
+    [content, settings.editorIndentSize]
+  )
   const extensions = useMemo(
     () => [
       ...editorExtensions(extension),
+      EditorState.tabSize.of(settings.editorIndentSize),
+      indentUnit.of(
+        settings.editorIndentStyle === 'tab' ? '\t' : ' '.repeat(settings.editorIndentSize)
+      ),
       EditorView.updateListener.of((update) => {
         if (update.docChanged || update.selectionSet) {
           const indentation = update.docChanged
@@ -185,7 +194,16 @@ export function FileEditor({
         }
       })
     ],
-    [contentIndentation, encoding, extension, lastChange, modifiedAt, onStatusChange]
+    [
+      contentIndentation,
+      encoding,
+      extension,
+      lastChange,
+      modifiedAt,
+      onStatusChange,
+      settings.editorIndentSize,
+      settings.editorIndentStyle
+    ]
   )
   const handleCreateEditor = useCallback(
     (view: EditorView): void => {
@@ -195,11 +213,11 @@ export function FileEditor({
           encoding,
           modifiedAt,
           lastChange,
-          indentation: detectIndentation(view.state.doc.toString(), view.state.tabSize)
+          indentation: detectIndentation(view.state.doc.toString(), settings.editorIndentSize)
         })
       )
     },
-    [encoding, lastChange, modifiedAt, onStatusChange]
+    [encoding, lastChange, modifiedAt, onStatusChange, settings.editorIndentSize]
   )
 
   return (

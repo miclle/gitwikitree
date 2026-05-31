@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
+  AppSettings,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   RepositoryLoadOptions,
@@ -47,6 +48,8 @@ const api = {
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content, options),
   searchRepository: (repoPath: string, query: string, options?: RepositoryLoadOptions) =>
     ipcRenderer.invoke('repository:search', repoPath, query, options),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  saveSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke('settings:save', settings),
   getSession: () => ipcRenderer.invoke('session:get'),
   getProjectSession: (repoPath: string) => ipcRenderer.invoke('session:get-project', repoPath),
   saveSession: (session: unknown) => ipcRenderer.invoke('session:save', session),
@@ -138,6 +141,12 @@ const api = {
     ipcRenderer.on('file:save-current', listener)
 
     return () => ipcRenderer.removeListener('file:save-current', listener)
+  },
+  onOpenSettings: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('settings:open', listener)
+
+    return () => ipcRenderer.removeListener('settings:open', listener)
   }
 }
 

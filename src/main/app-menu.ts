@@ -16,6 +16,7 @@ type AppMenuTemplateOptions = {
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
   saveCurrentFile: () => void
+  openSettings: () => void
   openCurrentTabSearch: () => void
   openGlobalSearch: () => void
   closeWindow: () => void
@@ -32,6 +33,7 @@ export function createAppMenuTemplate({
   clearRecent,
   closeCurrentTabOrWindow,
   saveCurrentFile,
+  openSettings,
   openCurrentTabSearch,
   openGlobalSearch,
   closeWindow
@@ -73,6 +75,12 @@ export function createAppMenuTemplate({
             label: appName,
             submenu: [
               { role: 'about' as const },
+              { type: 'separator' as const },
+              {
+                label: 'Settings...',
+                accelerator: 'CommandOrControl+,',
+                click: openSettings
+              },
               { type: 'separator' as const },
               { role: 'quit' as const }
             ]
@@ -130,6 +138,13 @@ export function createAppMenuTemplate({
           label: 'Search Repository...',
           accelerator: 'Shift+CommandOrControl+F',
           click: openGlobalSearch
+        },
+        { type: 'separator' },
+        {
+          label: 'Settings...',
+          accelerator: 'CommandOrControl+,',
+          visible: platform !== 'darwin',
+          click: openSettings
         },
         { role: 'selectAll' }
       ]

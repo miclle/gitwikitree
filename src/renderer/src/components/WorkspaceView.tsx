@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Settings,
   X
 } from 'lucide-react'
 import { iconForNode } from '../app-utils'
@@ -21,6 +22,7 @@ import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-
 import { FileEditor } from './FileEditor'
 import { GlobalSearchModal } from './GlobalSearchModal'
 import { PreviewContent } from './PreviewContent'
+import { SettingsDialog } from './SettingsDialog'
 import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
 import { applyDraftToPreview, getEditablePreviewTarget } from '../hooks/useRepositoryWorkspace'
@@ -76,6 +78,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     pendingMarkdownAnchor,
     clearPendingMarkdownAnchor,
     showMarkdownLinkContextMenu,
+    settings,
+    isSettingsOpen,
+    openSettings,
+    closeSettings,
+    saveSettings,
     selectedPath,
     breadcrumbParts,
     repositoryLabel,
@@ -476,6 +483,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             {loading ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
             Open Repository
           </button>
+          <button className="open-button secondary" type="button" onClick={openSettings}>
+            <Settings size={17} />
+            Settings
+          </button>
         </section>
       ) : (
         <>
@@ -721,6 +732,15 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     canNavigateForward={canNavigateForward}
                     onNavigate={navigateActiveTabHistory}
                   />
+                  <button
+                    className="titlebar-icon-button"
+                    type="button"
+                    aria-label="Settings"
+                    aria-expanded={isSettingsOpen}
+                    onClick={openSettings}
+                  >
+                    <Settings size={17} />
+                  </button>
                 </div>
                 {fileTabsNav}
               </div>
@@ -837,6 +857,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                           extension={editablePreviewTarget.extension}
                           lastChange={editablePreviewTarget.lastChange}
                           modifiedAt={editablePreviewTarget.modifiedAt}
+                          settings={settings}
                           onChange={updateDraftContent}
                           onStatusChange={setEditorStatus}
                         />
@@ -950,6 +971,9 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             editorStatus={showsEditor ? editorStatusWithFileMetadata : undefined}
           />
         </>
+      )}
+      {isSettingsOpen && (
+        <SettingsDialog settings={settings} onClose={closeSettings} onSave={saveSettings} />
       )}
     </main>
   )

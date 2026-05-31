@@ -2,6 +2,34 @@ export type RepositorySource = 'working-tree' | 'worktree'
 
 export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'pdf' | 'text' | 'unsupported'
 
+export type AppAppearance = 'system' | 'light' | 'dark'
+
+export type AppFontFamily = 'system' | 'sans' | 'serif' | 'mono'
+
+export type EditorIndentStyle = 'tab' | 'space'
+
+export type AppSettings = {
+  appearance: AppAppearance
+  homeFileNames: string[]
+  previewFontFamily: AppFontFamily
+  previewFontSize: number
+  editorFontFamily: AppFontFamily
+  editorFontSize: number
+  editorIndentStyle: EditorIndentStyle
+  editorIndentSize: number
+}
+
+export const defaultAppSettings: AppSettings = {
+  appearance: 'system',
+  homeFileNames: ['README.md', 'README.markdown', 'index.md', '_index.md'],
+  previewFontFamily: 'system',
+  previewFontSize: 15,
+  editorFontFamily: 'mono',
+  editorFontSize: 14,
+  editorIndentStyle: 'space',
+  editorIndentSize: 2
+}
+
 export type TreeNode = {
   name: string
   path: string

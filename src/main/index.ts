@@ -42,7 +42,10 @@ import {
 import { registerRepositoryIpcHandlers } from './repository-ipc'
 import { createRecentRepositoryState, createRepositorySessionReset } from './repository-session'
 import { registerSessionIpcHandlers } from './session-ipc'
+import { registerSettingsIpcHandlers } from './settings-ipc'
+import { createSettingsStore } from './settings-store'
 import { registerWindowIpcHandlers } from './window-ipc'
+import { configureDirectoryIndexNames } from './repository-tree'
 import {
   shouldOpenCurrentTabSearchFromInput,
   shouldOpenGlobalSearchFromInput
@@ -53,7 +56,8 @@ import {
   mergeWindowStateIntoSession,
   readWindowState
 } from './window-state'
-import type { RecentFileState, RepositoryPayload, SessionState } from '../shared/types'
+import type { AppSettings, RecentFileState, RepositoryPayload, SessionState } from '../shared/types'
+import { defaultAppSettings } from '../shared/types'
 
 const appName = 'Git Wikitree'
 
@@ -63,9 +67,19 @@ const windows = new Set<BrowserWindow>()
 const windowRepositoryPaths = new Map<BrowserWindow, string>()
 const windowStateSaveTimers = new Map<BrowserWindow, ReturnType<typeof setTimeout>>()
 let sessionState = createEmptySessionState()
+let appSettings = defaultAppSettings
 
 function getSessionFilePath(): string {
   return join(app.getPath('userData'), 'session.json')
+}
+
+function getSettingsFilePath(): string {
+  return join(app.getPath('userData'), 'settings.json')
+}
+
+function applySettings(settings: AppSettings): void {
+  appSettings = settings
+  configureDirectoryIndexNames(settings.homeFileNames)
 }
 
 async function readStoredSession(): Promise<SessionState> {
@@ -134,6 +148,10 @@ function openCurrentTabSearch(): void {
 
 function saveCurrentFile(): void {
   BrowserWindow.getFocusedWindow()?.webContents.send('file:save-current')
+}
+
+function openSettings(): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('settings:open')
 }
 
 async function isTreeItemContextMenu(params: ContextMenuParams): Promise<boolean> {
@@ -434,6 +452,7 @@ function createAppMenu(): void {
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
         saveCurrentFile,
+        openSettings,
         openCurrentTabSearch,
         openGlobalSearch,
         closeWindow: () => BrowserWindow.getFocusedWindow()?.close()
@@ -446,6 +465,8 @@ function createAppMenu(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
+  const settingsStore = createSettingsStore(getSettingsFilePath())
+  applySettings(await settingsStore.read())
   sessionState = await readStoredSession()
 
   // Set app user model id for windows
@@ -503,6 +524,13 @@ app.whenReady().then(async () => {
     },
     writeStoredSession,
     createAppMenu
+  })
+
+  registerSettingsIpcHandlers({
+    ipcMain,
+    readSettings: async () => appSettings,
+    writeSettings: (settings) => settingsStore.write(settings),
+    applySettings
   })
 
   createWindow(

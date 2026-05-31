@@ -23,10 +23,13 @@ import type {
   RepositorySource,
   SessionState,
   TreeItemOpenPayload,
-  TreeNode
+  TreeNode,
+  AppSettings
 } from '../../../shared/types'
+import { defaultAppSettings } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
+const homeFilePreviewReloadDelayMs = 450
 
 export type EditablePreviewTarget = {
   path: string
@@ -44,6 +47,13 @@ function extensionFromPath(path: string): string {
   const dotIndex = name.lastIndexOf('.')
 
   return dotIndex > 0 ? name.slice(dotIndex).toLocaleLowerCase() : ''
+}
+
+function fontFamilyForSetting(fontFamily: AppSettings['previewFontFamily']): string {
+  if (fontFamily === 'mono') return 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+  if (fontFamily === 'serif') return 'Georgia, Cambria, "Times New Roman", Times, serif'
+
+  return 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 }
 
 export function getEditablePreviewTarget(
@@ -196,6 +206,11 @@ export function useRepositoryWorkspace(): {
   pendingMarkdownAnchor: { path: string; hash: string; token: number } | undefined
   clearPendingMarkdownAnchor: (token: number) => void
   showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
+  settings: AppSettings
+  isSettingsOpen: boolean
+  openSettings: () => void
+  closeSettings: () => void
+  saveSettings: (settings: Partial<AppSettings>) => Promise<void>
   breadcrumbParts: string[]
   repositoryLabel: string
   canNavigateBack: boolean
@@ -205,6 +220,7 @@ export function useRepositoryWorkspace(): {
   const didReceiveOpenIntent = useRef(false)
   const nextTabId = useRef(0)
   const nextAnchorToken = useRef(0)
+  const homeFilePreviewReloadTimeoutRef = useRef<number | undefined>(undefined)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -216,6 +232,8 @@ export function useRepositoryWorkspace(): {
   const [draftModifiedAt, setDraftModifiedAt] = useState<string | undefined>()
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  const [settings, setSettings] = useState<AppSettings>(defaultAppSettings)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
@@ -258,6 +276,23 @@ export function useRepositoryWorkspace(): {
     return window.confirm('Discard unsaved changes in the current file?')
   }, [hasUnsavedChanges])
 
+  useEffect(() => {
+    document.documentElement.dataset.appAppearance = settings.appearance
+    document.documentElement.style.setProperty(
+      '--preview-font-size',
+      `${settings.previewFontSize}px`
+    )
+    document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`)
+    document.documentElement.style.setProperty(
+      '--preview-font-family',
+      fontFamilyForSetting(settings.previewFontFamily)
+    )
+    document.documentElement.style.setProperty(
+      '--editor-font-family',
+      fontFamilyForSetting(settings.editorFontFamily)
+    )
+  }, [settings])
+
   const discardEditingIfAllowed = useCallback((): boolean => {
     if (!confirmDiscardEditing()) return false
 
@@ -298,6 +333,35 @@ export function useRepositoryWorkspace(): {
     },
     [repository]
   )
+
+  const clearHomeFileDirectoryPreviewReload = useCallback((): void => {
+    if (homeFilePreviewReloadTimeoutRef.current) {
+      window.clearTimeout(homeFilePreviewReloadTimeoutRef.current)
+      homeFilePreviewReloadTimeoutRef.current = undefined
+    }
+  }, [])
+
+  const scheduleHomeFileDirectoryPreviewReload = useCallback((): void => {
+    clearHomeFileDirectoryPreviewReload()
+
+    if (preview?.kind !== 'directory') return
+
+    const directoryPath = preview.path
+    homeFilePreviewReloadTimeoutRef.current = window.setTimeout(() => {
+      homeFilePreviewReloadTimeoutRef.current = undefined
+      void loadPreview(directoryPath)
+    }, homeFilePreviewReloadDelayMs)
+  }, [clearHomeFileDirectoryPreviewReload, loadPreview, preview])
+
+  useEffect(() => {
+    if (preview?.kind === 'directory' && preview.path === selectedPath) return
+
+    clearHomeFileDirectoryPreviewReload()
+  }, [clearHomeFileDirectoryPreviewReload, preview, selectedPath])
+
+  useEffect(() => {
+    return clearHomeFileDirectoryPreviewReload
+  }, [clearHomeFileDirectoryPreviewReload])
 
   const restoreRepositorySession = useCallback(
     async (nextRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
@@ -566,6 +630,14 @@ export function useRepositoryWorkspace(): {
       removeOpenRequestListener()
     }
   }, [loadRepositoryPath, openFilePath, openRepository, openTreeItem])
+
+  useEffect(() => {
+    void window.api.getSettings().then(setSettings)
+
+    return window.api.onOpenSettings(() => {
+      setIsSettingsOpen(true)
+    })
+  }, [])
 
   useEffect(() => {
     if (didRestoreSession.current) return
@@ -1049,6 +1121,28 @@ export function useRepositoryWorkspace(): {
     repository
   ])
 
+  const openSettings = useCallback((): void => {
+    setIsSettingsOpen(true)
+  }, [])
+
+  const closeSettings = useCallback((): void => {
+    setIsSettingsOpen(false)
+  }, [])
+
+  const saveSettings = useCallback(
+    async (nextSettings: Partial<AppSettings>): Promise<void> => {
+      const previousHomeFileNames = settings.homeFileNames.join('\0')
+      const savedSettings = await window.api.saveSettings(nextSettings)
+
+      setSettings(savedSettings)
+
+      if (previousHomeFileNames !== savedSettings.homeFileNames.join('\0')) {
+        scheduleHomeFileDirectoryPreviewReload()
+      }
+    },
+    [scheduleHomeFileDirectoryPreviewReload, settings.homeFileNames]
+  )
+
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {
       selectPreviewPath(path, true)
@@ -1111,6 +1205,11 @@ export function useRepositoryWorkspace(): {
     pendingMarkdownAnchor,
     clearPendingMarkdownAnchor,
     showMarkdownLinkContextMenu,
+    settings,
+    isSettingsOpen,
+    openSettings,
+    closeSettings,
+    saveSettings,
     breadcrumbParts: selectedPath ? selectedPath.split('/').filter(Boolean) : [],
     repositoryLabel: repository ? getRepositoryLabel(repository) : '',
     canNavigateBack: canMoveTabHistory(openFileTabs, activeFileTabId, -1),
