@@ -651,19 +651,10 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     )
                   })}
                 </div>
-                <button
-                  className="path-search-button"
-                  type="button"
-                  aria-label="Find in current tab"
-                  aria-expanded={isSearchOpen}
-                  onClick={openPreviewSearch}
-                >
-                  <Search size={15} />
-                </button>
                 {canEditPreview && (
                   <>
                     <button
-                      className="path-search-button"
+                      className="pathbar-icon-button"
                       type="button"
                       aria-label={isEditing ? 'Show preview' : 'Edit file'}
                       aria-pressed={isEditing}

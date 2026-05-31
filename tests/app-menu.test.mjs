@@ -106,7 +106,7 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
       'pasteAndMatchStyle',
       'delete',
       'separator',
-      'Find in Current Tab',
+      'Find',
       'Search Repository...',
       'selectAll'
     ]
@@ -117,12 +117,10 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
   )
   assert.deepEqual(
     editMenu.submenu
-      .filter(
-        (item) => item.label === 'Find in Current Tab' || item.label === 'Search Repository...'
-      )
+      .filter((item) => item.label === 'Find' || item.label === 'Search Repository...')
       .map((item) => [item.label, item.accelerator]),
     [
-      ['Find in Current Tab', 'CommandOrControl+F'],
+      ['Find', 'CommandOrControl+F'],
       ['Search Repository...', 'Shift+CommandOrControl+F']
     ]
   )

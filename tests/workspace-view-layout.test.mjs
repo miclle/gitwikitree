@@ -208,6 +208,16 @@ test('current tab search is available from the app menu event', async () => {
   )
 })
 
+test('pathbar does not expose a separate current-tab search button', async () => {
+  const source = await readWorkspaceView()
+
+  assert.doesNotMatch(
+    source,
+    /<button[\s\S]*?aria-label="Find in current tab"[\s\S]*?onClick=\{openPreviewSearch\}/,
+    'current-tab search should stay in the app menu and keyboard shortcut, not the pathbar'
+  )
+})
+
 test('file editor uses a visible selection highlight', async () => {
   const css = await readMainCss()
 

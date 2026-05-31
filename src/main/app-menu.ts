@@ -122,7 +122,7 @@ export function createAppMenuTemplate({
         { role: 'delete' },
         { type: 'separator' },
         {
-          label: 'Find in Current Tab',
+          label: 'Find',
           accelerator: 'CommandOrControl+F',
           click: openCurrentTabSearch
         },

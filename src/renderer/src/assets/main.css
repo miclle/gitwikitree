@@ -1182,7 +1182,7 @@ kbd {
   background: #9a6700;
 }
 
-.path-search-button {
+.pathbar-icon-button {
   display: grid;
   width: 26px;
   height: 26px;
@@ -1193,18 +1193,17 @@ kbd {
   background: transparent;
 }
 
-.path-search-button:hover,
-.path-search-button[aria-expanded='true'] {
+.pathbar-icon-button:hover {
   color: #1f2328;
   background: #f0f3f6;
 }
 
-.path-search-button[aria-pressed='true'] {
+.pathbar-icon-button[aria-pressed='true'] {
   color: var(--accent);
   background: #ddf4ff;
 }
 
-.path-search-button:disabled {
+.pathbar-icon-button:disabled {
   color: #8c959f;
   cursor: default;
   opacity: 0.72;
