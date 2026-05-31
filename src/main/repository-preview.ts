@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs'
+import { promises as fs, type Stats } from 'fs'
 import { basename, extname, resolve } from 'path'
 import { Marked, type Token } from 'marked'
 import { detectPreviewType, textPreviewProbeBytes } from './preview-detection'
@@ -6,7 +6,16 @@ import { assertRepositoryPath, getLastChange } from './git-service'
 import { loadRepository } from './repository-loader'
 import { findDirectoryIndex, getNodeAtPath } from './repository-tree'
 import { safeJoin, toPosixPath } from './repository-paths'
-import type { PreviewPayload, RepositoryLoadOptions, SaveFileOptions } from '../shared/types'
+import type {
+  DirectoryPreview,
+  FilePreview,
+  GitLastChange,
+  PreviewPayload,
+  RepositoryLoadOptions,
+  RepositoryPayload,
+  SaveFileOptions,
+  TreeNode
+} from '../shared/types'
 
 const maxTextPreviewBytes = 1024 * 1024
 const textPreviewEncoding = 'UTF-8'
@@ -200,76 +209,95 @@ async function readFileSample(path: string, bytes: number): Promise<Buffer> {
   }
 }
 
-export async function getPreview(
-  repoPath: string,
-  relativePath = '',
-  options: RepositoryLoadOptions = {}
-): Promise<PreviewPayload> {
-  const repository = await loadRepository(repoPath, options)
-  const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined
-  const target = safeJoin(repository.path, relativePath)
-  const [stats, lastChange] = await Promise.all([
-    fs.stat(target),
-    getLastChange(repository.path, toPosixPath(relativePath))
-  ])
+function markdownAssetPreviewFields(markdownAssetPreviewData: MarkdownAssetPreviewData): {
+  markdownAssetDataUrls: Record<string, string>
+  markdownAssetPaths: Record<string, string>
+  markdownAssetAbsolutePaths?: Record<string, string>
+} {
+  return {
+    markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,
+    markdownAssetPaths: markdownAssetPreviewData.paths,
+    ...(markdownAssetPreviewData.absolutePaths
+      ? { markdownAssetAbsolutePaths: markdownAssetPreviewData.absolutePaths }
+      : {})
+  }
+}
 
-  if (stats.isDirectory()) {
-    const children = relativePath ? (node?.children ?? []) : repository.tree
-    const readme = (relativePath ? node?.index : repository.index) ?? findDirectoryIndex(children)
-    const modifiedAt = stats.mtime.toISOString()
+async function buildDirectoryPreview({
+  repository,
+  node,
+  relativePath,
+  stats,
+  lastChange
+}: {
+  repository: RepositoryPayload
+  node: TreeNode | undefined
+  relativePath: string
+  stats: Stats
+  lastChange: GitLastChange | undefined
+}): Promise<DirectoryPreview> {
+  const children = relativePath ? (node?.children ?? []) : repository.tree
+  const readme = (relativePath ? node?.index : repository.index) ?? findDirectoryIndex(children)
+  const modifiedAt = stats.mtime.toISOString()
 
-    if (readme) {
-      const readmeTarget = safeJoin(repository.path, readme.path)
-      const [readmeStats, readmeLastChange, content] = await Promise.all([
-        fs.stat(readmeTarget),
-        getLastChange(repository.path, toPosixPath(readme.path)),
-        fs.readFile(readmeTarget, 'utf8')
-      ])
-      const markdownAssetPreviewData = await getMarkdownAssetPreviewData({
-        repositoryPath: repository.path,
-        sourcePath: readme.path,
-        markdown: content
-      })
-      return {
-        kind: 'directory',
-        path: toPosixPath(relativePath),
-        modifiedAt,
-        ...(lastChange ? { lastChange } : {}),
-        readme: {
-          path: readme.path,
-          name: basename(readmeTarget),
-          extension: extname(readmeTarget).toLowerCase(),
-          editable: repository.editable,
-          content,
-          encoding: textPreviewEncoding,
-          modifiedAt: readmeStats.mtime.toISOString(),
-          ...(readmeLastChange ? { lastChange: readmeLastChange } : {}),
-          ...(markdownAssetPreviewData
-            ? {
-                markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,
-                markdownAssetPaths: markdownAssetPreviewData.paths,
-                ...(markdownAssetPreviewData.absolutePaths
-                  ? { markdownAssetAbsolutePaths: markdownAssetPreviewData.absolutePaths }
-                  : {})
-              }
-            : {})
-        }
-      }
-    }
+  if (readme) {
+    const readmeTarget = safeJoin(repository.path, readme.path)
+    const [readmeStats, readmeLastChange, content] = await Promise.all([
+      fs.stat(readmeTarget),
+      getLastChange(repository.path, toPosixPath(readme.path)),
+      fs.readFile(readmeTarget, 'utf8')
+    ])
+    const markdownAssetPreviewData = await getMarkdownAssetPreviewData({
+      repositoryPath: repository.path,
+      sourcePath: readme.path,
+      markdown: content
+    })
 
     return {
       kind: 'directory',
       path: toPosixPath(relativePath),
       modifiedAt,
       ...(lastChange ? { lastChange } : {}),
-      entries: children.map((entry) => ({
-        name: entry.name,
-        path: entry.path,
-        type: entry.type
-      }))
+      readme: {
+        path: readme.path,
+        name: basename(readmeTarget),
+        extension: extname(readmeTarget).toLowerCase(),
+        editable: repository.editable,
+        content,
+        encoding: textPreviewEncoding,
+        modifiedAt: readmeStats.mtime.toISOString(),
+        ...(readmeLastChange ? { lastChange: readmeLastChange } : {}),
+        ...(markdownAssetPreviewData ? markdownAssetPreviewFields(markdownAssetPreviewData) : {})
+      }
     }
   }
 
+  return {
+    kind: 'directory',
+    path: toPosixPath(relativePath),
+    modifiedAt,
+    ...(lastChange ? { lastChange } : {}),
+    entries: children.map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      type: entry.type
+    }))
+  }
+}
+
+async function buildFilePreview({
+  repository,
+  relativePath,
+  target,
+  stats,
+  lastChange
+}: {
+  repository: RepositoryPayload
+  relativePath: string
+  target: string
+  stats: Stats
+  lastChange: GitLastChange | undefined
+}): Promise<FilePreview> {
   const size = stats.size
   const extension = extname(target).toLowerCase()
   let previewType = detectPreviewType(extension)
@@ -280,8 +308,8 @@ export async function getPreview(
     previewType = detectPreviewType(extension, sample)
   }
 
-  const payload = {
-    kind: 'file' as const,
+  const payload: FilePreview = {
+    kind: 'file',
     path: toPosixPath(relativePath),
     name: basename(target),
     extension,
@@ -331,19 +359,31 @@ export async function getPreview(
       ...payload,
       content,
       encoding: textPreviewEncoding,
-      ...(markdownAssetPreviewData
-        ? {
-            markdownAssetDataUrls: markdownAssetPreviewData.dataUrls,
-            markdownAssetPaths: markdownAssetPreviewData.paths,
-            ...(markdownAssetPreviewData.absolutePaths
-              ? { markdownAssetAbsolutePaths: markdownAssetPreviewData.absolutePaths }
-              : {})
-          }
-        : {})
+      ...(markdownAssetPreviewData ? markdownAssetPreviewFields(markdownAssetPreviewData) : {})
     }
   }
 
   return payload
+}
+
+export async function getPreview(
+  repoPath: string,
+  relativePath = '',
+  options: RepositoryLoadOptions = {}
+): Promise<PreviewPayload> {
+  const repository = await loadRepository(repoPath, options)
+  const node = relativePath ? getNodeAtPath(repository.tree, relativePath) : undefined
+  const target = safeJoin(repository.path, relativePath)
+  const [stats, lastChange] = await Promise.all([
+    fs.stat(target),
+    getLastChange(repository.path, toPosixPath(relativePath))
+  ])
+
+  if (stats.isDirectory()) {
+    return buildDirectoryPreview({ repository, node, relativePath, stats, lastChange })
+  }
+
+  return buildFilePreview({ repository, relativePath, target, stats, lastChange })
 }
 
 export async function saveFile(
