@@ -24,7 +24,6 @@ import type {
   NavigationTarget,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
-  PreviewPayload,
   ProjectSessionState,
   RecentFileState,
   RepositoryPayload,
@@ -32,7 +31,6 @@ import type {
   SessionState,
   TreeItemOpenPayload,
   TreeNode,
-  AppSettings
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
@@ -75,68 +73,7 @@ function resolveHistoryTargets(
 
 export type RepositoryWorkspace = ReturnType<typeof useRepositoryWorkspace>
 
-export function useRepositoryWorkspace(): {
-  repository: RepositoryPayload | undefined
-  selectedPath: string
-  expandedPaths: Set<string>
-  preview: PreviewPayload | undefined
-  loading: boolean
-  previewLoading: boolean
-  error: string | undefined
-  isEditing: boolean
-  isSaving: boolean
-  canEditPreview: boolean
-  draftContent: string
-  hasUnsavedChanges: boolean
-  isSidebarOpen: boolean
-  setIsSidebarOpen: (isOpen: boolean) => void
-  openFileTabs: OpenFileTab[]
-  activeFileTabId: string | undefined
-  sidebarWidth: number
-  isResizing: boolean
-  startResizing: () => void
-  titlebarTabsRef: React.MutableRefObject<HTMLElement | null>
-  tabPopover:
-    | {
-        tab: OpenFileTab
-        left: number
-        visible: boolean
-      }
-    | undefined
-  tabPopoverStyle: React.CSSProperties | undefined
-  showTabPopover: (tab: OpenFileTab, tabElement: HTMLElement) => void
-  hideTabPopover: (delayed?: boolean) => void
-  handleTitlebarTabsPointerLeave: (event: React.PointerEvent<HTMLElement>) => void
-  openRepository: () => Promise<void>
-  handleSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
-  toggleDirectory: (path: string) => void
-  showTreeItemContextMenu: (node: TreeNode) => Promise<void>
-  showBreadcrumbContextMenu: (path: string) => Promise<void>
-  selectFileTab: (tab: OpenFileTab) => Promise<void>
-  closeFileTab: (id: string) => void
-  navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
-  checkoutBranch: (branch: string) => Promise<void>
-  openBranchWorktree: (ref: string) => Promise<void>
-  openRepositoryPreview: () => void
-  openBreadcrumbPath: (path: string) => void
-  selectPreviewPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
-  startEditing: () => void
-  cancelEditing: () => void
-  updateDraftContent: (content: string) => void
-  saveCurrentFile: () => Promise<void>
-  pendingMarkdownAnchor: { path: string; hash: string; token: number } | undefined
-  clearPendingMarkdownAnchor: (token: number) => void
-  showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
-  settings: AppSettings
-  isSettingsOpen: boolean
-  openSettings: () => void
-  closeSettings: () => void
-  saveSettings: (settings: Partial<AppSettings>) => Promise<void>
-  breadcrumbParts: string[]
-  repositoryLabel: string
-  canNavigateBack: boolean
-  canNavigateForward: boolean
-} {
+export function useRepositoryWorkspace() {
   const nextTabId = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
@@ -853,59 +790,73 @@ export function useRepositoryWorkspace(): {
   }, [saveCurrentFile])
 
   return {
-    repository,
-    selectedPath,
-    expandedPaths,
-    preview,
-    loading,
-    previewLoading,
-    error,
-    isEditing,
-    isSaving,
-    canEditPreview,
-    draftContent,
-    hasUnsavedChanges,
-    isSidebarOpen,
-    setIsSidebarOpen,
-    openFileTabs,
-    activeFileTabId,
-    sidebarWidth,
-    isResizing,
-    startResizing,
-    titlebarTabsRef,
-    tabPopover,
-    tabPopoverStyle,
-    showTabPopover,
-    hideTabPopover,
-    handleTitlebarTabsPointerLeave,
-    openRepository,
-    handleSelect,
-    toggleDirectory,
-    showTreeItemContextMenu,
-    showBreadcrumbContextMenu,
-    selectFileTab,
-    closeFileTab,
-    navigateActiveTabHistory,
-    checkoutBranch,
-    openBranchWorktree,
-    openRepositoryPreview,
-    openBreadcrumbPath,
-    selectPreviewPath,
-    startEditing,
-    cancelEditing,
-    updateDraftContent,
-    saveCurrentFile,
-    pendingMarkdownAnchor,
-    clearPendingMarkdownAnchor,
-    showMarkdownLinkContextMenu,
-    settings,
-    isSettingsOpen,
-    openSettings,
-    closeSettings,
-    saveSettings,
-    breadcrumbParts: selectedPath ? selectedPath.split('/').filter(Boolean) : [],
-    repositoryLabel: repository ? getRepositoryLabel(repository) : '',
-    canNavigateBack: canMoveTabHistory(openFileTabs, activeFileTabId, -1),
-    canNavigateForward: canMoveTabHistory(openFileTabs, activeFileTabId, 1)
+    repositoryState: {
+      repository,
+      selectedPath,
+      expandedPaths,
+      loading,
+      error,
+      breadcrumbParts: selectedPath ? selectedPath.split('/').filter(Boolean) : [],
+      repositoryLabel: repository ? getRepositoryLabel(repository) : ''
+    },
+    previewState: {
+      preview,
+      previewLoading,
+      pendingMarkdownAnchor,
+      clearPendingMarkdownAnchor,
+      showMarkdownLinkContextMenu
+    },
+    editingState: {
+      isEditing,
+      isSaving,
+      canEditPreview,
+      draftContent,
+      hasUnsavedChanges,
+      startEditing,
+      cancelEditing,
+      updateDraftContent,
+      saveCurrentFile
+    },
+    layoutState: {
+      isSidebarOpen,
+      setIsSidebarOpen,
+      sidebarWidth,
+      isResizing,
+      startResizing
+    },
+    tabState: {
+      openFileTabs,
+      activeFileTabId,
+      titlebarTabsRef,
+      tabPopover,
+      tabPopoverStyle,
+      showTabPopover,
+      hideTabPopover,
+      handleTitlebarTabsPointerLeave,
+      selectFileTab,
+      closeFileTab,
+      canNavigateBack: canMoveTabHistory(openFileTabs, activeFileTabId, -1),
+      canNavigateForward: canMoveTabHistory(openFileTabs, activeFileTabId, 1)
+    },
+    navigationActions: {
+      openRepository,
+      handleSelect,
+      toggleDirectory,
+      showTreeItemContextMenu,
+      showBreadcrumbContextMenu,
+      navigateActiveTabHistory,
+      checkoutBranch,
+      openBranchWorktree,
+      openRepositoryPreview,
+      openBreadcrumbPath,
+      selectPreviewPath
+    },
+    settingsState: {
+      settings,
+      isSettingsOpen,
+      openSettings,
+      closeSettings,
+      saveSettings
+    }
   }
 }

@@ -22,58 +22,79 @@ import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const { t } = useTranslation()
   const {
+    repositoryState,
+    previewState,
+    editingState,
+    layoutState,
+    tabState,
+    navigationActions,
+    settingsState
+  } = workspace
+  const {
     repository,
     expandedPaths,
-    preview,
     loading,
-    previewLoading,
     error,
+    selectedPath,
+    breadcrumbParts,
+    repositoryLabel
+  } = repositoryState
+  const {
+    preview,
+    previewLoading,
+    pendingMarkdownAnchor,
+    clearPendingMarkdownAnchor,
+    showMarkdownLinkContextMenu
+  } = previewState
+  const {
     isEditing,
     canEditPreview,
     draftContent,
     hasUnsavedChanges,
+    startEditing,
+    updateDraftContent
+  } = editingState
+  const {
     isSidebarOpen,
     setIsSidebarOpen,
-    openFileTabs,
-    activeFileTabId,
     sidebarWidth,
     isResizing,
-    startResizing,
+    startResizing
+  } = layoutState
+  const {
+    openFileTabs,
+    activeFileTabId,
     titlebarTabsRef,
     tabPopover,
     tabPopoverStyle,
     showTabPopover,
     hideTabPopover,
     handleTitlebarTabsPointerLeave,
+    selectFileTab,
+    closeFileTab,
+    canNavigateBack,
+    canNavigateForward
+  } = tabState
+  const {
     openRepository,
     handleSelect,
     toggleDirectory,
     showTreeItemContextMenu,
     showBreadcrumbContextMenu: openBreadcrumbContextMenu,
-    selectFileTab,
-    closeFileTab,
     navigateActiveTabHistory,
     checkoutBranch,
     openBranchWorktree,
     openRepositoryPreview,
     openBreadcrumbPath,
-    selectPreviewPath,
-    startEditing,
-    updateDraftContent,
-    pendingMarkdownAnchor,
-    clearPendingMarkdownAnchor,
-    showMarkdownLinkContextMenu,
+    selectPreviewPath
+  } = navigationActions
+  const {
     settings,
     isSettingsOpen,
     openSettings,
     closeSettings,
-    saveSettings,
-    selectedPath,
-    breadcrumbParts,
-    repositoryLabel,
-    canNavigateBack,
-    canNavigateForward
-  } = workspace
+    saveSettings
+  } = settingsState
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
   const {
     searchInputRef,
