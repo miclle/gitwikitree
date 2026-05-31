@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { EditablePreviewTarget } from './useRepositoryWorkspace'
+import type { EditablePreviewTarget } from './useWorkspaceEditing'
 import type { EditorStatusBarState } from '../status-bar'
 import type { PreviewPayload } from '../../../shared/types'
 

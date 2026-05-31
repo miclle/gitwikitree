@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react'
-import { applyDraftToPreview, getEditablePreviewTarget } from './useRepositoryWorkspace'
-import type { EditablePreviewTarget } from './useRepositoryWorkspace'
+import {
+  applyDraftToPreview,
+  getEditablePreviewTarget,
+  type EditablePreviewTarget
+} from './useWorkspaceEditing'
 import type { PreviewPayload } from '../../../shared/types'
 
 export type FileViewMode = 'preview' | 'code' | 'split'

@@ -7,6 +7,7 @@ import { useRepositoryLaunchIntents } from './useRepositoryLaunchIntents'
 import { useRepositoryPreviewLoader } from './useRepositoryPreviewLoader'
 import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
+import { useWorkspaceEditing } from './useWorkspaceEditing'
 import { useWorkspaceSettings } from './useWorkspaceSettings'
 import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
@@ -19,7 +20,6 @@ import {
   type WorkspaceNavigationPatch
 } from '../workspace-navigation'
 import type {
-  GitLastChange,
   NavigationTarget,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
@@ -35,84 +35,6 @@ import type {
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
-
-export type EditablePreviewTarget = {
-  path: string
-  name: string
-  extension: string
-  editable: boolean
-  content: string
-  encoding?: string
-  modifiedAt: string
-  lastChange?: GitLastChange
-}
-
-function extensionFromPath(path: string): string {
-  const name = fileNameFromPath(path)
-  const dotIndex = name.lastIndexOf('.')
-
-  return dotIndex > 0 ? name.slice(dotIndex).toLocaleLowerCase() : ''
-}
-
-export function getEditablePreviewTarget(
-  preview: PreviewPayload | undefined
-): EditablePreviewTarget | undefined {
-  if (!preview) return undefined
-
-  if (preview.kind === 'file') {
-    if (!preview.editable || preview.content === undefined) return undefined
-
-    return {
-      path: preview.path,
-      name: preview.name,
-      extension: preview.extension,
-      editable: preview.editable,
-      content: preview.content,
-      encoding: preview.encoding,
-      modifiedAt: preview.modifiedAt,
-      lastChange: preview.lastChange
-    }
-  }
-
-  if (!preview.readme?.editable) return undefined
-
-  return {
-    path: preview.readme.path,
-    name: preview.readme.name,
-    extension: preview.readme.extension || extensionFromPath(preview.readme.path),
-    editable: preview.readme.editable,
-    content: preview.readme.content,
-    encoding: preview.readme.encoding,
-    modifiedAt: preview.readme.modifiedAt,
-    lastChange: preview.readme.lastChange
-  }
-}
-
-export function applyDraftToPreview(
-  preview: PreviewPayload | undefined,
-  draftContent: string
-): PreviewPayload | undefined {
-  if (!preview) return undefined
-
-  if (preview.kind === 'file') {
-    if (preview.content === undefined) return preview
-
-    return {
-      ...preview,
-      content: draftContent
-    }
-  }
-
-  if (!preview.readme) return preview
-
-  return {
-    ...preview,
-    readme: {
-      ...preview.readme,
-      content: draftContent
-    }
-  }
-}
 
 type RepositoryLoadContext = {
   repoPath: string
@@ -219,10 +141,6 @@ export function useRepositoryWorkspace(): {
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
   const [loading, setLoading] = useState(false)
-  const [editingPath, setEditingPath] = useState<string | undefined>()
-  const [draftContent, setDraftContent] = useState('')
-  const [draftModifiedAt, setDraftModifiedAt] = useState<string | undefined>()
-  const [isSaving, setIsSaving] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
@@ -240,12 +158,6 @@ export function useRepositoryWorkspace(): {
   } = useTabPopover()
   const { preview, setPreview, previewLoading, error, setError, loadPreview } =
     useRepositoryPreviewLoader(repository)
-  const editablePreviewTarget = getEditablePreviewTarget(preview)
-  const isEditing = Boolean(editablePreviewTarget && editingPath === editablePreviewTarget.path)
-  const canEditPreview = Boolean(editablePreviewTarget)
-  const hasUnsavedChanges = Boolean(
-    isEditing && editablePreviewTarget && draftContent !== editablePreviewTarget.content
-  )
 
   const { scheduleHomeFileDirectoryPreviewReload } = useHomeFileDirectoryPreviewReload({
     preview,
@@ -258,18 +170,26 @@ export function useRepositoryWorkspace(): {
       onHomeFileNamesChange: scheduleHomeFileDirectoryPreviewReload
     })
 
-  const isEditingTargetPath = useCallback(
-    (path: string): boolean =>
-      path === editingPath ||
-      Boolean(isEditing && preview?.kind === 'directory' && path === preview.path),
-    [editingPath, isEditing, preview]
-  )
-
-  const clearEditing = useCallback((): void => {
-    setEditingPath(undefined)
-    setDraftContent('')
-    setDraftModifiedAt(undefined)
-  }, [])
+  const {
+    isEditing,
+    isSaving,
+    canEditPreview,
+    draftContent,
+    hasUnsavedChanges,
+    isEditingTargetPath,
+    discardEditingIfAllowed,
+    startEditing,
+    cancelEditing,
+    updateDraftContent,
+    saveCurrentFile
+  } = useWorkspaceEditing({
+    discardMessage: t('app.discardUnsaved'),
+    preview,
+    repository,
+    setError,
+    setPreview,
+    setRepository
+  })
 
   const applyNavigationPatch = useCallback((patch: WorkspaceNavigationPatch): void => {
     setSelectedPath(patch.selectedPath)
@@ -277,19 +197,6 @@ export function useRepositoryWorkspace(): {
     setActiveFileTabId(patch.activeFileTabId)
     setOpenFileTabs(patch.openFileTabs)
   }, [])
-
-  const confirmDiscardEditing = useCallback((): boolean => {
-    if (!hasUnsavedChanges) return true
-
-    return window.confirm(t('app.discardUnsaved'))
-  }, [hasUnsavedChanges, t])
-
-  const discardEditingIfAllowed = useCallback((): boolean => {
-    if (!confirmDiscardEditing()) return false
-
-    clearEditing()
-    return true
-  }, [clearEditing, confirmDiscardEditing])
 
   const createNextTabId = useCallback((): string => {
     nextTabId.current += 1
@@ -936,79 +843,6 @@ export function useRepositoryWorkspace(): {
     },
     [selectPreviewPath]
   )
-
-  const startEditing = useCallback((): void => {
-    if (!editablePreviewTarget) return
-
-    setEditingPath(editablePreviewTarget.path)
-    setDraftContent(editablePreviewTarget.content)
-    setDraftModifiedAt(editablePreviewTarget.modifiedAt)
-    setError(undefined)
-  }, [editablePreviewTarget, setError])
-
-  const cancelEditing = useCallback((): void => {
-    if (!discardEditingIfAllowed()) return
-
-    clearEditing()
-  }, [clearEditing, discardEditingIfAllowed])
-
-  const updateDraftContent = useCallback((content: string): void => {
-    setDraftContent(content)
-  }, [])
-
-  const saveCurrentFile = useCallback(async (): Promise<void> => {
-    if (!repository || !preview || !editablePreviewTarget || !isEditing || !hasUnsavedChanges) {
-      return
-    }
-
-    setIsSaving(true)
-    setError(undefined)
-
-    try {
-      const saveOptions = {
-        source: repository.source,
-        rootPath: repository.rootPath,
-        expectedModifiedAt: draftModifiedAt
-      }
-      const nextPreview = await window.api.saveFile(
-        repository.path,
-        editablePreviewTarget.path,
-        draftContent,
-        saveOptions
-      )
-      const nextRepository = await window.api.loadRepository(repository.path)
-      const refreshedPreview =
-        preview.kind === 'directory'
-          ? await window.api.previewPath(repository.path, preview.path, {
-              source: repository.source,
-              rootPath: repository.rootPath
-            })
-          : nextPreview
-      const nextEditableTarget = getEditablePreviewTarget(refreshedPreview)
-
-      setRepository(nextRepository)
-      setPreview(refreshedPreview)
-      if (nextEditableTarget) {
-        setEditingPath(nextEditableTarget.path)
-        setDraftContent(nextEditableTarget.content)
-        setDraftModifiedAt(nextEditableTarget.modifiedAt)
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setIsSaving(false)
-    }
-  }, [
-    draftContent,
-    draftModifiedAt,
-    editablePreviewTarget,
-    hasUnsavedChanges,
-    isEditing,
-    preview,
-    repository,
-    setError,
-    setPreview
-  ])
 
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {

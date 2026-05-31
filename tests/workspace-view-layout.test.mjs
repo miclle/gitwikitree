@@ -50,6 +50,13 @@ async function readRepositoryWorkspaceHook() {
   )
 }
 
+async function readWorkspaceEditingHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useWorkspaceEditing.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readRepositoryPreviewLoaderHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/useRepositoryPreviewLoader.ts', import.meta.url),
@@ -702,12 +709,18 @@ test('split editing lets users drag the editor and preview divider', async () =>
 test('directory index previews reuse file editing controls and drafts', async () => {
   const source = await readWorkspaceView()
   const hookSource = await readRepositoryWorkspaceHook()
+  const editingHook = await readWorkspaceEditingHook()
   const fileViewModeHook = await readFileViewModeHook()
 
   assert.match(
     hookSource,
+    /useWorkspaceEditing\(\{[\s\S]*preview,[\s\S]*repository,/,
+    'workspace state should delegate editable file state to a focused editing hook'
+  )
+  assert.match(
+    editingHook,
     /getEditablePreviewTarget\(preview\)/,
-    'workspace state should derive an editable source from file previews and directory index previews'
+    'editing state should derive an editable source from file previews and directory index previews'
   )
   assert.match(
     fileViewModeHook,
@@ -1416,7 +1429,7 @@ test('files tree marks the dirty edited file', async () => {
 })
 
 test('saving an edited file refreshes Git status decorations', async () => {
-  const source = await readRepositoryWorkspaceHook()
+  const source = await readWorkspaceEditingHook()
 
   assert.match(
     source,
