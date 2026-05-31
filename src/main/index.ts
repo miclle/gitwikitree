@@ -1,12 +1,4 @@
-import {
-  app,
-  shell,
-  BrowserWindow,
-  clipboard,
-  ipcMain,
-  dialog,
-  Menu
-} from 'electron'
+import { app, shell, BrowserWindow, clipboard, ipcMain, dialog, Menu } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { promises as fs } from 'fs'
 import { isAbsolute, join } from 'path'

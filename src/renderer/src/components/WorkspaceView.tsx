@@ -54,13 +54,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     startEditing,
     updateDraftContent
   } = editingState
-  const {
-    isSidebarOpen,
-    setIsSidebarOpen,
-    sidebarWidth,
-    isResizing,
-    startResizing
-  } = layoutState
+  const { isSidebarOpen, setIsSidebarOpen, sidebarWidth, isResizing, startResizing } = layoutState
   const {
     openFileTabs,
     activeFileTabId,
@@ -88,13 +82,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openBreadcrumbPath,
     selectPreviewPath
   } = navigationActions
-  const {
-    settings,
-    isSettingsOpen,
-    openSettings,
-    closeSettings,
-    saveSettings
-  } = settingsState
+  const { settings, isSettingsOpen, openSettings, closeSettings, saveSettings } = settingsState
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
   const {
     searchInputRef,

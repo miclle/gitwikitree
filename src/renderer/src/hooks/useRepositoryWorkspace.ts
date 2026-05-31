@@ -24,6 +24,7 @@ import type {
   NavigationTarget,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
+  PreviewPayload,
   ProjectSessionState,
   RecentFileState,
   RepositoryPayload,
@@ -31,6 +32,7 @@ import type {
   SessionState,
   TreeItemOpenPayload,
   TreeNode,
+  AppSettings
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
@@ -71,9 +73,98 @@ function resolveHistoryTargets(
   })
 }
 
-export type RepositoryWorkspace = ReturnType<typeof useRepositoryWorkspace>
+type RepositoryState = {
+  repository: RepositoryPayload | undefined
+  selectedPath: string
+  expandedPaths: Set<string>
+  loading: boolean
+  error: string | undefined
+  breadcrumbParts: string[]
+  repositoryLabel: string
+}
 
-export function useRepositoryWorkspace() {
+type PreviewState = {
+  preview: PreviewPayload | undefined
+  previewLoading: boolean
+  pendingMarkdownAnchor: { path: string; hash: string; token: number } | undefined
+  clearPendingMarkdownAnchor: (token: number) => void
+  showMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
+}
+
+type EditingState = {
+  isEditing: boolean
+  isSaving: boolean
+  canEditPreview: boolean
+  draftContent: string
+  hasUnsavedChanges: boolean
+  startEditing: () => void
+  cancelEditing: () => void
+  updateDraftContent: (content: string) => void
+  saveCurrentFile: () => Promise<void>
+}
+
+type LayoutState = {
+  isSidebarOpen: boolean
+  setIsSidebarOpen: (isOpen: boolean) => void
+  sidebarWidth: number
+  isResizing: boolean
+  startResizing: () => void
+}
+
+type TabState = {
+  openFileTabs: OpenFileTab[]
+  activeFileTabId: string | undefined
+  titlebarTabsRef: React.MutableRefObject<HTMLElement | null>
+  tabPopover:
+    | {
+        tab: OpenFileTab
+        left: number
+        visible: boolean
+      }
+    | undefined
+  tabPopoverStyle: React.CSSProperties | undefined
+  showTabPopover: (tab: OpenFileTab, tabElement: HTMLElement) => void
+  hideTabPopover: (delayed?: boolean) => void
+  handleTitlebarTabsPointerLeave: (event: React.PointerEvent<HTMLElement>) => void
+  selectFileTab: (tab: OpenFileTab) => Promise<void>
+  closeFileTab: (id: string) => void
+  canNavigateBack: boolean
+  canNavigateForward: boolean
+}
+
+type NavigationActions = {
+  openRepository: () => Promise<void>
+  handleSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
+  toggleDirectory: (path: string) => void
+  showTreeItemContextMenu: (node: TreeNode) => Promise<void>
+  showBreadcrumbContextMenu: (path: string) => Promise<void>
+  navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
+  checkoutBranch: (branch: string) => Promise<void>
+  openBranchWorktree: (ref: string) => Promise<void>
+  openRepositoryPreview: () => void
+  openBreadcrumbPath: (path: string) => void
+  selectPreviewPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
+}
+
+type SettingsState = {
+  settings: AppSettings
+  isSettingsOpen: boolean
+  openSettings: () => void
+  closeSettings: () => void
+  saveSettings: (settings: Partial<AppSettings>) => Promise<void>
+}
+
+export type RepositoryWorkspace = {
+  repositoryState: RepositoryState
+  previewState: PreviewState
+  editingState: EditingState
+  layoutState: LayoutState
+  tabState: TabState
+  navigationActions: NavigationActions
+  settingsState: SettingsState
+}
+
+export function useRepositoryWorkspace(): RepositoryWorkspace {
   const nextTabId = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
