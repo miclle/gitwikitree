@@ -50,6 +50,13 @@ async function readRepositoryWorkspaceHook() {
   )
 }
 
+async function readRepositoryPreviewLoaderHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useRepositoryPreviewLoader.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readWorkspaceSettingsHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/useWorkspaceSettings.ts', import.meta.url),
@@ -313,6 +320,42 @@ test('settings dialog applies changes immediately without a save action', async 
     homeFilePreviewReloadHook,
     /if \(preview\?\.kind === 'directory' && preview\.path === selectedPath\) return[\s\S]*clearHomeFileDirectoryPreviewReload\(\)/,
     'pending home file preview reloads should be canceled after navigating away from the directory'
+  )
+})
+
+test('repository preview loading state lives in a focused hook', async () => {
+  const workspaceHook = await readRepositoryWorkspaceHook()
+  const previewLoaderHook = await readRepositoryPreviewLoaderHook()
+
+  assert.match(
+    workspaceHook,
+    /useRepositoryPreviewLoader\(repository\)/,
+    'repository workspace should delegate preview loading state to a focused hook'
+  )
+  assert.match(
+    previewLoaderHook,
+    /const \[preview, setPreview\] = useState<PreviewPayload \| undefined>\(\)/,
+    'preview loader should own the active preview payload'
+  )
+  assert.match(
+    previewLoaderHook,
+    /const \[previewLoading, setPreviewLoading\] = useState\(false\)/,
+    'preview loader should own preview loading state'
+  )
+  assert.match(
+    previewLoaderHook,
+    /const \[error, setError\] = useState<string \| undefined>\(\)/,
+    'preview loader should keep preview load errors with the loading flow'
+  )
+  assert.match(
+    previewLoaderHook,
+    /window\.api\.previewPath\(repo\.path, path, \{[\s\S]*source: repo\.source,[\s\S]*rootPath: repo\.rootPath/,
+    'preview loader should preserve repository context while loading previews'
+  )
+  assert.doesNotMatch(
+    workspaceHook,
+    /const \[previewLoading, setPreviewLoading\] = useState\(false\)/,
+    'repository workspace should not duplicate preview loading state'
   )
 })
 

@@ -8,6 +8,7 @@ import {
 } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
 import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
+import { useRepositoryPreviewLoader } from './useRepositoryPreviewLoader'
 import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
 import { useWorkspaceSettings } from './useWorkspaceSettings'
@@ -216,14 +217,11 @@ export function useRepositoryWorkspace(): {
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
-  const [preview, setPreview] = useState<PreviewPayload | undefined>()
   const [loading, setLoading] = useState(false)
-  const [previewLoading, setPreviewLoading] = useState(false)
   const [editingPath, setEditingPath] = useState<string | undefined>()
   const [draftContent, setDraftContent] = useState('')
   const [draftModifiedAt, setDraftModifiedAt] = useState<string | undefined>()
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | undefined>()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
@@ -240,35 +238,13 @@ export function useRepositoryWorkspace(): {
     hideTabPopover,
     handleTitlebarTabsPointerLeave
   } = useTabPopover()
+  const { preview, setPreview, previewLoading, error, setError, loadPreview } =
+    useRepositoryPreviewLoader(repository)
   const editablePreviewTarget = getEditablePreviewTarget(preview)
   const isEditing = Boolean(editablePreviewTarget && editingPath === editablePreviewTarget.path)
   const canEditPreview = Boolean(editablePreviewTarget)
   const hasUnsavedChanges = Boolean(
     isEditing && editablePreviewTarget && draftContent !== editablePreviewTarget.content
-  )
-
-  const loadPreview = useCallback(
-    async (path: string, repo = repository): Promise<PreviewPayload | undefined> => {
-      if (!repo) return undefined
-
-      setPreviewLoading(true)
-      setError(undefined)
-
-      try {
-        const nextPreview = await window.api.previewPath(repo.path, path, {
-          source: repo.source,
-          rootPath: repo.rootPath
-        })
-        setPreview(nextPreview)
-        return nextPreview
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason))
-        return undefined
-      } finally {
-        setPreviewLoading(false)
-      }
-    },
-    [repository]
   )
 
   const { scheduleHomeFileDirectoryPreviewReload } = useHomeFileDirectoryPreviewReload({
@@ -397,7 +373,13 @@ export function useRepositoryWorkspace(): {
     } finally {
       setLoading(false)
     }
-  }, [discardEditingIfAllowed, loadPreview, resetRepositoryLayout, restoreRepositorySession])
+  }, [
+    discardEditingIfAllowed,
+    loadPreview,
+    resetRepositoryLayout,
+    restoreRepositorySession,
+    setError
+  ])
 
   const loadRepositoryPath = useCallback(
     async (repoPath: string): Promise<void> => {
@@ -443,7 +425,13 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [discardEditingIfAllowed, loadPreview, resetRepositoryLayout, restoreRepositorySession]
+    [
+      discardEditingIfAllowed,
+      loadPreview,
+      resetRepositoryLayout,
+      restoreRepositorySession,
+      setError
+    ]
   )
 
   const loadRepositoryWithSession = useCallback(
@@ -467,7 +455,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [restoreRepositorySession]
+    [restoreRepositorySession, setError]
   )
 
   const openFilePath = useCallback(
@@ -510,7 +498,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview, repository?.path]
+    [createNextTabId, discardEditingIfAllowed, loadPreview, repository?.path, setError]
   )
 
   const openTreeItem = useCallback(
@@ -558,7 +546,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview]
+    [createNextTabId, discardEditingIfAllowed, loadPreview, setError]
   )
 
   useEffect(() => {
@@ -806,7 +794,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [discardEditingIfAllowed, replaceRepositoryWorkspace, repository]
+    [discardEditingIfAllowed, replaceRepositoryWorkspace, repository, setError]
   )
 
   const openBranchWorktree = useCallback(
@@ -826,7 +814,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [discardEditingIfAllowed, replaceRepositoryWorkspace, repository]
+    [discardEditingIfAllowed, replaceRepositoryWorkspace, repository, setError]
   )
 
   const openRepositoryPreview = useCallback((): void => {
@@ -955,7 +943,8 @@ export function useRepositoryWorkspace(): {
       isEditingTargetPath,
       loadPreview,
       openFileTabs,
-      repository
+      repository,
+      setError
     ]
   )
 
@@ -1004,7 +993,7 @@ export function useRepositoryWorkspace(): {
     setDraftContent(editablePreviewTarget.content)
     setDraftModifiedAt(editablePreviewTarget.modifiedAt)
     setError(undefined)
-  }, [editablePreviewTarget])
+  }, [editablePreviewTarget, setError])
 
   const cancelEditing = useCallback((): void => {
     if (!discardEditingIfAllowed()) return
@@ -1065,7 +1054,9 @@ export function useRepositoryWorkspace(): {
     hasUnsavedChanges,
     isEditing,
     preview,
-    repository
+    repository,
+    setError,
+    setPreview
   ])
 
   useEffect(() => {
