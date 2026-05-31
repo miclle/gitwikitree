@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { Code2, Columns2, Eye, Loader2, Pencil, Plus, Settings } from 'lucide-react'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
-import { getSelectedPreviewSearchText, getSteppedSearchIndex } from '../preview-search'
 import { BranchControls } from './BranchControls'
 import { FileTabsNav } from './FileTabsNav'
 import { FileEditor } from './FileEditor'
@@ -14,6 +13,7 @@ import { SettingsDialog } from './SettingsDialog'
 import { StatusBar } from './StatusBar'
 import { TreeRow } from './TreeRow'
 import { HistoryButtons, TitlebarWindowControls } from './WindowControls'
+import { usePreviewSearchControls } from '../hooks/usePreviewSearchControls'
 import { applyDraftToPreview, getEditablePreviewTarget } from '../hooks/useRepositoryWorkspace'
 import { useSplitEditorResize } from '../hooks/useSplitEditorResize'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
@@ -77,14 +77,22 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     canNavigateForward
   } = workspace
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
-  const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const previewBodyRef = useRef<HTMLDivElement | null>(null)
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchMatchCount, setSearchMatchCount] = useState(0)
-  const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
-  const [searchFocusRequest, setSearchFocusRequest] = useState(0)
-  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
+  const {
+    searchInputRef,
+    previewBodyRef,
+    isSearchOpen,
+    searchQuery,
+    appliedSearchQuery,
+    searchMatchCount,
+    activeSearchIndex,
+    isGlobalSearchOpen,
+    setIsGlobalSearchOpen,
+    setSearchQuery,
+    setActiveSearchIndex,
+    closePreviewSearch,
+    stepSearchMatch,
+    handleSearchMatchCountChange
+  } = usePreviewSearchControls()
   const [fileViewModeState, setFileViewModeState] = useState<{
     editing: boolean
     mode: FileViewMode
@@ -92,7 +100,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   }>({ editing: false, mode: 'preview' })
   const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
   const [editorStatus, setEditorStatus] = useState<EditorStatusBarState | undefined>()
-  const appliedSearchQuery = isSearchOpen ? searchQuery : ''
   const activePdfPath =
     preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
   const activePdfPageCount =
@@ -142,40 +149,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
           lastChange: editablePreviewTarget.lastChange
         }
       : editorStatus
-  const openPreviewSearch = useCallback(() => {
-    const selectedText = getSelectedPreviewSearchText(window.getSelection(), previewBodyRef.current)
-    if (selectedText) {
-      setSearchQuery(selectedText)
-      setActiveSearchIndex(-1)
-    }
-
-    setIsSearchOpen(true)
-    setSearchFocusRequest((request) => request + 1)
-  }, [])
-  const closePreviewSearch = useCallback(() => {
-    setIsSearchOpen(false)
-    setActiveSearchIndex(-1)
-  }, [])
-  const stepSearchMatch = useCallback(
-    (direction: -1 | 1): void => {
-      setActiveSearchIndex((currentIndex) =>
-        getSteppedSearchIndex({
-          currentIndex,
-          matchCount: searchMatchCount,
-          direction
-        })
-      )
-    },
-    [searchMatchCount]
-  )
-  const handleSearchMatchCountChange = useCallback((count: number): void => {
-    setSearchMatchCount(count)
-    setActiveSearchIndex((currentIndex) => {
-      if (count <= 0) return -1
-      if (currentIndex < 0) return 0
-      return Math.min(currentIndex, count - 1)
-    })
-  }, [])
   const handlePdfPageCountChange = useCallback(
     (count: number | undefined): void => {
       if (!activePdfPath) return
@@ -198,49 +171,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       path: editablePreviewTarget?.path
     })
   }
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && isSearchOpen) {
-        event.preventDefault()
-        closePreviewSearch()
-        return
-      }
-
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.shiftKey &&
-        event.key.toLocaleLowerCase() === 'f'
-      ) {
-        event.preventDefault()
-        setIsGlobalSearchOpen(true)
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'f') {
-        event.preventDefault()
-        openPreviewSearch()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closePreviewSearch, isSearchOpen, openPreviewSearch])
-
-  useEffect(() => {
-    return window.api.onOpenGlobalSearch(() => setIsGlobalSearchOpen(true))
-  }, [])
-
-  useEffect(() => {
-    return window.api.onOpenCurrentTabSearch(openPreviewSearch)
-  }, [openPreviewSearch])
-
-  useEffect(() => {
-    if (!isSearchOpen) return
-
-    searchInputRef.current?.focus()
-    searchInputRef.current?.select()
-  }, [isSearchOpen, searchFocusRequest])
-
   const previewContentElement =
     showsPreview && previewForDisplay ? (
       <PreviewContent

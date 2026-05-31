@@ -78,6 +78,13 @@ async function readSplitEditorResizeHook() {
   )
 }
 
+async function readPreviewSearchControlsHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/usePreviewSearchControls.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
@@ -436,7 +443,7 @@ test('breadcrumb items stay on one line in narrow windows', async () => {
 })
 
 test('current tab search command refocuses the find input even when already open', async () => {
-  const source = await readWorkspaceView()
+  const source = await readPreviewSearchControlsHook()
 
   assert.match(
     source,
@@ -456,7 +463,7 @@ test('current tab search command refocuses the find input even when already open
 })
 
 test('current tab search is available from the app menu event', async () => {
-  const source = await readWorkspaceView()
+  const source = await readPreviewSearchControlsHook()
 
   assert.match(
     source,
@@ -763,25 +770,26 @@ test('file editor styles markdown syntax like a document editor', async () => {
 })
 
 test('global repository search is available from the sidebar and keyboard shortcut', async () => {
-  const source = await readWorkspaceView()
+  const workspaceSource = await readWorkspaceView()
+  const hookSource = await readPreviewSearchControlsHook()
 
   assert.match(
-    source,
+    hookSource,
     /const \[isGlobalSearchOpen, setIsGlobalSearchOpen\] = useState\(false\)/,
-    'workspace should keep global search modal state'
+    'search controls should keep global search modal state'
   )
   assert.match(
-    source,
+    hookSource,
     /window\.api\.onOpenGlobalSearch\(\(\) => setIsGlobalSearchOpen\(true\)\)/,
-    'workspace should subscribe to the app menu global search command'
+    'search controls should subscribe to the app menu global search command'
   )
   assert.match(
-    source,
+    hookSource,
     /event\.shiftKey[\s\S]*setIsGlobalSearchOpen\(true\)/,
     'Command/Ctrl+Shift+F should open global search'
   )
   assert.match(
-    source,
+    workspaceSource,
     /<GlobalSearchModal[\s\S]*open=\{isGlobalSearchOpen\}/,
     'workspace should render the global search modal'
   )
@@ -874,32 +882,33 @@ test('restored active file tabs reveal their item in the tree', async () => {
 })
 
 test('current tab search command seeds the query from selected preview text', async () => {
-  const source = await readWorkspaceView()
+  const workspaceSource = await readWorkspaceView()
+  const hookSource = await readPreviewSearchControlsHook()
 
   assert.match(
-    source,
+    hookSource,
     /const previewBodyRef = useRef<HTMLDivElement \| null>\(null\)/,
-    'workspace should keep a ref to the searchable preview content'
+    'search controls should keep a ref to the searchable preview content'
   )
   assert.match(
-    source,
+    hookSource,
     /getSelectedPreviewSearchText\(window\.getSelection\(\), previewBodyRef\.current\)/,
     'opening search should read the current selection from the preview content'
   )
   assert.match(
-    source,
+    hookSource,
     /if \(selectedText\) \{[\s\S]*setSearchQuery\(selectedText\)[\s\S]*setActiveSearchIndex\(-1\)[\s\S]*\}/,
     'selected preview text should seed the search query and reset the active match'
   )
   assert.match(
-    source,
+    workspaceSource,
     /<div className="preview-body" ref=\{previewBodyRef\}>/,
     'preview body should be the search selection boundary'
   )
 })
 
 test('current tab search closes on Escape even when the find input is blurred', async () => {
-  const source = await readWorkspaceView()
+  const source = await readPreviewSearchControlsHook()
 
   assert.match(
     source,
