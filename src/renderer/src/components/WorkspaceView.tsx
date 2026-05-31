@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronUp,
   Code2,
+  Columns2,
   Eye,
   GitBranch,
   Loader2,
@@ -25,6 +26,8 @@ import { TreeRow } from './TreeRow'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 import type { EditorStatusBarState } from '../status-bar'
 import type { RepositoryRef } from '../../../shared/types'
+
+type FileViewMode = 'preview' | 'code' | 'split'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const {
@@ -65,7 +68,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openBreadcrumbPath,
     selectPreviewPath,
     startEditing,
-    cancelEditing,
     updateDraftContent,
     pendingMarkdownAnchor,
     clearPendingMarkdownAnchor,
@@ -86,6 +88,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1)
   const [searchFocusRequest, setSearchFocusRequest] = useState(0)
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
+  const [fileViewModeState, setFileViewModeState] = useState<{
+    editing: boolean
+    mode: FileViewMode
+    path?: string
+  }>({ editing: false, mode: 'preview' })
   const [pdfPageCount, setPdfPageCount] = useState<{ path: string; count: number | undefined }>()
   const [editorStatus, setEditorStatus] = useState<EditorStatusBarState | undefined>()
   const [isBranchPickerOpen, setIsBranchPickerOpen] = useState(false)
@@ -113,6 +120,40 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     preview?.kind === 'file' && preview.previewType === 'pdf' ? preview.path : undefined
   const activePdfPageCount =
     pdfPageCount && pdfPageCount.path === activePdfPath ? pdfPageCount.count : undefined
+  const filePreview = preview?.kind === 'file' ? preview : undefined
+  const fileViewMode =
+    fileViewModeState.path === filePreview?.path && fileViewModeState.editing === isEditing
+      ? fileViewModeState.mode
+      : 'preview'
+  const canSplitPreview = Boolean(
+    canEditPreview &&
+    filePreview &&
+    ['.md', '.markdown', '.mdx'].includes(filePreview.extension.toLocaleLowerCase())
+  )
+  const effectiveFileViewMode =
+    fileViewMode === 'split' && !canSplitPreview
+      ? 'code'
+      : fileViewMode === 'code' && (!canEditPreview || !isEditing)
+        ? 'preview'
+        : fileViewMode
+  const isEditorMounted = Boolean(filePreview && isEditing)
+  const showsEditor = Boolean(
+    filePreview &&
+    isEditing &&
+    (effectiveFileViewMode === 'code' || effectiveFileViewMode === 'split')
+  )
+  const showsPreview = Boolean(preview && effectiveFileViewMode !== 'code')
+  const previewForDisplay =
+    filePreview && isEditing && filePreview.content !== undefined
+      ? {
+          ...filePreview,
+          content: draftContent
+        }
+      : preview
+  const fileWorkspaceClassName =
+    effectiveFileViewMode === 'split' ? 'file-workspace split' : 'file-workspace'
+  const editorPaneClassName =
+    effectiveFileViewMode === 'split' ? 'file-editor-pane split' : 'file-editor-pane'
   const editorStatusWithFileMetadata =
     editorStatus && preview?.kind === 'file'
       ? {
@@ -166,6 +207,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const showBreadcrumbContextMenu = (event: React.MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
     void openBreadcrumbContextMenu(path)
+  }
+  const selectFileViewMode = (mode: FileViewMode): void => {
+    if ((mode === 'code' || mode === 'split') && canEditPreview && !isEditing) {
+      startEditing()
+    }
+
+    setFileViewModeState({ editing: Boolean(mode !== 'preview'), mode, path: filePreview?.path })
   }
 
   useEffect(() => {
@@ -651,18 +699,38 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     )
                   })}
                 </div>
-                {canEditPreview && (
-                  <>
+                {preview?.kind === 'file' && (
+                  <div className="file-view-tabs" role="tablist" aria-label="File view">
                     <button
-                      className="pathbar-icon-button"
                       type="button"
-                      aria-label={isEditing ? 'Show preview' : 'Edit file'}
-                      aria-pressed={isEditing}
-                      onClick={isEditing ? cancelEditing : startEditing}
+                      role="tab"
+                      aria-selected={effectiveFileViewMode === 'preview'}
+                      onClick={() => selectFileViewMode('preview')}
                     >
-                      {isEditing ? <Eye size={15} /> : <Pencil size={15} />}
+                      <Eye size={15} />
+                      Preview
                     </button>
-                  </>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveFileViewMode === 'code'}
+                      disabled={!canEditPreview}
+                      onClick={() => selectFileViewMode('code')}
+                    >
+                      <Pencil size={15} />
+                      Code
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveFileViewMode === 'split'}
+                      disabled={!canSplitPreview}
+                      onClick={() => selectFileViewMode('split')}
+                    >
+                      <Columns2 size={15} />
+                      Split
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -672,31 +740,35 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     <Loader2 className="spin" size={26} />
                   </div>
                 )}
-                {!previewLoading && preview && isEditing && preview.kind === 'file' ? (
-                  <FileEditor
-                    content={draftContent}
-                    encoding={preview.encoding}
-                    extension={preview.extension}
-                    lastChange={preview.lastChange}
-                    modifiedAt={preview.modifiedAt}
-                    onChange={updateDraftContent}
-                    onStatusChange={setEditorStatus}
-                  />
-                ) : (
-                  !previewLoading &&
-                  preview && (
-                    <PreviewContent
-                      pendingAnchor={pendingMarkdownAnchor}
-                      preview={preview}
-                      searchQuery={appliedSearchQuery}
-                      activeSearchIndex={activeSearchIndex}
-                      onSearchMatchCountChange={handleSearchMatchCountChange}
-                      onPdfPageCountChange={handlePdfPageCountChange}
-                      onSelectPath={selectPreviewPath}
-                      onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
-                      onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
-                    />
-                  )
+                {!previewLoading && preview && (
+                  <div className={fileWorkspaceClassName}>
+                    {isEditorMounted && filePreview && (
+                      <div className={editorPaneClassName} hidden={!showsEditor}>
+                        <FileEditor
+                          content={draftContent}
+                          encoding={filePreview.encoding}
+                          extension={filePreview.extension}
+                          lastChange={filePreview.lastChange}
+                          modifiedAt={filePreview.modifiedAt}
+                          onChange={updateDraftContent}
+                          onStatusChange={setEditorStatus}
+                        />
+                      </div>
+                    )}
+                    {showsPreview && previewForDisplay && (
+                      <PreviewContent
+                        pendingAnchor={pendingMarkdownAnchor}
+                        preview={previewForDisplay}
+                        searchQuery={appliedSearchQuery}
+                        activeSearchIndex={activeSearchIndex}
+                        onSearchMatchCountChange={handleSearchMatchCountChange}
+                        onPdfPageCountChange={handlePdfPageCountChange}
+                        onSelectPath={selectPreviewPath}
+                        onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
+                        onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
               {isSearchOpen && (
@@ -782,7 +854,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             repository={repository}
             preview={preview}
             pdfPageCount={activePdfPageCount}
-            editorStatus={isEditing ? editorStatusWithFileMetadata : undefined}
+            editorStatus={showsEditor ? editorStatusWithFileMetadata : undefined}
           />
         </>
       )}

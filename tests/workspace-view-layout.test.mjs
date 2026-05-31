@@ -264,6 +264,78 @@ test('file editing relies on keyboard save and marks dirty file names', async ()
   )
 })
 
+test('file view modes expose preview, code, and split editing without discarding drafts', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /const \[fileViewModeState, setFileViewModeState\] = useState<\{[\s\S]*editing: boolean[\s\S]*mode: FileViewMode[\s\S]*path\?: string[\s\S]*\}>\(\{ editing: false, mode: 'preview' \}\)/,
+    'workspace should keep a simple GitHub-like file view mode scoped to the active edit session'
+  )
+  assert.match(
+    source,
+    /role="tablist"[\s\S]*aria-label="File view"[\s\S]*Preview[\s\S]*Code[\s\S]*Split/,
+    'file view controls should present preview, code, and split as one obvious choice'
+  )
+  assert.match(
+    source,
+    /previewForDisplay[\s\S]*content:\s*draftContent/,
+    'live Markdown preview should render the current draft instead of the last saved file'
+  )
+  assert.match(
+    source,
+    /className=\{fileWorkspaceClassName\}[\s\S]*<FileEditor[\s\S]*<PreviewContent/,
+    'split mode should show the editor and preview side by side'
+  )
+  assert.match(
+    css,
+    /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*1fr\)\s*minmax\(260px,\s*1fr\);/,
+    'split editing should keep both panes usable at desktop widths'
+  )
+})
+
+test('stale code mode falls back to preview after editing ends', async () => {
+  const source = await readWorkspaceView()
+
+  assert.match(
+    source,
+    /fileViewModeState\.editing === isEditing/,
+    'file view mode should not reuse code mode from an ended editing session'
+  )
+  assert.match(
+    source,
+    /fileViewMode === 'code' && \(!canEditPreview \|\| !isEditing\)[\s\S]*\? 'preview'/,
+    'code mode should never hide both editor and preview when the file is no longer being edited'
+  )
+  assert.match(
+    source,
+    /setFileViewModeState\(\{ editing: Boolean\(mode !== 'preview'\), mode, path: filePreview\?\.path \}\)/,
+    'view mode state should record whether it belongs to an active edit session'
+  )
+})
+
+test('file preview keeps the editing CodeMirror instance mounted for undo history', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /isEditorMounted = Boolean\(\s*filePreview && isEditing\s*\)/,
+    'editing should keep the editor mounted across file view mode changes'
+  )
+  assert.match(
+    source,
+    /isEditorMounted && filePreview[\s\S]*<div className=\{editorPaneClassName\} hidden=\{!showsEditor\}[\s\S]*<FileEditor/,
+    'preview mode should hide, not unmount, the editor pane so CodeMirror keeps undo history'
+  )
+  assert.match(
+    css,
+    /\.file-editor-pane\[hidden\]\s*\{[\s\S]*display:\s*none;/,
+    'hidden editor panes should not affect the preview layout'
+  )
+})
+
 test('file editor styles markdown syntax like a document editor', async () => {
   const source = await readFileEditor()
   const css = await readMainCss()
@@ -890,23 +962,23 @@ test('editing mode routes editor state into the status bar', async () => {
   )
   assert.match(
     workspaceSource,
-    /encoding=\{preview\.encoding\}/,
+    /encoding=\{filePreview\.encoding\}/,
     'Workspace should pass the preview encoding into the editor status'
   )
   assert.match(
     workspaceSource,
-    /modifiedAt=\{preview\.modifiedAt\}/,
+    /modifiedAt=\{filePreview\.modifiedAt\}/,
     'Workspace should pass the preview modified time into the editor status'
   )
   assert.match(
     workspaceSource,
-    /lastChange=\{preview\.lastChange\}/,
+    /lastChange=\{filePreview\.lastChange\}/,
     'Workspace should pass the preview Git author metadata into the editor status'
   )
   assert.match(
     workspaceSource,
-    /editorStatus=\{isEditing \? editorStatusWithFileMetadata : undefined\}/,
-    'StatusBar should switch to editor facts only while edit mode is active'
+    /editorStatus=\{showsEditor \? editorStatusWithFileMetadata : undefined\}/,
+    'StatusBar should switch to editor facts only when the editor pane is visible'
   )
   assert.match(
     workspaceSource,
