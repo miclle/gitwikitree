@@ -741,15 +741,6 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     canNavigateForward={canNavigateForward}
                     onNavigate={navigateActiveTabHistory}
                   />
-                  <button
-                    className="titlebar-icon-button"
-                    type="button"
-                    aria-label={t('app.settings')}
-                    aria-expanded={isSettingsOpen}
-                    onClick={openSettings}
-                  >
-                    <Settings size={17} />
-                  </button>
                 </div>
                 {fileTabsNav}
               </div>

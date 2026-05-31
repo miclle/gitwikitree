@@ -80,11 +80,20 @@ test('renderer content security policy allows remote markdown images', async () 
 
 test('preview titlebar places sidebar and history controls before the tab strip', async () => {
   const source = await readWorkspaceView()
+  const titlebarActions = source.match(
+    /<div className="main-titlebar-actions">([\s\S]*?)<\/div>\n\s*\{fileTabsNav\}/
+  )
 
   assert.match(
     source,
     /<div className="main-titlebar">[\s\S]*<div className="main-titlebar-actions">[\s\S]*aria-label=\{isSidebarOpen \? t\('app\.hideFiles'\) : t\('app\.showFiles'\)\}[\s\S]*<HistoryButtons[\s\S]*\{fileTabsNav\}/,
     'preview titlebar should place sidebar and history controls before all tabs'
+  )
+  assert.ok(titlebarActions, 'preview titlebar actions should exist')
+  assert.doesNotMatch(
+    titlebarActions[1],
+    /app\.settings|openSettings/,
+    'preview titlebar actions should not include a settings button'
   )
 })
 
