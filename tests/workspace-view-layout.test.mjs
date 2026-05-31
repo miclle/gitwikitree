@@ -10,6 +10,20 @@ async function readWorkspaceView() {
   )
 }
 
+async function readBranchControls() {
+  return readFile(
+    new URL('../src/renderer/src/components/BranchControls.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readFileTabsNav() {
+  return readFile(
+    new URL('../src/renderer/src/components/FileTabsNav.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readMainCss() {
   return readFile(new URL('../src/renderer/src/assets/main.css', import.meta.url), 'utf8')
 }
@@ -36,9 +50,90 @@ async function readRepositoryWorkspaceHook() {
   )
 }
 
+async function readWorkspaceSettingsHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useWorkspaceSettings.ts', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readHomeFileDirectoryPreviewReloadHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useHomeFileDirectoryPreviewReload.ts', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readPreviewImageLightboxHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/usePreviewImageLightbox.ts', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readSplitEditorResizeHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useSplitEditorResize.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readMarkdownPreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/MarkdownPreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readCodePreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/CodePreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readDirectoryListPreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/DirectoryListPreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readHtmlPreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/HtmlPreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readImagePreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/ImagePreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readUnsupportedPreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/UnsupportedPreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
+async function readPdfPreview() {
+  return readFile(new URL('../src/renderer/src/components/PdfPreview.tsx', import.meta.url), 'utf8')
+}
+
+async function readImageLightbox() {
+  return readFile(
+    new URL('../src/renderer/src/components/ImageLightbox.tsx', import.meta.url),
     'utf8'
   )
 }
@@ -60,11 +155,17 @@ async function readTreeRow() {
 
 test('preview titlebar places file tabs in the titlebar row', async () => {
   const source = await readWorkspaceView()
+  const tabsSource = await readFileTabsNav()
 
   assert.match(
     source,
-    /<div className="main-titlebar">[\s\S]*\{fileTabsNav\}[\s\S]*<\/div>/,
+    /<div className="main-titlebar">[\s\S]*<FileTabsNav[\s\S]*<\/div>/,
     'preview titlebar should render the file tab strip inside the titlebar'
+  )
+  assert.match(
+    tabsSource,
+    /<nav[\s\S]*className="main-tabs"[\s\S]*aria-label=\{t\('app\.openTabs'\)\}/,
+    'file tab strip should keep the main tabs navigation markup in its focused component'
   )
 })
 
@@ -81,12 +182,12 @@ test('renderer content security policy allows remote markdown images', async () 
 test('preview titlebar places sidebar and history controls before the tab strip', async () => {
   const source = await readWorkspaceView()
   const titlebarActions = source.match(
-    /<div className="main-titlebar-actions">([\s\S]*?)<\/div>\n\s*\{fileTabsNav\}/
+    /<div className="main-titlebar-actions">([\s\S]*?)<\/div>\n\s*<FileTabsNav/
   )
 
   assert.match(
     source,
-    /<div className="main-titlebar">[\s\S]*<div className="main-titlebar-actions">[\s\S]*aria-label=\{isSidebarOpen \? t\('app\.hideFiles'\) : t\('app\.showFiles'\)\}[\s\S]*<HistoryButtons[\s\S]*\{fileTabsNav\}/,
+    /<div className="main-titlebar">[\s\S]*<div className="main-titlebar-actions">[\s\S]*aria-label=\{isSidebarOpen \? t\('app\.hideFiles'\) : t\('app\.showFiles'\)\}[\s\S]*<HistoryButtons[\s\S]*<FileTabsNav/,
     'preview titlebar should place sidebar and history controls before all tabs'
   )
   assert.ok(titlebarActions, 'preview titlebar actions should exist')
@@ -99,7 +200,7 @@ test('preview titlebar places sidebar and history controls before the tab strip'
 
 test('collapsed sidebar omits the repository label from the tab bar', async () => {
   const source = await readWorkspaceView()
-  const collapsedTitlebar = source.match(/<div className="main-titlebar">([\s\S]*?)\{fileTabsNav\}/)
+  const collapsedTitlebar = source.match(/<div className="main-titlebar">([\s\S]*?)<FileTabsNav/)
 
   assert.ok(collapsedTitlebar, 'preview titlebar should exist')
   assert.doesNotMatch(
@@ -131,7 +232,8 @@ test('preview titlebar keeps preview controls tight before tabs', async () => {
 
 test('settings dialog applies changes immediately without a save action', async () => {
   const source = await readSettingsDialog()
-  const workspaceHook = await readRepositoryWorkspaceHook()
+  const settingsHook = await readWorkspaceSettingsHook()
+  const homeFilePreviewReloadHook = await readHomeFileDirectoryPreviewReloadHook()
 
   assert.doesNotMatch(source, /onSubmit=|type="submit"|>\s*Save\s*</)
   assert.doesNotMatch(source, /settings-actions|>\s*Done\s*</)
@@ -160,17 +262,22 @@ test('settings dialog applies changes immediately without a save action', async 
     /onChange=\{\(event\) =>[\s\S]*applyHomeFileNames/,
     'home file candidate edits should apply without an extra save click'
   )
-  const saveSettingsBlock = workspaceHook.match(
-    /const saveSettings = useCallback\([\s\S]*?\n {2}\)\n\n {2}useEffect/
+  const saveSettingsBlock = settingsHook.match(
+    /const saveSettings = useCallback\([\s\S]*?\n {2}\)\n\n {2}return/
   )
-  assert.ok(saveSettingsBlock, 'workspace should expose a saveSettings callback')
+  assert.ok(saveSettingsBlock, 'settings hook should expose a saveSettings callback')
   assert.doesNotMatch(
     saveSettingsBlock[0],
     /setIsSettingsOpen\(false\)/,
     'saving settings should not close the modal after each immediate change'
   )
   assert.match(
-    workspaceHook,
+    settingsHook,
+    /onHomeFileNamesChange\(\)/,
+    'home file candidate edits should notify the workspace after settings persist'
+  )
+  assert.match(
+    homeFilePreviewReloadHook,
     /homeFilePreviewReloadTimeoutRef = useRef<number \| undefined>\(undefined\)/,
     'home file candidate edits should use a debounced directory preview reload'
   )
@@ -180,12 +287,12 @@ test('settings dialog applies changes immediately without a save action', async 
     'home file candidate edits should not reload the repository or affect file previews'
   )
   assert.match(
-    workspaceHook,
+    homeFilePreviewReloadHook,
     /if \(preview\?\.kind !== 'directory'\) return[\s\S]*homeFilePreviewReloadTimeoutRef\.current = window\.setTimeout\(\(\) => \{[\s\S]*void loadPreview\(directoryPath\)/,
     'home file candidate edits should only coalesce reloads for the current directory preview'
   )
   assert.match(
-    workspaceHook,
+    homeFilePreviewReloadHook,
     /if \(preview\?\.kind === 'directory' && preview\.path === selectedPath\) return[\s\S]*clearHomeFileDirectoryPreviewReload\(\)/,
     'pending home file preview reloads should be canceled after navigating away from the directory'
   )
@@ -447,21 +554,27 @@ test('file view modes expose preview, code, and split editing without discarding
 
 test('split editing lets users drag the editor and preview divider', async () => {
   const source = await readWorkspaceView()
+  const splitResizeHook = await readSplitEditorResizeHook()
   const css = await readMainCss()
 
   assert.match(
-    source,
+    splitResizeHook,
     /const \[splitEditorPaneWidthPct, setSplitEditorPaneWidthPct\] = useState\(50\)/,
     'split editing should remember the current editor pane width during the session'
   )
   assert.match(
-    source,
+    splitResizeHook,
     /const handleSplitResizerPointerDown = useCallback[\s\S]*setSplitEditorPaneWidthPct\(\(nextWidth \/ rect\.width\) \* 100\)[\s\S]*setPointerCapture\(event\.pointerId\)/,
     'split divider dragging should calculate a clamped percentage from pointer movement'
   )
   assert.match(
+    splitResizeHook,
+    /const splitWorkspaceStyle =[\s\S]*'--split-editor-width': `\$\{splitEditorPaneWidthPct\}%`[\s\S]*as CSSProperties/,
+    'the split resize hook should expose the remembered width to CSS'
+  )
+  assert.match(
     source,
-    /const splitWorkspaceStyle =[\s\S]*'--split-editor-width': `\$\{splitEditorPaneWidthPct\}%`[\s\S]*as React\.CSSProperties[\s\S]*style=\{splitWorkspaceStyle\}/,
+    /useSplitEditorResize\(effectiveFileViewMode === 'split'\)[\s\S]*style=\{splitWorkspaceStyle\}/,
     'the split workspace should expose the remembered width to CSS'
   )
   assert.match(
@@ -475,7 +588,7 @@ test('split editing lets users drag the editor and preview divider', async () =>
     'keyboard-focusable split dividers should expose their value and handle keyboard resizing'
   )
   assert.match(
-    source,
+    splitResizeHook,
     /const handleSplitResizerKeyDown = useCallback[\s\S]*event\.key === 'ArrowLeft'[\s\S]*event\.key === 'ArrowRight'[\s\S]*MIN_SPLIT_PANE_WIDTH[\s\S]*setSplitEditorPaneWidthPct\(\(currentWidth\) =>[\s\S]*Math\.min\([\s\S]*SPLIT_KEYBOARD_STEP[\s\S]*Math\.max\(/,
     'split divider keyboard resizing should adjust the stored editor width while preserving pane minimums'
   )
@@ -529,6 +642,61 @@ test('stale code mode falls back to preview after editing ends', async () => {
     source,
     /setFileViewModeState\(\{[\s\S]*editing: Boolean\(mode !== 'preview'\),[\s\S]*mode,[\s\S]*path: editablePreviewTarget\?\.path[\s\S]*\}\)/,
     'view mode state should record whether it belongs to an active edit session'
+  )
+})
+
+test('preview content delegates pure preview surfaces to focused components', async () => {
+  const previewSource = await readPreviewContent()
+  const codePreviewSource = await readCodePreview()
+  const directoryListPreviewSource = await readDirectoryListPreview()
+  const htmlPreviewSource = await readHtmlPreview()
+  const imagePreviewSource = await readImagePreview()
+  const unsupportedPreviewSource = await readUnsupportedPreview()
+
+  assert.match(
+    previewSource,
+    /<DirectoryListPreview[\s\S]*entries=\{preview\.entries\}[\s\S]*rootRef=\{setPreviewSearchRoot\}[\s\S]*onSelectPath=\{onSelectPath\}/,
+    'directory list rendering should stay in the focused directory preview component'
+  )
+  assert.match(
+    directoryListPreviewSource,
+    /shouldOpenInNewTab\(event\)[\s\S]*className="directory-list"[\s\S]*iconForNode\(entry\)/,
+    'directory preview should keep icons and new-tab selection behavior together'
+  )
+  assert.match(
+    previewSource,
+    /<CodePreview[\s\S]*content=\{preview\.content\}[\s\S]*extension=\{preview\.extension\}[\s\S]*rootRef=\{setPreviewSearchRoot\}/,
+    'source rendering should stay in the focused code preview component'
+  )
+  assert.match(
+    codePreviewSource,
+    /aria-label=\{t\('preview\.sourceCode'\)\}[\s\S]*highlightCodeBlock\(content, language\)/,
+    'code preview should own syntax highlighting and source accessibility labels'
+  )
+  assert.match(
+    previewSource,
+    /<HtmlPreview[\s\S]*content=\{preview\.content\}[\s\S]*rootRef=\{setPreviewSearchRoot\}[\s\S]*onContentReady=\{markPreviewSearchRootReady\}/,
+    'html rendering should stay in the focused html preview component'
+  )
+  assert.match(
+    htmlPreviewSource,
+    /rootRef\(element\?\.contentDocument\?\.body \?\? null\)[\s\S]*sandbox="allow-same-origin"[\s\S]*onContentReady\(\)/,
+    'html preview should own iframe search-root registration and safe sandboxing'
+  )
+  assert.match(
+    previewSource,
+    /<SvgPreview[\s\S]*content=\{preview\.content\}[\s\S]*<ImagePreview[\s\S]*src=\{preview\.dataUrl\}/,
+    'image and svg rendering should stay in the focused image preview component'
+  )
+  assert.match(
+    imagePreviewSource,
+    /className="image-preview"[\s\S]*onPreviewImageClick\(event\.currentTarget, event\)[\s\S]*svgPreviewDataUrl/,
+    'image preview should own image preview markup and svg data-url encoding'
+  )
+  assert.match(
+    unsupportedPreviewSource,
+    /className="unsupported-preview"[\s\S]*FileText[\s\S]*t\('preview\.fileUnavailable'\)/,
+    'unsupported previews should keep their empty-state copy in a focused component'
   )
 })
 
@@ -640,7 +808,7 @@ test('global repository search opens reveal the selected file in the tree', asyn
 })
 
 test('branch selection opens an action modal with explanatory choices', async () => {
-  const source = await readWorkspaceView()
+  const source = await readBranchControls()
   const css = await readMainCss()
 
   assert.match(
@@ -655,7 +823,7 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
-    /pointerdown[\s\S]*branchPickerRef\.current\.contains\(event\.target as Node\)[\s\S]*closeBranchPicker/,
+    /if \(branchPickerRef\.current\.contains\(event\.target as Node\)\) return[\s\S]*closeBranchPicker\(\)[\s\S]*window\.addEventListener\('pointerdown'/,
     'clicking outside the branch picker should close the popover'
   )
   assert.match(
@@ -665,12 +833,12 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
-    /if \(ref\.worktreePath\)[\s\S]*void openBranchWorktree\(ref\.name\)[\s\S]*return/,
+    /if \(ref\.worktreePath\)[\s\S]*void onOpenBranchWorktree\(ref\.name\)[\s\S]*return/,
     'refs that already have a worktree should open directly without the action modal'
   )
   assert.match(
     source,
-    /primaryWorkspaceBranch[\s\S]*repository\?\.refs\.find\([\s\S]*ref\.worktreePath === repository\.rootPath/,
+    /primaryWorkspaceBranch[\s\S]*repository\.refs\.find\([\s\S]*ref\.worktreePath === repository\.rootPath/,
     'branch action copy should use the primary workspace branch as the source branch'
   )
   assert.match(
@@ -746,11 +914,11 @@ test('current tab search closes on Escape even when the find input is blurred', 
 })
 
 test('html previews register their iframe body as searchable content', async () => {
-  const source = await readPreviewContent()
+  const source = await readHtmlPreview()
 
   assert.match(
     source,
-    /const setHtmlPreviewRoot = \(element: HTMLIFrameElement \| null\): void => \{[\s\S]*previewSearchRootRef\.current = element\?\.contentDocument\?\.body \?\? null[\s\S]*\}/,
+    /const setHtmlPreviewRoot = \(element: HTMLIFrameElement \| null\): void => \{[\s\S]*rootRef\(element\?\.contentDocument\?\.body \?\? null\)[\s\S]*\}/,
     'html preview should expose the iframe body to the current-tab search highlighter'
   )
   assert.match(
@@ -760,13 +928,13 @@ test('html previews register their iframe body as searchable content', async () 
   )
   assert.match(
     source,
-    /setSearchRootVersion\(\(version\) => version \+ 1\)/,
+    /onContentReady\(\)/,
     'html preview load should rerun search once iframe content is available'
   )
 })
 
 test('Mermaid previews render diagrams directly without stale processed markers', async () => {
-  const source = await readPreviewContent()
+  const source = await readMarkdownPreview()
 
   assert.match(
     source,
@@ -801,7 +969,7 @@ test('PDF previews render in-app without Electron PDF viewer frames', async () =
 })
 
 test('PDF preview canvas keeps page aspect ratio when constrained', async () => {
-  const source = await readPreviewContent()
+  const source = await readPdfPreview()
   const css = await readMainCss()
 
   assert.match(
@@ -822,7 +990,7 @@ test('PDF preview canvas keeps page aspect ratio when constrained', async () => 
 })
 
 test('PDF preview lazily renders pages near the visible viewport', async () => {
-  const source = await readPreviewContent()
+  const source = await readPdfPreview()
   const css = await readMainCss()
 
   assert.match(
@@ -848,7 +1016,7 @@ test('PDF preview lazily renders pages near the visible viewport', async () => {
 })
 
 test('PDF loading state clears after the first page renders', async () => {
-  const source = await readPreviewContent()
+  const source = await readPdfPreview()
 
   assert.match(
     source,
@@ -863,7 +1031,7 @@ test('PDF loading state clears after the first page renders', async () => {
 })
 
 test('PDF preview reports page count to the status bar instead of overlaying it', async () => {
-  const previewSource = await readPreviewContent()
+  const previewSource = await readPdfPreview()
   const workspaceSource = await readWorkspaceView()
   const statusBarSource = await readFile(
     new URL('../src/renderer/src/components/StatusBar.tsx', import.meta.url),
@@ -899,66 +1067,69 @@ test('PDF preview reports page count to the status bar instead of overlaying it'
 })
 
 test('image preview lightbox supports click, keyboard, and adjacent image navigation', async () => {
-  const source = await readPreviewContent()
+  const previewSource = await readPreviewContent()
+  const imageLightboxHookSource = await readPreviewImageLightboxHook()
+  const markdownPreviewSource = await readMarkdownPreview()
+  const lightboxSource = await readImageLightbox()
   const css = await readMainCss()
 
   assert.match(
-    source,
+    imageLightboxHookSource,
     /collectPreviewImages\(container\.querySelectorAll\('img'\)\)/,
     'image lightbox should collect images from the current preview only'
   )
   assert.match(
-    source,
-    /handlePreviewImageClick\(event\.currentTarget\)\(event\)[\s\S]*if \(event\.defaultPrevented\) return[\s\S]*handleMarkdownLinkClick\(sourcePath\)\(event\)/,
+    markdownPreviewSource,
+    /onPreviewImageClick\(event\.currentTarget, event\)[\s\S]*if \(event\.defaultPrevented\) return[\s\S]*handleMarkdownLinkClick\(event\)/,
     'markdown image clicks should open the lightbox before linked images can navigate'
   )
   assert.match(
-    source,
+    markdownPreviewSource,
     /if \(event\.target\.closest\('img'\)\) return[\s\S]*const link = event\.target\.closest<HTMLAnchorElement>\('a\[data-markdown-link\]'\)/,
     'linked image context menus should fall through to the browser image menu'
   )
   assert.match(
-    source,
+    imageLightboxHookSource,
     /event\.key === 'Escape'[\s\S]*closeImageLightbox\(\)/,
     'image lightbox should close from the keyboard'
   )
   assert.match(
-    source,
+    imageLightboxHookSource,
     /event\.key === 'ArrowLeft'[\s\S]*stepImageLightbox\(-1\)[\s\S]*event\.key === 'ArrowRight'[\s\S]*stepImageLightbox\(1\)/,
     'image lightbox should navigate adjacent images from the keyboard'
   )
   assert.match(
-    source,
+    lightboxSource,
     /onWheel=\{\(event\) => \{[\s\S]*getSteppedPreviewImageZoom[\s\S]*onDoubleClick=\{\(event\) => \{[\s\S]*getToggledPreviewImageZoom/,
     'image lightbox should support mouse zoom through wheel and double click'
   )
   assert.match(
-    source,
+    lightboxSource,
     /onPointerDown=\{handleImagePointerDown\}[\s\S]*onPointerMove=\{handleImagePointerMove\}[\s\S]*onPointerUp=\{handleImagePointerEnd\}/,
     'image lightbox should support dragging a zoomed image to inspect clipped regions'
   )
   assert.match(
-    source,
+    lightboxSource,
     /clampPreviewImagePan\(/,
     'image lightbox should keep dragged zoomed images within visible bounds'
   )
   assert.doesNotMatch(
-    source,
+    imageLightboxHookSource,
     /type ImageLightboxState = \{[\s\S]*zoom: number[\s\S]*\}/,
     'wheel zoom state should stay inside the lightbox so large previews do not rerender on every wheel event'
   )
   assert.match(
-    source,
-    /function ImageLightbox\(/,
+    lightboxSource,
+    /export function ImageLightbox\(/,
     'image lightbox rendering should be isolated from the heavier preview content'
   )
   assert.match(
-    source,
+    previewSource,
     /key=\{[\s\S]*activeImageLightbox\.index[\s\S]*activeImageLightbox\.images\[activeImageLightbox\.index\]\?\.src/,
     'image navigation should remount the lightbox by index before src so duplicate image URLs reset zoom'
   )
   assert.match(
-    source,
+    lightboxSource,
     /role="dialog"[\s\S]*aria-modal="true"[\s\S]*className="image-lightbox-nav previous"[\s\S]*className="image-lightbox-nav next"/,
     'image lightbox should render a modal with previous and next controls'
   )
@@ -982,7 +1153,7 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
 test('expanded sidebar keeps sidebar and history controls out of the sidebar titlebar', async () => {
   const source = await readWorkspaceView()
   const sidebarTitlebar = source.match(
-    /<div className="sidebar-titlebar">([\s\S]*?)<\/div>\s*<div className="sidebar-controls">/
+    /<div className="sidebar-titlebar">([\s\S]*?)<\/div>\s*<BranchControls/
   )
 
   assert.ok(sidebarTitlebar, 'sidebar titlebar should exist')
