@@ -18,7 +18,7 @@
   --selected: #ddf4ff;
   --chrome-bg: #d0d7de;
   --chrome-text: #3f4854;
-  --chrome-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --chrome-shadow: none;
   --sidebar-bg: #f6f8fa;
   --tree-bg: #ffffff;
   --tab-text: #3f4854;
@@ -1258,11 +1258,13 @@ kbd {
 
 .repo-pathbar {
   position: relative;
+  z-index: 3;
   flex: 0 0 auto;
   justify-content: space-between;
   gap: 10px;
   min-height: 30px;
   padding: 5px 16px;
+  background: var(--panel);
 }
 
 .breadcrumb {
@@ -2567,7 +2569,7 @@ textarea.settings-control {
   }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 900px) {
   body {
     min-width: 0;
     overflow: auto;

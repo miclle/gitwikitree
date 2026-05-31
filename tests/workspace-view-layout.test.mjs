@@ -276,6 +276,21 @@ test('preview titlebar keeps preview controls tight before tabs', async () => {
   )
 })
 
+test('preview chrome keeps tab corners behind pathbar controls', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /--chrome-shadow:\s*none;/,
+    'the titlebar should not draw a bright top inset line above the tabs'
+  )
+  assert.match(
+    css,
+    /\.repo-pathbar\s*\{[\s\S]*?z-index:\s*3;[\s\S]*?background:\s*var\(--panel\);/,
+    'pathbar controls should paint over the active-tab corner filler'
+  )
+})
+
 test('settings dialog applies changes immediately without a save action', async () => {
   const source = await readSettingsDialog()
   const settingsHook = await readWorkspaceSettingsHook()
@@ -1367,6 +1382,21 @@ test('files sidebar layout resets for projects without saved session state', asy
     workspaceSource,
     /const loadRepositoryPath = useCallback[\s\S]*if \(normalizedProjectSession\)[\s\S]*return[\s\S]*openRepositoryRoot\(nextRepository, \{ resetLayout: true \}\)/,
     'repository path opens should reset layout when no project session exists'
+  )
+})
+
+test('files sidebar does not stack above preview at the minimum window width', async () => {
+  const css = await readMainCss()
+
+  assert.doesNotMatch(
+    css,
+    /@media\s*\(max-width:\s*10[2-7]\dpx\)[\s\S]*?grid-template-columns:\s*1fr\s*!important;/,
+    'the sidebar and preview should stay side-by-side throughout the supported 1024px minimum window width'
+  )
+  assert.match(
+    css,
+    /@media\s*\(max-width:\s*900px\)[\s\S]*?grid-template-columns:\s*1fr\s*!important;/,
+    'single-column layout should only be reserved for widths below the desktop window minimum'
   )
 })
 
