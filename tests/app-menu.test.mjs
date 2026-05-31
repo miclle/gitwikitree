@@ -6,7 +6,12 @@ import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 async function loadAppMenu() {
   const { module } = await loadTranspiledModule({
     entry: 'src/main/app-menu.ts',
-    modules: ['src/main/app-menu.ts', 'src/main/session-store.ts', 'src/shared/types.ts']
+    modules: [
+      'src/main/app-menu.ts',
+      'src/main/menu-i18n.ts',
+      'src/main/session-store.ts',
+      'src/shared/types.ts'
+    ]
   })
   return module
 }
@@ -63,13 +68,13 @@ test('createAppMenuTemplate builds file menu actions for recent repositories and
   assert.deepEqual(
     recentMenu.submenu.map((item) => item.label ?? item.type),
     [
-      '最近打开的项目',
+      'Recent Projects',
       'repo - /repo',
       'separator',
       'Recent Files',
       'README.md - /repo',
       'separator',
-      '清除最近打开...'
+      'Clear Recent...'
     ]
   )
   assert.deepEqual(calls, [
@@ -98,20 +103,20 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
   assert.deepEqual(
     editMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
     [
-      'undo',
-      'redo',
+      'Undo',
+      'Redo',
       'separator',
-      'cut',
-      'copy',
-      'paste',
-      'pasteAndMatchStyle',
-      'delete',
+      'Cut',
+      'Copy',
+      'Paste',
+      'Paste and Match Style',
+      'Delete',
       'separator',
       'Find',
       'Search Repository...',
       'separator',
       'Settings...',
-      'selectAll'
+      'Select All'
     ]
   )
   assert.equal(
@@ -199,13 +204,75 @@ test('createAppMenuTemplate disables empty recent menus and adds darwin app menu
   assert.deepEqual(
     recentMenu.submenu.map((item) => ({ label: item.label, enabled: item.enabled })),
     [
-      { label: '最近打开的项目', enabled: false },
+      { label: 'Recent Projects', enabled: false },
       { label: 'No Recent Projects', enabled: false },
       { label: undefined, enabled: undefined },
       { label: 'Recent Files', enabled: false },
       { label: 'No Recent Files', enabled: false },
       { label: undefined, enabled: undefined },
-      { label: '清除最近打开...', enabled: false }
+      { label: 'Clear Recent...', enabled: false }
     ]
+  )
+})
+
+test('createAppMenuTemplate localizes app menu labels', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    language: 'zh-CN',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const fileMenu = template.find((item) => item.label === '文件')
+  const editMenu = template.find((item) => item.label === '编辑')
+  const viewMenu = template.find((item) => item.label === '视图')
+
+  assert.ok(fileMenu)
+  assert.ok(editMenu)
+  assert.ok(viewMenu)
+  assert.deepEqual(
+    fileMenu.submenu.map((item) => item.label ?? item.type),
+    ['打开仓库...', '最近文件', 'separator', '保存', '关闭标签', '关闭窗口']
+  )
+  assert.deepEqual(
+    fileMenu.submenu[1].submenu.map((item) => item.label ?? item.type),
+    [
+      '最近项目',
+      '无最近项目',
+      'separator',
+      '最近文件',
+      '无最近文件',
+      'separator',
+      '清除最近打开...'
+    ]
+  )
+  assert.equal(editMenu.submenu[9].label, '查找')
+  assert.equal(editMenu.submenu[10].label, '搜索仓库...')
+  assert.equal(editMenu.submenu[12].label, '设置...')
+  assert.deepEqual(
+    editMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
+    [
+      '撤销',
+      '重做',
+      'separator',
+      '剪切',
+      '复制',
+      '粘贴',
+      '粘贴并匹配样式',
+      '删除',
+      'separator',
+      '查找',
+      '搜索仓库...',
+      'separator',
+      '设置...',
+      '全选'
+    ]
+  )
+  assert.deepEqual(
+    viewMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
+    ['重新加载', '切换开发者工具', 'separator', '重置缩放']
   )
 })

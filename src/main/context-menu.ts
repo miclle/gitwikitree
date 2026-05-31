@@ -1,5 +1,7 @@
 import type { MenuItemConstructorOptions, WebContents } from 'electron'
+import { translateMenu } from './menu-i18n'
 import type {
+  AppLanguage,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   TreeItemOpenPayload
@@ -11,20 +13,24 @@ export type MarkdownLinkContextMenuItem = MarkdownLinkContext
 
 export function createTreeItemContextMenuItems({
   item,
+  language = 'en',
   sender,
   openInNewWindow
 }: {
   item: TreeItemContext
+  language?: AppLanguage
   sender: Pick<WebContents, 'send'>
   openInNewWindow: (item: TreeItemContext) => void
 }): MenuItemConstructorOptions[] {
+  const t = (key: Parameters<typeof translateMenu>[1]): string => translateMenu(language, key)
+
   return [
     {
-      label: 'Open in New Tab',
+      label: t('menu.openInNewTab'),
       click: () => sender.send('tree-item:open-in-new-tab', item.path)
     },
     {
-      label: 'Open in New Window',
+      label: t('menu.openInNewWindow'),
       click: () => openInNewWindow(item)
     }
   ]
@@ -32,19 +38,22 @@ export function createTreeItemContextMenuItems({
 
 export function createMarkdownLinkContextMenuItems({
   item,
+  language = 'en',
   sender,
   openExternal,
   writeClipboardText,
   openInNewWindow
 }: {
   item: MarkdownLinkContextMenuItem
+  language?: AppLanguage
   sender: Pick<WebContents, 'send'>
   openExternal: (url: string) => void
   writeClipboardText: (text: string) => void
   openInNewWindow: (item: TreeItemContext) => void
 }): MenuItemConstructorOptions[] {
+  const t = (key: Parameters<typeof translateMenu>[1]): string => translateMenu(language, key)
   const copyLinkItem: MenuItemConstructorOptions = {
-    label: 'Copy Link Address',
+    label: t('menu.copyLinkAddress'),
     click: () => writeClipboardText(item.href)
   }
 
@@ -57,7 +66,7 @@ export function createMarkdownLinkContextMenuItems({
 
     return [
       {
-        label: 'Open Link',
+        label: t('menu.openLink'),
         enabled: canOpen,
         click: () => {
           if (canOpen) openExternal(item.href)
@@ -87,15 +96,15 @@ export function createMarkdownLinkContextMenuItems({
 
   return [
     {
-      label: 'Open Link',
+      label: t('menu.openLink'),
       click: () => sendOpen('open')
     },
     {
-      label: 'Open in New Tab',
+      label: t('menu.openInNewTab'),
       click: () => sendOpen('open-new-tab')
     },
     {
-      label: 'Open in New Window',
+      label: t('menu.openInNewWindow'),
       click: openLinkInNewWindow
     },
     { type: 'separator' },

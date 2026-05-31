@@ -8,6 +8,7 @@ async function loadContextMenu() {
     entry: 'src/main/context-menu.ts',
     modules: [
       'src/main/context-menu.ts',
+      'src/main/menu-i18n.ts',
       'src/main/browser-context-menu.ts',
       'src/shared/types.ts'
     ],
@@ -50,6 +51,33 @@ test('tree item context menu exposes new tab and new window actions', async () =
     { channel: 'tree-item:open-in-new-tab', payload: 'docs/guide.md' }
   ])
   assert.deepEqual(openedWindows, [item])
+})
+
+test('tree item context menu localizes actions', async () => {
+  const { createTreeItemContextMenuItems } = await loadContextMenu()
+  const item = {
+    repoPath: '/repo',
+    rootPath: '/repo',
+    activeRef: 'main',
+    source: 'working-tree',
+    path: 'docs/guide.md',
+    name: 'guide.md',
+    type: 'file'
+  }
+
+  const items = createTreeItemContextMenuItems({
+    item,
+    language: 'zh-CN',
+    sender: {
+      send: () => undefined
+    },
+    openInNewWindow: () => undefined
+  })
+
+  assert.deepEqual(
+    items.map((menuItem) => menuItem.label),
+    ['在新标签中打开', '在新窗口中打开']
+  )
 })
 
 test('external markdown link context menu opens only in the system browser', async () => {
@@ -196,4 +224,27 @@ test('internal markdown link context menu opens in the app', async () => {
     }
   ])
   assert.deepEqual(copiedText, ['../guide.md#install'])
+})
+
+test('markdown link context menu localizes actions', async () => {
+  const { createMarkdownLinkContextMenuItems } = await loadContextMenu()
+
+  const items = createMarkdownLinkContextMenuItems({
+    item: {
+      kind: 'external',
+      href: 'https://example.com/docs'
+    },
+    language: 'zh-CN',
+    sender: {
+      send: () => undefined
+    },
+    openExternal: () => undefined,
+    writeClipboardText: () => undefined,
+    openInNewWindow: () => undefined
+  })
+
+  assert.deepEqual(
+    items.map((menuItem) => menuItem.label),
+    ['打开链接', '复制链接地址']
+  )
 })

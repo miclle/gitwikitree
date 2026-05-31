@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   canMoveTabHistory,
   createFileTab,
@@ -11,6 +11,7 @@ import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
 import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
+import { changeAppLanguage, createTranslator } from '../i18n'
 import type {
   GitLastChange,
   NavigationTarget,
@@ -253,6 +254,7 @@ export function useRepositoryWorkspace(): {
   const editablePreviewTarget = getEditablePreviewTarget(preview)
   const isEditing = Boolean(editablePreviewTarget && editingPath === editablePreviewTarget.path)
   const canEditPreview = Boolean(editablePreviewTarget)
+  const t = useMemo(() => createTranslator(settings.language), [settings.language])
   const hasUnsavedChanges = Boolean(
     isEditing && editablePreviewTarget && draftContent !== editablePreviewTarget.content
   )
@@ -273,10 +275,12 @@ export function useRepositoryWorkspace(): {
   const confirmDiscardEditing = useCallback((): boolean => {
     if (!hasUnsavedChanges) return true
 
-    return window.confirm('Discard unsaved changes in the current file?')
-  }, [hasUnsavedChanges])
+    return window.confirm(t('app.discardUnsaved'))
+  }, [hasUnsavedChanges, t])
 
   useEffect(() => {
+    changeAppLanguage(settings.language)
+    document.documentElement.lang = settings.language === 'zh-CN' ? 'zh-CN' : 'en'
     document.documentElement.dataset.appAppearance = settings.appearance
     document.documentElement.style.setProperty(
       '--preview-font-size',

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import type { AppSettings } from '../../../shared/types'
 
@@ -13,6 +14,7 @@ export function SettingsDialog({
   onClose,
   onSave
 }: SettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState(settings)
   const [homeFileNamesText, setHomeFileNamesText] = useState(settings.homeFileNames.join('\n'))
 
@@ -51,21 +53,21 @@ export function SettingsDialog({
         className="settings-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Settings"
+        aria-label={t('settings.title')}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="settings-header">
-          <strong>Settings</strong>
-          <button type="button" aria-label="Close settings" onClick={onClose}>
+          <strong>{t('settings.title')}</strong>
+          <button type="button" aria-label={t('settings.close')} onClick={onClose}>
             <X size={17} />
           </button>
         </header>
 
         <div className="settings-content">
-          <section className="settings-section" aria-label="Appearance">
-            <h2>Appearance</h2>
+          <section className="settings-section" aria-label={t('settings.appearance')}>
+            <h2>{t('settings.appearance')}</h2>
             <label className="settings-field">
-              <span>Theme</span>
+              <span>{t('settings.theme')}</span>
               <select
                 className="settings-control"
                 value={draft.appearance}
@@ -73,17 +75,30 @@ export function SettingsDialog({
                   applySetting('appearance', event.currentTarget.value as AppSettings['appearance'])
                 }
               >
-                <option value="system">Follow system</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option value="system">{t('settings.themeSystem')}</option>
+                <option value="light">{t('settings.themeLight')}</option>
+                <option value="dark">{t('settings.themeDark')}</option>
+              </select>
+            </label>
+            <label className="settings-field">
+              <span>{t('settings.language')}</span>
+              <select
+                className="settings-control"
+                value={draft.language}
+                onChange={(event) =>
+                  applySetting('language', event.currentTarget.value as AppSettings['language'])
+                }
+              >
+                <option value="en">{t('settings.languageEnglish')}</option>
+                <option value="zh-CN">{t('settings.languageChinese')}</option>
               </select>
             </label>
           </section>
 
-          <section className="settings-section" aria-label="Home files">
-            <h2>Home Files</h2>
+          <section className="settings-section" aria-label={t('settings.homeFiles')}>
+            <h2>{t('settings.homeFiles')}</h2>
             <label className="settings-field">
-              <span>Candidate order</span>
+              <span>{t('settings.candidateOrder')}</span>
               <textarea
                 className="settings-control"
                 value={homeFileNamesText}
@@ -94,10 +109,10 @@ export function SettingsDialog({
             </label>
           </section>
 
-          <section className="settings-section" aria-label="Preview">
-            <h2>Preview</h2>
+          <section className="settings-section" aria-label={t('settings.preview')}>
+            <h2>{t('settings.preview')}</h2>
             <label className="settings-field">
-              <span>Font</span>
+              <span>{t('settings.font')}</span>
               <select
                 className="settings-control"
                 value={draft.previewFontFamily}
@@ -108,14 +123,14 @@ export function SettingsDialog({
                   )
                 }
               >
-                <option value="system">System</option>
-                <option value="sans">Sans</option>
-                <option value="serif">Serif</option>
-                <option value="mono">Mono</option>
+                <option value="system">{t('settings.fontSystem')}</option>
+                <option value="sans">{t('settings.fontSans')}</option>
+                <option value="serif">{t('settings.fontSerif')}</option>
+                <option value="mono">{t('settings.fontMono')}</option>
               </select>
             </label>
             <label className="settings-field">
-              <span>Font size</span>
+              <span>{t('settings.fontSize')}</span>
               <input
                 className="settings-control"
                 type="number"
@@ -129,10 +144,10 @@ export function SettingsDialog({
             </label>
           </section>
 
-          <section className="settings-section" aria-label="Editor">
-            <h2>Editor</h2>
+          <section className="settings-section" aria-label={t('settings.editor')}>
+            <h2>{t('settings.editor')}</h2>
             <label className="settings-field">
-              <span>Font</span>
+              <span>{t('settings.font')}</span>
               <select
                 className="settings-control"
                 value={draft.editorFontFamily}
@@ -143,14 +158,14 @@ export function SettingsDialog({
                   )
                 }
               >
-                <option value="mono">Mono</option>
-                <option value="system">System</option>
-                <option value="sans">Sans</option>
-                <option value="serif">Serif</option>
+                <option value="mono">{t('settings.fontMono')}</option>
+                <option value="system">{t('settings.fontSystem')}</option>
+                <option value="sans">{t('settings.fontSans')}</option>
+                <option value="serif">{t('settings.fontSerif')}</option>
               </select>
             </label>
             <label className="settings-field">
-              <span>Font size</span>
+              <span>{t('settings.fontSize')}</span>
               <input
                 className="settings-control"
                 type="number"
@@ -163,7 +178,7 @@ export function SettingsDialog({
               />
             </label>
             <label className="settings-field">
-              <span>Indent with</span>
+              <span>{t('settings.indentWith')}</span>
               <select
                 className="settings-control"
                 value={draft.editorIndentStyle}
@@ -174,12 +189,12 @@ export function SettingsDialog({
                   )
                 }
               >
-                <option value="space">Spaces</option>
-                <option value="tab">Tabs</option>
+                <option value="space">{t('settings.spaces')}</option>
+                <option value="tab">{t('settings.tabs')}</option>
               </select>
             </label>
             <label className="settings-field">
-              <span>Indent size</span>
+              <span>{t('settings.indentSize')}</span>
               <select
                 className="settings-control"
                 value={draft.editorIndentSize}

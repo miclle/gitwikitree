@@ -27,7 +27,8 @@ test('registerSettingsIpcHandlers exposes get and save channels', async () => {
       calls.push(settings)
       return { appearance: 'dark' }
     },
-    applySettings: (settings) => calls.push(['applySettings', settings])
+    applySettings: (settings) => calls.push(['applySettings', settings]),
+    createAppMenu: () => calls.push(['createAppMenu'])
   })
 
   assert.deepEqual([...handlers.keys()], ['settings:get', 'settings:save'])
@@ -35,5 +36,9 @@ test('registerSettingsIpcHandlers exposes get and save channels', async () => {
   assert.deepEqual(await handlers.get('settings:save')({}, { appearance: 'dark' }), {
     appearance: 'dark'
   })
-  assert.deepEqual(calls, [{ appearance: 'dark' }, ['applySettings', { appearance: 'dark' }]])
+  assert.deepEqual(calls, [
+    { appearance: 'dark' },
+    ['applySettings', { appearance: 'dark' }],
+    ['createAppMenu']
+  ])
 })

@@ -1,4 +1,6 @@
 import type { ContextMenuParams, MenuItemConstructorOptions } from 'electron'
+import { translateMenu } from './menu-i18n'
+import type { AppLanguage } from '../shared/types'
 
 type BrowserContextMenuActions = {
   openExternal: (url: string) => void
@@ -9,6 +11,7 @@ type BrowserContextMenuActions = {
 
 type BrowserContextMenuOptions = BrowserContextMenuActions & {
   params: ContextMenuParams
+  language?: AppLanguage
   isDev: boolean
   imageSourceURL?: string
   imageAbsoluteSourceURL?: string
@@ -25,6 +28,7 @@ export function canOpenExternalUrl(url: string): boolean {
 
 export function createBrowserContextMenuItems({
   params,
+  language = 'en',
   isDev,
   imageSourceURL,
   imageAbsoluteSourceURL,
@@ -33,6 +37,7 @@ export function createBrowserContextMenuItems({
   copyImageAt,
   inspectElement
 }: BrowserContextMenuOptions): MenuItemConstructorOptions[] {
+  const t = (key: Parameters<typeof translateMenu>[1]): string => translateMenu(language, key)
   const items: MenuItemConstructorOptions[] = []
   const addSeparator = (): void => {
     if (items.length > 0 && items.at(-1)?.type !== 'separator') {
@@ -46,12 +51,12 @@ export function createBrowserContextMenuItems({
   if (params.linkURL) {
     addEditItems([
       {
-        label: 'Open Link',
+        label: t('menu.openLink'),
         enabled: canOpenExternalUrl(params.linkURL),
         click: () => openExternal(params.linkURL)
       },
       {
-        label: 'Copy Link Address',
+        label: t('menu.copyLinkAddress'),
         click: () => writeClipboardText(params.linkURL)
       }
     ])
@@ -62,20 +67,20 @@ export function createBrowserContextMenuItems({
     const copyableImageSourceURL = imageSourceURL ?? params.srcURL
 
     items.push({
-      label: 'Copy Image',
+      label: t('menu.copyImage'),
       click: () => copyImageAt(params.x, params.y)
     })
 
     if (copyableImageSourceURL) {
       items.push({
-        label: 'Copy Image Path',
+        label: t('menu.copyImagePath'),
         click: () => writeClipboardText(copyableImageSourceURL)
       })
     }
 
     if (imageAbsoluteSourceURL) {
       items.push({
-        label: 'Copy Absolute Image Path',
+        label: t('menu.copyAbsoluteImagePath'),
         click: () => writeClipboardText(imageAbsoluteSourceURL)
       })
     }
@@ -85,28 +90,36 @@ export function createBrowserContextMenuItems({
 
   if (params.isEditable) {
     addEditItems([
-      { role: 'undo', enabled: params.editFlags.canUndo },
-      { role: 'redo', enabled: params.editFlags.canRedo },
+      { role: 'undo', label: t('menu.undo'), enabled: params.editFlags.canUndo },
+      { role: 'redo', label: t('menu.redo'), enabled: params.editFlags.canRedo },
       { type: 'separator' },
-      { role: 'cut', enabled: params.editFlags.canCut },
-      { role: 'copy', enabled: params.editFlags.canCopy },
-      { role: 'paste', enabled: params.editFlags.canPaste },
-      { role: 'pasteAndMatchStyle', enabled: params.editFlags.canPaste },
-      { role: 'delete', enabled: params.editFlags.canDelete },
+      { role: 'cut', label: t('menu.cut'), enabled: params.editFlags.canCut },
+      { role: 'copy', label: t('menu.copy'), enabled: params.editFlags.canCopy },
+      { role: 'paste', label: t('menu.paste'), enabled: params.editFlags.canPaste },
+      {
+        role: 'pasteAndMatchStyle',
+        label: t('menu.pasteAndMatchStyle'),
+        enabled: params.editFlags.canPaste
+      },
+      { role: 'delete', label: t('menu.delete'), enabled: params.editFlags.canDelete },
       { type: 'separator' },
-      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+      { role: 'selectAll', label: t('menu.selectAll'), enabled: params.editFlags.canSelectAll }
     ])
   } else {
     addEditItems([
-      { role: 'copy', enabled: params.editFlags.canCopy || params.selectionText.length > 0 },
-      { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+      {
+        role: 'copy',
+        label: t('menu.copy'),
+        enabled: params.editFlags.canCopy || params.selectionText.length > 0
+      },
+      { role: 'selectAll', label: t('menu.selectAll'), enabled: params.editFlags.canSelectAll }
     ])
   }
 
   if (isDev) {
     addSeparator()
     items.push({
-      label: 'Inspect Element',
+      label: t('menu.inspectElement'),
       click: () => inspectElement(params.x, params.y)
     })
   }

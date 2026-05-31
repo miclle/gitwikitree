@@ -5,7 +5,7 @@ import type {
   MenuItemConstructorOptions,
   WebContents
 } from 'electron'
-import type { MarkdownLinkContext } from '../shared/types'
+import type { AppLanguage, MarkdownLinkContext } from '../shared/types'
 import {
   createMarkdownLinkContextMenuItems,
   createTreeItemContextMenuItems,
@@ -23,6 +23,7 @@ type ContextMenuIpcDependencies = {
   openTreeItemInNewWindow: (item: TreeItemContext) => void
   openExternal: (url: string) => void
   writeClipboardText: (text: string) => void
+  getLanguage: () => AppLanguage
 }
 
 export function registerContextMenuIpcHandlers({
@@ -31,7 +32,8 @@ export function registerContextMenuIpcHandlers({
   buildMenuFromTemplate,
   openTreeItemInNewWindow,
   openExternal,
-  writeClipboardText
+  writeClipboardText,
+  getLanguage
 }: ContextMenuIpcDependencies): void {
   ipcMain.handle('context-menu:tree-item', (event, item: TreeItemContext) => {
     const targetWindow = getWindowFromWebContents(event.sender)
@@ -39,6 +41,7 @@ export function registerContextMenuIpcHandlers({
 
     const menuItems = createTreeItemContextMenuItems({
       item,
+      language: getLanguage(),
       sender: event.sender as Pick<WebContents, 'send'>,
       openInNewWindow: openTreeItemInNewWindow
     })
@@ -52,6 +55,7 @@ export function registerContextMenuIpcHandlers({
 
     const menuItems = createMarkdownLinkContextMenuItems({
       item,
+      language: getLanguage(),
       sender: event.sender as Pick<WebContents, 'send'>,
       openExternal,
       writeClipboardText,

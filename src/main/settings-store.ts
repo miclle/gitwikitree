@@ -55,6 +55,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
 
   return {
     appearance: normalizeChoice(record.appearance, ['system', 'light', 'dark'], 'system'),
+    language: normalizeChoice(record.language, ['en', 'zh-CN'], defaultAppSettings.language),
     homeFileNames: normalizeHomeFileNames(record.homeFileNames),
     previewFontFamily: normalizeChoice(
       record.previewFontFamily,

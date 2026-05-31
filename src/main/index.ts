@@ -276,6 +276,7 @@ async function showContextMenu(
 
   const items = createBrowserContextMenuItems({
     params,
+    language: appSettings.language,
     isDev: is.dev,
     ...imageSourceURLs,
     ...(imageAbsoluteSourceURL ? { imageAbsoluteSourceURL } : {}),
@@ -434,6 +435,7 @@ function createAppMenu(): void {
       createAppMenuTemplate({
         appName,
         platform: process.platform,
+        language: appSettings.language,
         recentRepositories: sessionState.recentRepositories,
         recentFiles: sessionState.recentFiles,
         openRepository: () =>
@@ -492,7 +494,8 @@ app.whenReady().then(async () => {
     buildMenuFromTemplate: (items) => Menu.buildFromTemplate(items),
     openTreeItemInNewWindow: (targetItem) => createWindow(undefined, undefined, targetItem),
     openExternal: (url) => void shell.openExternal(url),
-    writeClipboardText: (text) => clipboard.writeText(text)
+    writeClipboardText: (text) => clipboard.writeText(text),
+    getLanguage: () => appSettings.language
   })
 
   registerRepositoryIpcHandlers({
@@ -530,7 +533,8 @@ app.whenReady().then(async () => {
     ipcMain,
     readSettings: async () => appSettings,
     writeSettings: (settings) => settingsStore.write(settings),
-    applySettings
+    applySettings,
+    createAppMenu
   })
 
   createWindow(

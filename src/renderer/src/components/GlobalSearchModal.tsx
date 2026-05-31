@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileText, Folder, Loader2, Search, X } from 'lucide-react'
 import type { RepositoryPayload, RepositorySearchResult } from '../../../shared/types'
 
@@ -76,6 +77,7 @@ export function GlobalSearchModal({
   onOpenChange,
   onOpenResult
 }: GlobalSearchModalProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<RepositorySearchResult[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -91,9 +93,10 @@ export function GlobalSearchModal({
   const trimmedQuery = query.trim()
   const selectedResult = results[selectedIndex]
   const sourceLabel = useMemo(() => {
-    if (repository.source === 'worktree') return `${repository.activeRef} worktree`
+    if (repository.source === 'worktree')
+      return t('globalSearch.worktreeSource', { ref: repository.activeRef })
     return repository.branch
-  }, [repository.activeRef, repository.branch, repository.source])
+  }, [repository.activeRef, repository.branch, repository.source, t])
 
   useEffect(() => {
     if (!open) return
@@ -219,7 +222,7 @@ export function GlobalSearchModal({
         className="global-search-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Search repository"
+        aria-label={t('globalSearch.dialog')}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -251,7 +254,7 @@ export function GlobalSearchModal({
         <button
           className="global-search-close"
           type="button"
-          aria-label="Close search"
+          aria-label={t('globalSearch.close')}
           onClick={close}
         >
           <X size={15} />
@@ -260,12 +263,14 @@ export function GlobalSearchModal({
           <Search size={17} aria-hidden="true" />
           <input
             ref={inputRef}
-            aria-label="Search repository"
+            aria-label={t('globalSearch.dialog')}
             value={query}
-            placeholder="Search files and content"
+            placeholder={t('globalSearch.placeholder')}
             onChange={(event) => handleQueryChange(event.target.value)}
           />
-          {isSearching && <Loader2 className="spin" size={16} aria-label="Searching" />}
+          {isSearching && (
+            <Loader2 className="spin" size={16} aria-label={t('globalSearch.searching')} />
+          )}
         </div>
 
         <div className="global-search-meta">
@@ -275,13 +280,11 @@ export function GlobalSearchModal({
 
         <div ref={listRef} className="global-search-results">
           {!trimmedQuery ? (
-            <div className="global-search-empty">
-              Type to search paths and text in this repository.
-            </div>
+            <div className="global-search-empty">{t('globalSearch.empty')}</div>
           ) : error ? (
             <div className="global-search-empty">{error}</div>
           ) : !isSearching && results.length === 0 ? (
-            <div className="global-search-empty">No results</div>
+            <div className="global-search-empty">{t('globalSearch.noResults')}</div>
           ) : (
             results.map((result, index) => {
               const Icon = result.type === 'directory' ? Folder : FileText
@@ -312,7 +315,7 @@ export function GlobalSearchModal({
                     )}
                   </span>
                   <span className="global-search-result-kind">
-                    {result.matchType === 'path' ? 'Path' : 'Text'}
+                    {result.matchType === 'path' ? t('globalSearch.path') : t('globalSearch.text')}
                   </span>
                 </button>
               )

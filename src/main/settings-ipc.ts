@@ -6,19 +6,22 @@ type SettingsIpcDependencies = {
   readSettings: () => Promise<AppSettings>
   writeSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>
   applySettings: (settings: AppSettings) => void
+  createAppMenu: () => void
 }
 
 export function registerSettingsIpcHandlers({
   ipcMain,
   readSettings,
   writeSettings,
-  applySettings
+  applySettings,
+  createAppMenu
 }: SettingsIpcDependencies): void {
   ipcMain.handle('settings:get', () => readSettings())
 
   ipcMain.handle('settings:save', async (_event, settings: Partial<AppSettings>) => {
     const nextSettings = await writeSettings(settings)
     applySettings(nextSettings)
+    createAppMenu()
     return nextSettings
   })
 }

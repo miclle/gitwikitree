@@ -109,6 +109,33 @@ test('getStatusBarFileFacts includes rendered PDF page count when available', as
   }
 })
 
+test('getStatusBarFileFacts can summarize facts in Chinese', async () => {
+  const { module, tempDir } = await loadStatusBar()
+
+  try {
+    assert.deepEqual(
+      module.getStatusBarFileFacts(
+        {
+          kind: 'file',
+          path: 'docs/guide.md',
+          name: 'guide.md',
+          extension: '.md',
+          previewType: 'markdown',
+          editable: true,
+          content: '# 指南\n\n你好 workspace\n',
+          encoding: 'UTF-8',
+          size: 512,
+          modifiedAt: '2026-05-30T08:00:00.000Z'
+        },
+        { language: 'zh-CN' }
+      ),
+      ['3 个词', '3 行', '512 B', 'UTF-8', '修改于 2026年5月30日 16:00']
+    )
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('getStatusBarEditorFacts summarizes cursor, selection, characters, and indentation', async () => {
   const { module, tempDir } = await loadStatusBar()
 

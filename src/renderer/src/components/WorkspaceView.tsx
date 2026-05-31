@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import {
   ChevronDown,
@@ -36,6 +37,7 @@ const MIN_SPLIT_PANE_WIDTH = 260
 const SPLIT_KEYBOARD_STEP = 5
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
+  const { t } = useTranslation()
   const {
     repository,
     expandedPaths,
@@ -404,7 +406,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const fileTabsNav = (
     <nav
       className="main-tabs"
-      aria-label="Open tabs"
+      aria-label={t('app.openTabs')}
       ref={titlebarTabsRef}
       onPointerLeave={handleTitlebarTabsPointerLeave}
       onBlur={(event) => {
@@ -436,12 +438,16 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             {iconForNode({ type: tab.type ?? 'file', name: tab.name })}
             <span className="main-tab-name">{tab.name}</span>
             {hasUnsavedChanges && active && (
-              <span className="main-tab-dirty" aria-label="Unsaved changes" title="Unsaved" />
+              <span
+                className="main-tab-dirty"
+                aria-label={t('app.unsavedChanges')}
+                title={t('app.unsaved')}
+              />
             )}
             <button
               className="main-tab-close"
               type="button"
-              aria-label={`Close ${tab.name}`}
+              aria-label={t('app.closeTab', { name: tab.name })}
               onClick={(event) => {
                 event.stopPropagation()
                 hideTabPopover()
@@ -473,7 +479,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       {!repository ? (
         <section className="welcome-state">
           <Code2 size={42} />
-          <h2>Open a repository</h2>
+          <h2>{t('app.openRepository')}</h2>
           <button
             className="open-button large"
             type="button"
@@ -481,11 +487,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             onClick={openRepository}
           >
             {loading ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
-            Open Repository
+            {t('app.openRepository')}
           </button>
           <button className="open-button secondary" type="button" onClick={openSettings}>
             <Settings size={17} />
-            Settings
+            {t('app.settings')}
           </button>
         </section>
       ) : (
@@ -500,7 +506,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
           >
             {isSidebarOpen && (
               <>
-                <aside className="tree-panel" aria-label="Files">
+                <aside className="tree-panel" aria-label={t('app.files')}>
                   <div className="sidebar-titlebar">
                     <TitlebarWindowControls />
                     <div className="titlebar-repository" title={repository.path}>
@@ -513,7 +519,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       <button
                         className="branch-pill"
                         type="button"
-                        aria-label="Switch branches"
+                        aria-label={t('branch.switchBranches')}
                         aria-expanded={isBranchPickerOpen}
                         disabled={loading}
                         onClick={() => setIsBranchPickerOpen((open) => !open)}
@@ -526,13 +532,13 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         <div
                           className="branch-picker-popover"
                           role="dialog"
-                          aria-label="Switch branches"
+                          aria-label={t('branch.switchBranches')}
                         >
                           <div className="branch-picker-header">
-                            <strong>Switch branches</strong>
+                            <strong>{t('branch.switchBranches')}</strong>
                             <button
                               type="button"
-                              aria-label="Close branch picker"
+                              aria-label={t('branch.closePicker')}
                               onClick={() => setIsBranchPickerOpen(false)}
                             >
                               <X size={15} />
@@ -542,14 +548,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                             <Search size={16} />
                             <input
                               value={branchQuery}
-                              placeholder="Find a branch..."
+                              placeholder={t('branch.findPlaceholder')}
                               onChange={(event) => setBranchQuery(event.target.value)}
                             />
                           </label>
                           <div
                             className="branch-picker-tabs"
                             role="tablist"
-                            aria-label="Branch refs"
+                            aria-label={t('branch.refs')}
                           >
                             <button
                               type="button"
@@ -557,7 +563,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               aria-selected={branchPickerTab === 'branches'}
                               onClick={() => setBranchPickerTab('branches')}
                             >
-                              Branches
+                              {t('branch.branches')}
                             </button>
                             <button
                               type="button"
@@ -565,7 +571,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               aria-selected={branchPickerTab === 'remotes'}
                               onClick={() => setBranchPickerTab('remotes')}
                             >
-                              Remotes
+                              {t('branch.remotes')}
                             </button>
                           </div>
                           <div className="branch-picker-list">
@@ -578,12 +584,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               >
                                 <span aria-hidden="true">{ref.current ? '✓' : ''}</span>
                                 <span title={ref.name}>{ref.name}</span>
-                                {ref.current && <strong>current</strong>}
-                                {!ref.current && ref.worktreePath && <strong>open</strong>}
+                                {ref.current && <strong>{t('branch.current')}</strong>}
+                                {!ref.current && ref.worktreePath && (
+                                  <strong>{t('branch.open')}</strong>
+                                )}
                               </button>
                             ))}
                             {displayedBranchRefs.length === 0 && (
-                              <div className="branch-picker-empty">No branches found</div>
+                              <div className="branch-picker-empty">{t('branch.empty')}</div>
                             )}
                           </div>
                         </div>
@@ -594,7 +602,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         className="branch-action-backdrop"
                         role="dialog"
                         aria-modal="true"
-                        aria-label={`Choose action for ${selectedBranchAction.name}`}
+                        aria-label={t('branch.chooseAction', { name: selectedBranchAction.name })}
                         onMouseDown={closeBranchActionModal}
                       >
                         <section
@@ -603,14 +611,14 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         >
                           <div className="branch-action-heading">
                             <div>
-                              <span>Selected branch</span>
+                              <span>{t('branch.selectedBranch')}</span>
                               <strong title={selectedBranchAction.name}>
                                 {selectedBranchAction.name}
                               </strong>
                             </div>
                             <button
                               type="button"
-                              aria-label="Close branch action"
+                              aria-label={t('branch.closeAction')}
                               onClick={closeBranchActionModal}
                             >
                               <X size={15} />
@@ -628,12 +636,15 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                               }}
                             >
                               <strong>
-                                Switch primary workspace from {primaryWorkspaceBranch} to{' '}
-                                {selectedBranchAction.name}
+                                {t('branch.switchPrimary', {
+                                  from: primaryWorkspaceBranch,
+                                  to: selectedBranchAction.name
+                                })}
                               </strong>
                               <span>
-                                Changes the primary repository folder to {selectedBranchAction.name}
-                                . Existing worktrees keep their branches.
+                                {t('branch.switchPrimaryDescription', {
+                                  branch: selectedBranchAction.name
+                                })}
                               </span>
                             </button>
                             <button
@@ -646,36 +657,34 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                                 void openBranchWorktree(ref)
                               }}
                             >
-                              <strong>Create git worktree in .worktrees</strong>
-                              <span>
-                                Creates or opens an isolated working copy under .worktrees while the
-                                current folder keeps its branch.
-                              </span>
+                              <strong>{t('branch.createWorktree')}</strong>
+                              <span>{t('branch.createWorktreeDescription')}</span>
                             </button>
                           </div>
                           {selectedBranchAction.type !== 'local' && (
-                            <p className="branch-action-note">
-                              Remote refs can be opened as worktrees. Switching in place requires a
-                              local branch first.
-                            </p>
+                            <p className="branch-action-note">{t('branch.remoteNote')}</p>
                           )}
                           <button
                             className="branch-action-cancel"
                             type="button"
                             onClick={closeBranchActionModal}
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </section>
                       </div>
                     )}
-                    <button className="sidebar-control-button" type="button" aria-label="Add">
+                    <button
+                      className="sidebar-control-button"
+                      type="button"
+                      aria-label={t('app.add')}
+                    >
                       <Plus size={16} />
                     </button>
                     <button
                       className="sidebar-control-button"
                       type="button"
-                      aria-label="Search files"
+                      aria-label={t('app.searchFiles')}
                       aria-expanded={isGlobalSearchOpen}
                       onClick={() => setIsGlobalSearchOpen(true)}
                     >
@@ -701,7 +710,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 </aside>
 
                 <div
-                  aria-label="Resize panels"
+                  aria-label={t('preview.resizePanels')}
                   className="split-resizer"
                   role="separator"
                   tabIndex={0}
@@ -717,7 +726,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <button
                     className="titlebar-icon-button"
                     type="button"
-                    aria-label={isSidebarOpen ? 'Hide files' : 'Show files'}
+                    aria-label={isSidebarOpen ? t('app.hideFiles') : t('app.showFiles')}
                     aria-expanded={isSidebarOpen}
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   >
@@ -735,7 +744,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <button
                     className="titlebar-icon-button"
                     type="button"
-                    aria-label="Settings"
+                    aria-label={t('app.settings')}
                     aria-expanded={isSettingsOpen}
                     onClick={openSettings}
                   >
@@ -758,7 +767,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     <span
                       className="breadcrumb-source"
                       title={directoryReadmeSource.path}
-                      aria-label={`Showing ${directoryReadmeSource.path}`}
+                      aria-label={t('app.showingPath', { path: directoryReadmeSource.path })}
                     >
                       <span aria-hidden="true">·</span>
                       {directoryReadmeSource.name}
@@ -777,15 +786,17 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                             {hasUnsavedChanges && isLast && (
                               <span
                                 className="breadcrumb-dirty"
-                                aria-label="Unsaved changes"
-                                title="Unsaved"
+                                aria-label={t('app.unsavedChanges')}
+                                title={t('app.unsaved')}
                               />
                             )}
                             {directoryReadmeSource && (
                               <span
                                 className="breadcrumb-source"
                                 title={directoryReadmeSource.path}
-                                aria-label={`Showing ${directoryReadmeSource.path}`}
+                                aria-label={t('app.showingPath', {
+                                  path: directoryReadmeSource.path
+                                })}
                               >
                                 <span aria-hidden="true">·</span>
                                 {directoryReadmeSource.name}
@@ -807,7 +818,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   })}
                 </div>
                 {(preview?.kind === 'file' || editablePreviewTarget) && (
-                  <div className="file-view-tabs" role="tablist" aria-label="File view">
+                  <div className="file-view-tabs" role="tablist" aria-label={t('fileView.label')}>
                     <button
                       type="button"
                       role="tab"
@@ -815,7 +826,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       onClick={() => selectFileViewMode('preview')}
                     >
                       <Eye size={15} />
-                      Preview
+                      {t('fileView.preview')}
                     </button>
                     <button
                       type="button"
@@ -825,7 +836,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       onClick={() => selectFileViewMode('code')}
                     >
                       <Pencil size={15} />
-                      Code
+                      {t('fileView.code')}
                     </button>
                     <button
                       type="button"
@@ -835,7 +846,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       onClick={() => selectFileViewMode('split')}
                     >
                       <Columns2 size={15} />
-                      Split
+                      {t('fileView.split')}
                     </button>
                   </div>
                 )}
@@ -865,7 +876,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     )}
                     {effectiveFileViewMode === 'split' && showsEditor && showsPreview && (
                       <div
-                        aria-label="Resize editor and preview"
+                        aria-label={t('preview.resizeEditorPreview')}
                         aria-orientation="vertical"
                         aria-valuemax={100}
                         aria-valuemin={0}
@@ -889,7 +900,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                 <form
                   className="preview-search-popover"
                   role="search"
-                  aria-label="Find in current tab"
+                  aria-label={t('search.currentTab')}
                   onSubmit={(event) => {
                     event.preventDefault()
                     stepSearchMatch(1)
@@ -910,9 +921,9 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <Search className="preview-search-icon" size={15} aria-hidden="true" />
                   <input
                     ref={searchInputRef}
-                    aria-label="Find in current tab"
+                    aria-label={t('search.currentTab')}
                     value={searchQuery}
-                    placeholder="Find"
+                    placeholder={t('search.find')}
                     onChange={(event) => {
                       setSearchQuery(event.target.value)
                       setActiveSearchIndex(-1)
@@ -928,7 +939,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <button
                     className="preview-search-button"
                     type="button"
-                    aria-label="Previous match"
+                    aria-label={t('search.previousMatch')}
                     disabled={searchMatchCount === 0}
                     onClick={() => stepSearchMatch(-1)}
                   >
@@ -937,7 +948,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <button
                     className="preview-search-button"
                     type="button"
-                    aria-label="Next match"
+                    aria-label={t('search.nextMatch')}
                     disabled={searchMatchCount === 0}
                     onClick={() => stepSearchMatch(1)}
                   >
@@ -946,7 +957,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   <button
                     className="preview-search-button"
                     type="button"
-                    aria-label="Close find"
+                    aria-label={t('search.closeFind')}
                     onClick={closePreviewSearch}
                   >
                     <X size={15} />
@@ -969,6 +980,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
             preview={preview}
             pdfPageCount={activePdfPageCount}
             editorStatus={showsEditor ? editorStatusWithFileMetadata : undefined}
+            language={settings.language}
           />
         </>
       )}
@@ -980,24 +992,26 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
 }
 
 function TitlebarWindowControls(): React.JSX.Element {
+  const { t } = useTranslation()
+
   return (
     <div className="titlebar-window-controls">
       <button
         className="window-control close"
         type="button"
-        aria-label="Close window"
+        aria-label={t('app.closeWindow')}
         onClick={() => window.api.controlWindow('close')}
       />
       <button
         className="window-control minimize"
         type="button"
-        aria-label="Minimize window"
+        aria-label={t('app.minimizeWindow')}
         onClick={() => window.api.controlWindow('minimize')}
       />
       <button
         className="window-control zoom"
         type="button"
-        aria-label="Toggle fullscreen"
+        aria-label={t('app.toggleFullscreen')}
         onClick={() => window.api.controlWindow('toggle-maximize')}
       />
     </div>
@@ -1013,12 +1027,14 @@ function HistoryButtons({
   canNavigateForward: boolean
   onNavigate: (delta: -1 | 1) => Promise<void>
 }): React.JSX.Element {
+  const { t } = useTranslation()
+
   return (
     <>
       <button
         className="titlebar-icon-button"
         type="button"
-        aria-label="Back"
+        aria-label={t('app.back')}
         disabled={!canNavigateBack}
         onClick={() => void onNavigate(-1)}
       >
@@ -1027,7 +1043,7 @@ function HistoryButtons({
       <button
         className="titlebar-icon-button"
         type="button"
-        aria-label="Forward"
+        aria-label={t('app.forward')}
         disabled={!canNavigateForward}
         onClick={() => void onNavigate(1)}
       >

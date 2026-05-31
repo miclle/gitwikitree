@@ -9,6 +9,7 @@ async function loadContextMenuIpc() {
     modules: [
       'src/main/context-menu-ipc.ts',
       'src/main/context-menu.ts',
+      'src/main/menu-i18n.ts',
       'src/main/browser-context-menu.ts',
       'src/shared/types.ts'
     ]
@@ -47,7 +48,8 @@ function createHarness(targetWindow = { id: 'target-window' }) {
       }),
       openTreeItemInNewWindow: (targetItem) => openedWindows.push(targetItem),
       openExternal: () => undefined,
-      writeClipboardText: () => undefined
+      writeClipboardText: () => undefined,
+      getLanguage: () => 'zh-CN'
     }
   }
 }
@@ -72,7 +74,7 @@ test('context-menu:tree-item builds and opens a menu for the sender window', asy
   assert.equal(popups.length, 1)
   assert.deepEqual(
     popups[0].items.map((menuItem) => menuItem.label),
-    ['Open in New Tab', 'Open in New Window']
+    ['在新标签中打开', '在新窗口中打开']
   )
   assert.deepEqual(popups[0].options, { window: { id: 'target-window' } })
 

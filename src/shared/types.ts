@@ -4,12 +4,15 @@ export type PreviewType = 'markdown' | 'html' | 'svg' | 'image' | 'pdf' | 'text'
 
 export type AppAppearance = 'system' | 'light' | 'dark'
 
+export type AppLanguage = 'en' | 'zh-CN'
+
 export type AppFontFamily = 'system' | 'sans' | 'serif' | 'mono'
 
 export type EditorIndentStyle = 'tab' | 'space'
 
 export type AppSettings = {
   appearance: AppAppearance
+  language: AppLanguage
   homeFileNames: string[]
   previewFontFamily: AppFontFamily
   previewFontSize: number
@@ -21,6 +24,7 @@ export type AppSettings = {
 
 export const defaultAppSettings: AppSettings = {
   appearance: 'system',
+  language: 'en',
   homeFileNames: ['README.md', 'README.markdown', 'index.md', '_index.md'],
   previewFontFamily: 'system',
   previewFontSize: 15,

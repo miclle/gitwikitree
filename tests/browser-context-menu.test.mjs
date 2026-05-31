@@ -6,7 +6,7 @@ import { loadTranspiledModule } from './helpers/transpile-modules.mjs'
 async function loadBrowserContextMenu() {
   const { module } = await loadTranspiledModule({
     entry: 'src/main/browser-context-menu.ts',
-    modules: ['src/main/browser-context-menu.ts']
+    modules: ['src/main/browser-context-menu.ts', 'src/main/menu-i18n.ts', 'src/shared/types.ts']
   })
   return module
 }
@@ -81,8 +81,8 @@ test('createBrowserContextMenuItems builds link and image actions', async () => 
       'Copy Image',
       'Copy Image Path',
       'separator',
-      'copy',
-      'selectAll'
+      'Copy',
+      'Select All'
     ]
   )
 
@@ -163,4 +163,74 @@ test('createBrowserContextMenuItems includes editable and inspect actions', asyn
 
   items.at(-1).click()
   assert.deepEqual(calls, [['inspectElement', 12, 24]])
+})
+
+test('createBrowserContextMenuItems localizes browser actions', async () => {
+  const { createBrowserContextMenuItems } = await loadBrowserContextMenu()
+  const { actions } = createActions()
+  const items = createBrowserContextMenuItems({
+    params: createParams({
+      linkURL: 'https://example.com',
+      mediaType: 'image',
+      hasImageContents: true,
+      srcURL: 'https://example.com/image.png'
+    }),
+    language: 'zh-CN',
+    isDev: true,
+    ...actions
+  })
+
+  assert.deepEqual(
+    items.map((item) => item.label ?? item.role ?? item.type),
+    [
+      '打开链接',
+      '复制链接地址',
+      'separator',
+      '复制图片',
+      '复制图片路径',
+      'separator',
+      '复制',
+      '全选',
+      'separator',
+      '检查元素'
+    ]
+  )
+})
+
+test('createBrowserContextMenuItems localizes editable role actions', async () => {
+  const { createBrowserContextMenuItems } = await loadBrowserContextMenu()
+  const { actions } = createActions()
+  const items = createBrowserContextMenuItems({
+    params: createParams({
+      isEditable: true,
+      editFlags: {
+        canUndo: true,
+        canRedo: true,
+        canCut: true,
+        canCopy: true,
+        canPaste: true,
+        canDelete: true,
+        canSelectAll: true
+      }
+    }),
+    language: 'zh-CN',
+    isDev: false,
+    ...actions
+  })
+
+  assert.deepEqual(
+    items.map((item) => item.label ?? item.role ?? item.type),
+    [
+      '撤销',
+      '重做',
+      'separator',
+      '剪切',
+      '复制',
+      '粘贴',
+      '粘贴并匹配样式',
+      '删除',
+      'separator',
+      '全选'
+    ]
+  )
 })

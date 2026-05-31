@@ -83,7 +83,7 @@ test('preview titlebar places sidebar and history controls before the tab strip'
 
   assert.match(
     source,
-    /<div className="main-titlebar">[\s\S]*<div className="main-titlebar-actions">[\s\S]*aria-label=\{isSidebarOpen \? 'Hide files' : 'Show files'\}[\s\S]*<HistoryButtons[\s\S]*\{fileTabsNav\}/,
+    /<div className="main-titlebar">[\s\S]*<div className="main-titlebar-actions">[\s\S]*aria-label=\{isSidebarOpen \? t\('app\.hideFiles'\) : t\('app\.showFiles'\)\}[\s\S]*<HistoryButtons[\s\S]*\{fileTabsNav\}/,
     'preview titlebar should place sidebar and history controls before all tabs'
   )
 })
@@ -416,7 +416,7 @@ test('file view modes expose preview, code, and split editing without discarding
   )
   assert.match(
     source,
-    /role="tablist"[\s\S]*aria-label="File view"[\s\S]*Preview[\s\S]*Code[\s\S]*Split/,
+    /role="tablist"[\s\S]*aria-label=\{t\('fileView\.label'\)\}[\s\S]*t\('fileView\.preview'\)[\s\S]*t\('fileView\.code'\)[\s\S]*t\('fileView\.split'\)/,
     'file view controls should present preview, code, and split as one obvious choice'
   )
   assert.match(
@@ -457,7 +457,7 @@ test('split editing lets users drag the editor and preview divider', async () =>
   )
   assert.match(
     source,
-    /<div[\s\S]*aria-label="Resize editor and preview"[\s\S]*aria-orientation="vertical"[\s\S]*className="file-split-resizer"[\s\S]*role="separator"[\s\S]*onPointerDown=\{handleSplitResizerPointerDown\}/,
+    /<div[\s\S]*aria-label=\{t\('preview\.resizeEditorPreview'\)\}[\s\S]*aria-orientation="vertical"[\s\S]*className="file-split-resizer"[\s\S]*role="separator"[\s\S]*onPointerDown=\{handleSplitResizerPointerDown\}/,
     'split editing should render an accessible divider between the editor and preview'
   )
   assert.match(
@@ -666,12 +666,12 @@ test('branch selection opens an action modal with explanatory choices', async ()
   )
   assert.match(
     source,
-    /Switch primary workspace from[\s\S]*primaryWorkspaceBranch[\s\S]*selectedBranchAction\.name[\s\S]*Existing worktrees keep their branches/,
+    /t\('branch\.switchPrimary'[\s\S]*primaryWorkspaceBranch[\s\S]*selectedBranchAction\.name[\s\S]*t\('branch\.switchPrimaryDescription'[\s\S]*selectedBranchAction\.name/,
     'switching should explain that the primary workspace changes while worktrees keep their branches'
   )
   assert.match(
     source,
-    /Create git worktree in \.worktrees[\s\S]*isolated working copy under \.worktrees/,
+    /t\('branch\.createWorktree'\)[\s\S]*t\('branch\.createWorktreeDescription'\)/,
     'worktree creation should explain that a separate local working copy is used'
   )
   assert.match(

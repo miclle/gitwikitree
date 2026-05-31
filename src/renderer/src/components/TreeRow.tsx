@@ -1,4 +1,5 @@
 import { type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
 import type { TreeNode } from '../../../shared/types'
@@ -22,6 +23,7 @@ export function TreeRow({
   onToggle: (path: string) => void
   onOpenContextMenu: (node: TreeNode) => Promise<void>
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
   const isDirty = dirtyPath === node.path
@@ -57,7 +59,7 @@ export function TreeRow({
         {node.type === 'directory' ? (
           <button
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
+            aria-label={t(expanded ? 'tree.collapse' : 'tree.expand', { name: node.name })}
             className="tree-toggle"
             disabled={!hasChildren}
             type="button"
@@ -75,10 +77,18 @@ export function TreeRow({
           {iconForNode(node, expanded)}
           <span className="tree-node-name">{node.name}</span>
           {isDirty && (
-            <span className="tree-node-dirty" aria-label="Unsaved changes" title="Unsaved" />
+            <span
+              className="tree-node-dirty"
+              aria-label={t('app.unsavedChanges')}
+              title={t('app.unsaved')}
+            />
           )}
           {!isDirty && node.gitStatus === 'modified' && (
-            <span className="tree-node-git-status" aria-label="Modified" title="Modified">
+            <span
+              className="tree-node-git-status"
+              aria-label={t('tree.modified')}
+              title={t('tree.modified')}
+            >
               M
             </span>
           )}

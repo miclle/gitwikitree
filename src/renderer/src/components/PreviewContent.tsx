@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -6,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type Ref
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import DOMPurify from 'dompurify'
 import { ChevronLeft, ChevronRight, FileText, X } from 'lucide-react'
 import {
@@ -134,11 +136,12 @@ function CodePreview({
   extension: string
   rootRef: Ref<HTMLDivElement>
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const lineCount = Math.max(1, content.split('\n').length)
   const language = languageForExtension(extension)
 
   return (
-    <div ref={rootRef} className="code-preview-shell" aria-label="Source code">
+    <div ref={rootRef} className="code-preview-shell" aria-label={t('preview.sourceCode')}>
       <pre className="code-line-gutter" aria-hidden="true">
         {Array.from({ length: lineCount }, (_, index) => index + 1).join('\n')}
       </pre>
@@ -154,15 +157,15 @@ function CodePreview({
 
 type PdfPreviewStatus = 'loading' | 'ready' | 'error'
 
-function createPdfPreviewPage(pageNumber: number): HTMLElement {
+function createPdfPreviewPage(pageNumber: number, pageLabelText: string): HTMLElement {
   const pageElement = document.createElement('section')
   const pageLabel = document.createElement('div')
 
   pageElement.className = 'pdf-preview-page pending'
-  pageElement.setAttribute('aria-label', `Page ${pageNumber}`)
+  pageElement.setAttribute('aria-label', pageLabelText)
   pageElement.dataset.pageNumber = String(pageNumber)
   pageLabel.className = 'pdf-preview-page-label'
-  pageLabel.textContent = `Page ${pageNumber}`
+  pageLabel.textContent = pageLabelText
   pageElement.append(pageLabel)
 
   return pageElement
@@ -197,6 +200,7 @@ function PdfPreview({
   rootRef: (element: HTMLElement | null) => void
   onPageCountChange: (count: number | undefined) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const pagesRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<PdfPreviewStatus>('loading')
   const setPdfPreviewRoot = (element: HTMLDivElement | null): void => {
@@ -248,7 +252,10 @@ function PdfPreview({
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
           if (isCancelled) return
 
-          const pageElement = createPdfPreviewPage(pageNumber)
+          const pageElement = createPdfPreviewPage(
+            pageNumber,
+            t('preview.page', { page: pageNumber })
+          )
           pagesContainer.append(pageElement)
 
           if (pageNumber === 1) {
@@ -295,21 +302,25 @@ function PdfPreview({
       pageObserver?.disconnect()
       void loadingTask?.destroy()
     }
-  }, [dataUrl, onPageCountChange])
+  }, [dataUrl, onPageCountChange, t])
 
   return (
-    <div ref={setPdfPreviewRoot} className="pdf-preview" aria-label={`PDF preview: ${name}`}>
+    <div
+      ref={setPdfPreviewRoot}
+      className="pdf-preview"
+      aria-label={t('preview.pdfLabel', { name })}
+    >
       {status === 'loading' && (
         <div className="pdf-preview-state">
           <FileText size={32} />
-          <strong>Loading PDF</strong>
+          <strong>{t('preview.loadingPdf')}</strong>
         </div>
       )}
       {status === 'error' && (
         <div className="pdf-preview-state">
           <FileText size={32} />
-          <strong>Preview unavailable</strong>
-          <span>This PDF could not be rendered.</span>
+          <strong>{t('preview.unavailable')}</strong>
+          <span>{t('preview.pdfUnavailable')}</span>
         </div>
       )}
       <div className="pdf-preview-pages" />
@@ -345,6 +356,7 @@ function ImageLightbox({
   onClose: () => void
   onStep: (delta: number) => void
 }): React.JSX.Element | undefined {
+  const { t } = useTranslation()
   const stageRef = useRef<HTMLDivElement | null>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
   const dragRef = useRef<ImageLightboxDragState | undefined>(undefined)
@@ -354,7 +366,7 @@ function ImageLightbox({
   const image = images[index]
   if (!image) return undefined
 
-  const imageLabel = image.alt || image.title || 'Preview image'
+  const imageLabel = image.alt || image.title || t('preview.image')
   const canNavigate = images.length > 1
   const normalizedZoom = Number.isFinite(zoom) ? zoom : 1
   const zoomLabel = `${Math.round(normalizedZoom * 100)}%`
@@ -431,7 +443,7 @@ function ImageLightbox({
       className="image-lightbox"
       role="dialog"
       aria-modal="true"
-      aria-label="Image preview"
+      aria-label={t('preview.image')}
       onClick={onClose}
     >
       <div className="image-lightbox-topbar" onClick={(event) => event.stopPropagation()}>
@@ -444,7 +456,12 @@ function ImageLightbox({
           )}
           <span className="image-lightbox-count">{zoomLabel}</span>
         </div>
-        <button type="button" aria-label="Close image preview" title="Close" onClick={onClose}>
+        <button
+          type="button"
+          aria-label={t('preview.closeImage')}
+          title={t('globalSearch.close')}
+          onClick={onClose}
+        >
           <X size={18} />
         </button>
       </div>
@@ -453,8 +470,8 @@ function ImageLightbox({
         <button
           type="button"
           className="image-lightbox-nav previous"
-          aria-label="Previous image"
-          title="Previous image"
+          aria-label={t('preview.previousImage')}
+          title={t('preview.previousImage')}
           onClick={(event) => {
             event.stopPropagation()
             onStep(-1)
@@ -485,7 +502,7 @@ function ImageLightbox({
           className={imageClassName}
           src={image.src}
           style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${normalizedZoom})` }}
-          title="Scroll to zoom. Double-click to toggle zoom."
+          title={t('preview.scrollZoom')}
           onDoubleClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -503,8 +520,8 @@ function ImageLightbox({
         <button
           type="button"
           className="image-lightbox-nav next"
-          aria-label="Next image"
-          title="Next image"
+          aria-label={t('preview.nextImage')}
+          title={t('preview.nextImage')}
           onClick={(event) => {
             event.stopPropagation()
             onStep(1)
@@ -538,6 +555,7 @@ export function PreviewContent({
   onOpenMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   onMarkdownAnchorHandled: (token: number) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const markdownBodyRef = useRef<HTMLElement | null>(null)
   const previewSearchRootRef = useRef<HTMLElement | null>(null)
   const [searchRootVersion, setSearchRootVersion] = useState(0)
@@ -557,6 +575,20 @@ export function PreviewContent({
       void renderMermaidDiagrams(element)
     }
   }
+  const localizeMarkdownCodeCopyButtons = useCallback(
+    (container: HTMLElement): void => {
+      for (const button of container.querySelectorAll<HTMLButtonElement>(
+        'button[data-copy-code]'
+      )) {
+        if (button.dataset.copyState && button.dataset.copyState !== 'idle') continue
+        button.dataset.copyState = 'idle'
+        button.textContent = t('preview.copy')
+        button.setAttribute('aria-label', t('preview.copyCode'))
+        button.title = t('preview.copyCode')
+      }
+    },
+    [t]
+  )
   const setHtmlPreviewRoot = (element: HTMLIFrameElement | null): void => {
     previewSearchRootRef.current = element?.contentDocument?.body ?? null
   }
@@ -568,12 +600,15 @@ export function PreviewContent({
   ): void => {
     button.dataset.copyState = state
     button.textContent = label
-    button.setAttribute('aria-label', label === 'Copied' ? 'Code copied' : 'Copy failed')
+    button.setAttribute(
+      'aria-label',
+      label === t('preview.copied') ? t('preview.codeCopied') : t('preview.copyFailed')
+    )
 
     window.setTimeout(() => {
       button.dataset.copyState = 'idle'
-      button.textContent = 'Copy'
-      button.setAttribute('aria-label', 'Copy code')
+      button.textContent = t('preview.copy')
+      button.setAttribute('aria-label', t('preview.copyCode'))
     }, resetDelay)
   }
 
@@ -586,9 +621,9 @@ export function PreviewContent({
 
     try {
       await navigator.clipboard.writeText(code)
-      setCopyButtonState(button, 'copied', 'Copied')
+      setCopyButtonState(button, 'copied', t('preview.copied'))
     } catch {
-      setCopyButtonState(button, 'failed', 'Failed')
+      setCopyButtonState(button, 'failed', t('preview.failed'))
     }
   }
 
@@ -652,6 +687,8 @@ export function PreviewContent({
     const container = markdownBodyRef.current
     if (!container) return
 
+    localizeMarkdownCodeCopyButtons(container)
+
     let isCancelled = false
     void renderMermaidDiagrams(container).then(() => {
       if (!isCancelled) setSearchRootVersion((version) => version + 1)
@@ -660,7 +697,7 @@ export function PreviewContent({
     return () => {
       isCancelled = true
     }
-  }, [preview])
+  }, [localizeMarkdownCodeCopyButtons, preview])
 
   useEffect(() => {
     const container = previewSearchRootRef.current
@@ -943,8 +980,8 @@ export function PreviewContent({
   return withImageLightbox(
     <div ref={setPreviewSearchRoot} className="unsupported-preview">
       <FileText size={32} />
-      <strong>Preview unavailable</strong>
-      <span>This file type is not rendered yet.</span>
+      <strong>{t('preview.unavailable')}</strong>
+      <span>{t('preview.fileUnavailable')}</span>
     </div>
   )
 }
