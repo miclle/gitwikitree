@@ -60,6 +60,13 @@ export function createSingleFileTabPatch(
   }
 }
 
+export function mergeOpenedFileTab(
+  openFileTabs: OpenFileTab[],
+  openedTab: OpenFileTab
+): OpenFileTab[] {
+  return [...openFileTabs.filter((item) => item.path !== openedTab.path), openedTab]
+}
+
 export function createResetNavigationPatch(): WorkspaceNavigationPatch {
   return {
     selectedPath: '',

@@ -172,3 +172,38 @@ test('createCloseFileTabPatch selects the adjacent tab when closing the active t
     ['tab-docs']
   )
 })
+
+test('mergeOpenedFileTab preserves current tabs while replacing duplicate paths', async () => {
+  const { module } = await loadWorkspaceNavigation()
+  const currentTabs = [
+    {
+      id: 'tab-old-readme',
+      path: 'README.md',
+      name: 'README.md',
+      type: 'file',
+      history: [{ path: 'README.md', name: 'README.md', type: 'file' }],
+      historyIndex: 0
+    },
+    {
+      id: 'tab-docs',
+      path: 'docs',
+      name: 'docs',
+      type: 'directory',
+      history: [{ path: 'docs', name: 'docs', type: 'directory' }],
+      historyIndex: 0
+    }
+  ]
+  const openedTab = {
+    id: 'tab-new-readme',
+    path: 'README.md',
+    name: 'README.md',
+    type: 'file',
+    history: [{ path: 'README.md', name: 'README.md', type: 'file' }],
+    historyIndex: 0
+  }
+
+  assert.deepEqual(
+    module.mergeOpenedFileTab(currentTabs, openedTab).map((tab) => tab.id),
+    ['tab-docs', 'tab-new-readme']
+  )
+})

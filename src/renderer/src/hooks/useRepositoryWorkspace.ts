@@ -17,6 +17,7 @@ import {
   createResetNavigationPatch,
   createSingleFileTabPatch,
   createWorkspaceNavigationPatch,
+  mergeOpenedFileTab,
   type WorkspaceNavigationPatch
 } from '../workspace-navigation'
 import type {
@@ -386,22 +387,21 @@ export function useRepositoryWorkspace(): {
         if (resolved) {
           const { target } = resolved
           const patch = createSingleFileTabPatch(target, createNextTabId())
-          applyNavigationPatch({
-            ...patch,
-            openFileTabs:
-              repository?.path === nextRepository.path
-                ? [
-                    ...openFileTabs.filter((item) => item.path !== target.path),
-                    ...patch.openFileTabs
-                  ]
-                : patch.openFileTabs
-          })
+          setSelectedPath(patch.selectedPath)
+          setActiveFilePath(patch.activeFilePath)
+          setActiveFileTabId(patch.activeFileTabId)
+          setOpenFileTabs((current) =>
+            repository?.path === nextRepository.path
+              ? mergeOpenedFileTab(current, patch.openFileTabs[0])
+              : patch.openFileTabs
+          )
           await loadPreview(target.path, nextRepository)
         } else {
-          applyNavigationPatch({
-            ...createResetNavigationPatch(),
-            openFileTabs: repository?.path === nextRepository.path ? openFileTabs : []
-          })
+          const patch = createResetNavigationPatch()
+          setSelectedPath(patch.selectedPath)
+          setActiveFilePath(patch.activeFilePath)
+          setActiveFileTabId(patch.activeFileTabId)
+          if (repository?.path !== nextRepository.path) setOpenFileTabs(patch.openFileTabs)
           await loadPreview('', nextRepository)
           setError(`${fileNameFromPath(filePath)} is no longer available in this repository.`)
         }
@@ -411,15 +411,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [
-      applyNavigationPatch,
-      createNextTabId,
-      discardEditingIfAllowed,
-      loadPreview,
-      openFileTabs,
-      repository,
-      setError
-    ]
+    [createNextTabId, discardEditingIfAllowed, loadPreview, repository, setError]
   )
 
   const openTreeItem = useCallback(
