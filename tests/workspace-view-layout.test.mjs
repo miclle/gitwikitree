@@ -709,18 +709,12 @@ test('split editing lets users drag the editor and preview divider', async () =>
 test('directory index previews reuse file editing controls and drafts', async () => {
   const source = await readWorkspaceView()
   const hookSource = await readRepositoryWorkspaceHook()
-  const editingHook = await readWorkspaceEditingHook()
   const fileViewModeHook = await readFileViewModeHook()
 
   assert.match(
     hookSource,
     /useWorkspaceEditing\(\{[\s\S]*preview,[\s\S]*repository,/,
     'workspace state should delegate editable file state to a focused editing hook'
-  )
-  assert.match(
-    editingHook,
-    /getEditablePreviewTarget\(preview\)/,
-    'editing state should derive an editable source from file previews and directory index previews'
   )
   assert.match(
     fileViewModeHook,

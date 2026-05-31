@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { fileNameFromPath } from '../app-utils'
 import type { GitLastChange, PreviewPayload, RepositoryPayload } from '../../../shared/types'
 
 export type EditablePreviewTarget = {
@@ -14,7 +13,7 @@ export type EditablePreviewTarget = {
 }
 
 function extensionFromPath(path: string): string {
-  const name = fileNameFromPath(path)
+  const name = path.split('/').filter(Boolean).at(-1) ?? path
   const dotIndex = name.lastIndexOf('.')
 
   return dotIndex > 0 ? name.slice(dotIndex).toLocaleLowerCase() : ''
