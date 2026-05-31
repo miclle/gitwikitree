@@ -1862,7 +1862,7 @@ kbd {
   min-height: 100%;
   padding-right: 18px;
   padding-left: 18px;
-  border-right: 1px solid var(--border-muted);
+  border-right: 0;
   color: #59636e;
   text-align: right;
   user-select: none;

@@ -278,6 +278,11 @@ test('file editor styles markdown syntax like a document editor', async () => {
     /\.file-editor\s+\.cm-gutters\s*\{[\s\S]*border-right:\s*0;/,
     'editor gutters should not draw a vertical divider beside the line numbers'
   )
+  assert.match(
+    css,
+    /\.code-line-gutter\s*\{[\s\S]*border-right:\s*0;/,
+    'code preview gutters should not draw a vertical divider beside the line numbers'
+  )
 })
 
 test('global repository search is available from the sidebar and keyboard shortcut', async () => {
