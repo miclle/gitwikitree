@@ -1614,17 +1614,24 @@ kbd {
   outline: none;
 }
 
+.file-editor .cm-selectionLayer {
+  z-index: 50 !important;
+  pointer-events: none;
+}
+
 .file-editor .cm-selectionBackground,
 .file-editor .cm-focused .cm-selectionBackground {
-  background: rgba(9, 105, 218, 0.28) !important;
+  background: rgba(9, 105, 218, 0.34) !important;
+  box-shadow: inset 0 0 0 1px rgba(9, 105, 218, 0.58);
 }
 
 .file-editor .cm-content ::selection {
-  background: rgba(9, 105, 218, 0.28) !important;
+  background: rgba(9, 105, 218, 0.34) !important;
 }
 
 .file-editor .cm-selectionMatch {
-  background: rgba(9, 105, 218, 0.14) !important;
+  background: rgba(9, 105, 218, 0.18) !important;
+  box-shadow: inset 0 0 0 1px rgba(9, 105, 218, 0.24);
 }
 
 .directory-list {

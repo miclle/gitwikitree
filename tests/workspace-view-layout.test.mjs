@@ -223,12 +223,22 @@ test('file editor uses a visible selection highlight', async () => {
 
   assert.match(
     css,
-    /\.file-editor\s+\.cm-selectionBackground[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.28\)\s*!important;/,
+    /\.file-editor\s+\.cm-selectionLayer\s*\{[\s\S]*z-index:\s*50\s*!important;[\s\S]*pointer-events:\s*none;/,
+    'CodeMirror drawn selections need to sit above match decorations without intercepting editor input'
+  )
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-selectionBackground[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.34\)\s*!important;/,
     'CodeMirror selections need an explicit high-contrast background in the app theme'
   )
   assert.match(
     css,
-    /\.file-editor\s+\.cm-content\s*::selection[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.28\)\s*!important;/,
+    /\.file-editor\s+\.cm-selectionBackground[^{]*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px rgba\(9,\s*105,\s*218,\s*0\.58\);/,
+    'CodeMirror selections need a visible edge when multiple short ranges are selected'
+  )
+  assert.match(
+    css,
+    /\.file-editor\s+\.cm-content\s*::selection[^{]*\{[\s\S]*background:\s*rgba\(9,\s*105,\s*218,\s*0\.34\)\s*!important;/,
     'native text selection inside CodeMirror should match the visible editor selection color'
   )
 })
