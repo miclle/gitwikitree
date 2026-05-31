@@ -109,6 +109,17 @@ export type GitLastChange = {
   subject: string
 }
 
+export type GitBlameLine = GitLastChange & {
+  lineNumber: number
+  content: string
+  authorAvatarUrl?: string
+}
+
+export type GitBlamePayload = {
+  path: string
+  lines: GitBlameLine[]
+}
+
 export type DirectoryPreview = {
   kind: 'directory'
   path: string

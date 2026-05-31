@@ -24,6 +24,7 @@ import {
 import { openRepositoryInNewWindow } from './open-repository-dialog'
 import {
   getPreview,
+  getBlame,
   checkoutBranch,
   loadRepository,
   openWorktree,
@@ -373,6 +374,7 @@ app.whenReady().then(async () => {
     checkoutBranch,
     openWorktree,
     getPreview,
+    getBlame,
     saveFile,
     searchRepository,
     activateRepositoryInWindow

@@ -1,5 +1,6 @@
 export { loadRepository } from './repository-loader'
 export { getPreview, saveFile } from './repository-preview'
+export { getBlame } from './repository-blame'
 export { searchRepository } from './repository-search'
 export { openWorktree } from './repository-worktree'
 export { checkoutBranch } from './repository-workspace'

@@ -21,6 +21,8 @@ test('createTranslator resolves English and Chinese UI labels', async () => {
     assert.equal(module.createTranslator('en')('settings.language'), 'Language')
     assert.equal(module.createTranslator('zh-CN')('settings.language'), '语言')
     assert.equal(module.createTranslator('zh-CN')('branch.current'), '当前')
+    assert.equal(module.createTranslator('en')('fileView.blame'), 'Blame')
+    assert.equal(module.createTranslator('zh-CN')('fileView.blame'), 'Blame')
   } finally {
     await rm(tempDir, { recursive: true, force: true })
   }

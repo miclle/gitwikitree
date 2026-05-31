@@ -2,7 +2,7 @@ import { execFile } from 'child_process'
 import { promises as fs } from 'fs'
 import { resolve } from 'path'
 import { promisify } from 'util'
-import type { GitLastChange, RepositoryPayload } from '../shared/types'
+import type { GitBlameLine, GitLastChange, RepositoryPayload } from '../shared/types'
 
 export const execFileAsync = promisify(execFile)
 
@@ -142,6 +142,93 @@ export async function getLastChange(
   } catch {
     return undefined
   }
+}
+
+function getGitBlameAvatarUrl(authorEmail: string): string | undefined {
+  const normalizedEmail = authorEmail.trim().toLowerCase()
+  if (!normalizedEmail) return undefined
+
+  const gitHubNoreplyMatch = normalizedEmail.match(
+    /^(?:\d+\+)?([a-z0-9-]+)@users\.noreply\.github\.com$/
+  )
+
+  if (gitHubNoreplyMatch?.[1]) {
+    return `https://github.com/${gitHubNoreplyMatch[1]}.png?size=48`
+  }
+
+  return undefined
+}
+
+export async function getBlameLines(
+  repoPath: string,
+  relativePath: string
+): Promise<GitBlameLine[]> {
+  const { stdout } = await execFileAsync(
+    'git',
+    ['-C', repoPath, 'blame', '--line-porcelain', '--', relativePath],
+    { maxBuffer: 16 * 1024 * 1024 }
+  )
+  const lines: GitBlameLine[] = []
+  let current:
+    | {
+        lineNumber: number
+        authorName: string
+        authorEmail: string
+        committedAt: string
+        shortHash: string
+        subject: string
+      }
+    | undefined
+
+  for (const rawLine of stdout.split('\n')) {
+    if (!current) {
+      const match = rawLine.match(/^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/)
+      if (!match) continue
+      current = {
+        lineNumber: Number(match[2]),
+        authorName: '',
+        authorEmail: '',
+        committedAt: '',
+        shortHash: /^0+$/.test(match[1]) ? '' : match[1].slice(0, 12),
+        subject: ''
+      }
+      continue
+    }
+
+    if (rawLine.startsWith('author ')) {
+      current.authorName = rawLine.slice('author '.length)
+      continue
+    }
+
+    if (rawLine.startsWith('author-mail ')) {
+      current.authorEmail = rawLine.slice('author-mail '.length).replace(/^<|>$/g, '')
+      continue
+    }
+
+    if (rawLine.startsWith('author-time ')) {
+      const timestamp = Number(rawLine.slice('author-time '.length))
+      current.committedAt = Number.isFinite(timestamp)
+        ? new Date(timestamp * 1000).toISOString()
+        : ''
+      continue
+    }
+
+    if (rawLine.startsWith('summary ')) {
+      current.subject = rawLine.slice('summary '.length)
+      continue
+    }
+
+    if (rawLine.startsWith('\t')) {
+      lines.push({
+        ...current,
+        authorAvatarUrl: getGitBlameAvatarUrl(current.authorEmail),
+        content: rawLine.slice(1)
+      })
+      current = undefined
+    }
+  }
+
+  return lines
 }
 
 export async function getRefs(

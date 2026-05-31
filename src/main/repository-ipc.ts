@@ -1,5 +1,6 @@
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
 import type {
+  GitBlamePayload,
   PreviewPayload,
   RepositoryPayload,
   RepositorySearchResult,
@@ -28,6 +29,11 @@ type RepositoryIpcDependencies = {
     relativePath?: string,
     options?: RepositoryLoadOptions
   ) => Promise<PreviewPayload>
+  getBlame: (
+    repoPath: string,
+    relativePath: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<GitBlamePayload>
   saveFile: (
     repoPath: string,
     relativePath: string,
@@ -54,6 +60,7 @@ export function registerRepositoryIpcHandlers({
   checkoutBranch,
   openWorktree,
   getPreview,
+  getBlame,
   saveFile,
   searchRepository,
   activateRepositoryInWindow
@@ -100,6 +107,13 @@ export function registerRepositoryIpcHandlers({
     'repository:preview',
     async (_event, repoPath: string, relativePath = '', options?: RepositoryLoadOptions) => {
       return getPreview(repoPath, relativePath, options)
+    }
+  )
+
+  ipcMain.handle(
+    'repository:blame',
+    async (_event, repoPath: string, relativePath: string, options?: RepositoryLoadOptions) => {
+      return getBlame(repoPath, relativePath, options)
     }
   )
 

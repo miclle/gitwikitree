@@ -17,6 +17,7 @@ async function loadRepositoryService() {
     modules: [
       'src/main/repository-service.ts',
       'src/main/repository-loader.ts',
+      'src/main/repository-blame.ts',
       'src/main/repository-files.ts',
       'src/main/repository-preview.ts',
       'src/main/repository-search.ts',
@@ -135,6 +136,67 @@ test('getPreview includes the latest Git author for status metadata', async () =
     assert.equal(preview.lastChange.committedAt, '2026-05-27T06:59:00Z')
     assert.match(preview.lastChange.shortHash, /^[a-f0-9]{7,}$/)
     assert.equal(preview.lastChange.subject, 'docs: update guide')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('getBlame returns Git author metadata for each source line', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await writeFile(join(repoPath, 'docs', 'guide.md'), 'Alpha\nBeta\n')
+    await execFileAsync('git', ['add', 'docs/guide.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'docs: add guide lines'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'First Author',
+        GIT_AUTHOR_EMAIL: '123+octocat@users.noreply.github.com',
+        GIT_AUTHOR_DATE: '2026-05-26T06:59:00Z',
+        GIT_COMMITTER_NAME: 'First Author',
+        GIT_COMMITTER_EMAIL: '123+octocat@users.noreply.github.com',
+        GIT_COMMITTER_DATE: '2026-05-26T06:59:00Z'
+      }
+    })
+
+    await writeFile(join(repoPath, 'docs', 'guide.md'), 'Alpha\nBeta updated\n')
+    await execFileAsync('git', ['add', 'docs/guide.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'docs: update beta'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Second Author',
+        GIT_AUTHOR_EMAIL: 'second@example.com',
+        GIT_AUTHOR_DATE: '2026-05-27T06:59:00Z',
+        GIT_COMMITTER_NAME: 'Second Author',
+        GIT_COMMITTER_EMAIL: 'second@example.com',
+        GIT_COMMITTER_DATE: '2026-05-27T06:59:00Z'
+      }
+    })
+
+    const blame = await service.getBlame(repoPath, 'docs/guide.md')
+
+    assert.equal(blame.path, 'docs/guide.md')
+    assert.deepEqual(
+      blame.lines.map((line) => line.content),
+      ['Alpha', 'Beta updated']
+    )
+    assert.equal(blame.lines[0].lineNumber, 1)
+    assert.equal(blame.lines[0].authorName, 'First Author')
+    assert.equal(blame.lines[0].authorEmail, '123+octocat@users.noreply.github.com')
+    assert.equal(blame.lines[0].authorAvatarUrl, 'https://github.com/octocat.png?size=48')
+    assert.equal(blame.lines[0].committedAt, '2026-05-26T06:59:00.000Z')
+    assert.equal(blame.lines[0].subject, 'docs: add guide lines')
+    assert.match(blame.lines[0].shortHash, /^[a-f0-9]{7,}$/)
+    assert.equal(blame.lines[1].lineNumber, 2)
+    assert.equal(blame.lines[1].authorName, 'Second Author')
+    assert.equal(blame.lines[1].authorEmail, 'second@example.com')
+    assert.equal(blame.lines[1].authorAvatarUrl, undefined)
+    assert.equal(blame.lines[1].committedAt, '2026-05-27T06:59:00.000Z')
+    assert.equal(blame.lines[1].subject, 'docs: update beta')
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

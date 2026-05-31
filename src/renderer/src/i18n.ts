@@ -43,6 +43,7 @@ export type TranslationKey =
   | 'fileView.preview'
   | 'fileView.code'
   | 'fileView.split'
+  | 'fileView.blame'
   | 'preview.resizePanels'
   | 'preview.resizeEditorPreview'
   | 'search.currentTab'
@@ -91,6 +92,14 @@ export type TranslationKey =
   | 'status.workingTree'
   | 'status.worktree'
   | 'preview.sourceCode'
+  | 'preview.blame'
+  | 'preview.ageLegend'
+  | 'preview.older'
+  | 'preview.newer'
+  | 'preview.contributors'
+  | 'preview.loadingBlame'
+  | 'preview.blameUnavailable'
+  | 'preview.uncommitted'
   | 'preview.page'
   | 'preview.pdfLabel'
   | 'preview.loadingPdf'
@@ -159,6 +168,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'fileView.preview': 'Preview',
     'fileView.code': 'Code',
     'fileView.split': 'Split',
+    'fileView.blame': 'Blame',
     'preview.resizePanels': 'Resize panels',
     'preview.resizeEditorPreview': 'Resize editor and preview',
     'search.currentTab': 'Find in current tab',
@@ -207,6 +217,14 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'status.workingTree': 'Working tree',
     'status.worktree': 'Worktree',
     'preview.sourceCode': 'Source code',
+    'preview.blame': 'Blame',
+    'preview.ageLegend': 'Blame age legend',
+    'preview.older': 'Older',
+    'preview.newer': 'Newer',
+    'preview.contributors': 'Contributors',
+    'preview.loadingBlame': 'Loading blame',
+    'preview.blameUnavailable': 'Blame unavailable',
+    'preview.uncommitted': 'Uncommitted',
     'preview.page': 'Page {page}',
     'preview.pdfLabel': 'PDF preview: {name}',
     'preview.loadingPdf': 'Loading PDF',
@@ -268,6 +286,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'fileView.preview': '预览',
     'fileView.code': '代码',
     'fileView.split': '分栏',
+    'fileView.blame': 'Blame',
     'preview.resizePanels': '调整面板大小',
     'preview.resizeEditorPreview': '调整编辑器和预览大小',
     'search.currentTab': '在当前标签中查找',
@@ -316,6 +335,14 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'status.workingTree': '工作树',
     'status.worktree': 'Worktree',
     'preview.sourceCode': '源代码',
+    'preview.blame': 'Blame',
+    'preview.ageLegend': 'Blame 时间图例',
+    'preview.older': '较早',
+    'preview.newer': '较新',
+    'preview.contributors': '贡献者',
+    'preview.loadingBlame': '正在加载 Blame',
+    'preview.blameUnavailable': 'Blame 不可用',
+    'preview.uncommitted': '未提交',
     'preview.page': '第 {page} 页',
     'preview.pdfLabel': 'PDF 预览：{name}',
     'preview.loadingPdf': '正在加载 PDF',

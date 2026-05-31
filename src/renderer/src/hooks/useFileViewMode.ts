@@ -6,7 +6,7 @@ import {
 } from './useWorkspaceEditing'
 import type { PreviewPayload } from '../../../shared/types'
 
-export type FileViewMode = 'preview' | 'code' | 'split'
+export type FileViewMode = 'preview' | 'code' | 'split' | 'blame'
 
 interface FileViewModeState {
   editing: boolean
@@ -49,7 +49,7 @@ export function useFileViewMode({
   const editablePreviewTarget = getEditablePreviewTarget(preview)
   const fileViewMode =
     fileViewModeState.path === editablePreviewTarget?.path &&
-    fileViewModeState.editing === isEditing
+    (fileViewModeState.mode === 'blame' || fileViewModeState.editing === isEditing)
       ? fileViewModeState.mode
       : 'preview'
   const canSplitPreview = Boolean(
@@ -60,16 +60,20 @@ export function useFileViewMode({
   const effectiveFileViewMode =
     fileViewMode === 'split' && !canSplitPreview
       ? 'code'
-      : fileViewMode === 'code' && (!canEditPreview || !isEditing)
+      : fileViewMode === 'blame' && !editablePreviewTarget
         ? 'preview'
-        : fileViewMode
+        : fileViewMode === 'code' && (!canEditPreview || !isEditing)
+          ? 'preview'
+          : fileViewMode
   const isEditorMounted = Boolean(editablePreviewTarget && isEditing)
   const showsEditor = Boolean(
     editablePreviewTarget &&
     isEditing &&
     (effectiveFileViewMode === 'code' || effectiveFileViewMode === 'split')
   )
-  const showsPreview = Boolean(preview && effectiveFileViewMode !== 'code')
+  const showsPreview = Boolean(
+    preview && effectiveFileViewMode !== 'code' && effectiveFileViewMode !== 'blame'
+  )
   const previewForDisplay =
     editablePreviewTarget && isEditing ? applyDraftToPreview(preview, draftContent) : preview
   const fileWorkspaceClassName =
@@ -84,7 +88,7 @@ export function useFileViewMode({
       }
 
       setFileViewModeState({
-        editing: Boolean(mode !== 'preview'),
+        editing: Boolean(mode !== 'preview' && mode !== 'blame'),
         mode,
         path: editablePreviewTarget?.path
       })

@@ -1,9 +1,11 @@
 import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
-import { Code2, Columns2, Eye, Loader2, Pencil, Plus, Settings } from 'lucide-react'
+import { Code2, Columns2, Eye, GitCommit, Loader2, Pencil, Plus, Settings } from 'lucide-react'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
+import { useGitBlame } from '../hooks/useGitBlame'
 import { BranchControls } from './BranchControls'
+import { BlamePreview } from './BlamePreview'
 import { FileTabsNav } from './FileTabsNav'
 import { FileEditor } from './FileEditor'
 import { GlobalSearchModal } from './GlobalSearchModal'
@@ -133,6 +135,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     preview,
     editablePreviewTarget,
     showsEditor
+  })
+  const { blame, blameLoading, blameError } = useGitBlame({
+    repository,
+    target: editablePreviewTarget,
+    active: effectiveFileViewMode === 'blame'
   })
   const showBreadcrumbContextMenu = (event: MouseEvent<HTMLElement>, path: string): void => {
     event.preventDefault()
@@ -363,6 +370,16 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                       <Columns2 size={15} />
                       {t('fileView.split')}
                     </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={effectiveFileViewMode === 'blame'}
+                      disabled={!editablePreviewTarget}
+                      onClick={() => selectFileViewMode('blame')}
+                    >
+                      <GitCommit size={15} />
+                      {t('fileView.blame')}
+                    </button>
                   </div>
                 )}
               </div>
@@ -405,6 +422,17 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                     )}
                     {effectiveFileViewMode === 'split' && previewContentElement ? (
                       <div className="file-preview-pane">{previewContentElement}</div>
+                    ) : effectiveFileViewMode === 'blame' ? (
+                      blameLoading ? (
+                        <div className="loading-state">
+                          <Loader2 className="spin" size={26} />
+                          <span>{t('preview.loadingBlame')}</span>
+                        </div>
+                      ) : blameError ? (
+                        <div className="unsupported-preview">{t('preview.blameUnavailable')}</div>
+                      ) : blame ? (
+                        <BlamePreview blame={blame} />
+                      ) : undefined
                     ) : (
                       previewContentElement
                     )}

@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AppSettings,
+  GitBlamePayload,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   PreviewPayload,
@@ -31,6 +32,11 @@ export type GitWikitreeAPI = {
       rootPath?: string
     }
   ) => Promise<PreviewPayload>
+  getBlame: (
+    repoPath: string,
+    relativePath: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<GitBlamePayload>
   saveFile: (
     repoPath: string,
     relativePath: string,

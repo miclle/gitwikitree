@@ -67,6 +67,12 @@ function createHarness() {
         relativePath,
         options
       }),
+      getBlame: async (repoPath, relativePath, options) => ({
+        kind: 'blame',
+        repoPath,
+        relativePath,
+        options
+      }),
       saveFile: async (repoPath, relativePath, content, options) => ({
         repoPath,
         relativePath,
@@ -99,10 +105,32 @@ test('registerRepositoryIpcHandlers registers all repository load channels', asy
       'repository:checkout-branch',
       'repository:open-worktree',
       'repository:preview',
+      'repository:blame',
       'repository:save-file',
       'repository:search'
     ]
   )
+})
+
+test('repository:blame returns blame for the requested repository path', async () => {
+  const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
+  const { handlers, dependencies } = createHarness()
+
+  registerRepositoryIpcHandlers(dependencies)
+  const blame = await handlers.get('repository:blame')({}, '/repo', 'docs/index.md', {
+    source: 'worktree',
+    rootPath: '/repo'
+  })
+
+  assert.deepEqual(blame, {
+    kind: 'blame',
+    repoPath: '/repo',
+    relativePath: 'docs/index.md',
+    options: {
+      source: 'worktree',
+      rootPath: '/repo'
+    }
+  })
 })
 
 test('repository:load activates the repository in the sender window', async () => {

@@ -44,6 +44,8 @@ const api = {
       rootPath?: string
     }
   ) => ipcRenderer.invoke('repository:preview', repoPath, relativePath, options),
+  getBlame: (repoPath: string, relativePath: string, options?: RepositoryLoadOptions) =>
+    ipcRenderer.invoke('repository:blame', repoPath, relativePath, options),
   saveFile: (repoPath: string, relativePath: string, content: string, options?: SaveFileOptions) =>
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content, options),
   searchRepository: (repoPath: string, query: string, options?: RepositoryLoadOptions) =>

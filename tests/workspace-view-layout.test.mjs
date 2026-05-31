@@ -124,6 +124,17 @@ async function readPreviewStatusMetadataHook() {
   )
 }
 
+async function readGitBlameHook() {
+  return readFile(new URL('../src/renderer/src/hooks/useGitBlame.ts', import.meta.url), 'utf8')
+}
+
+async function readBlamePreview() {
+  return readFile(
+    new URL('../src/renderer/src/components/BlamePreview.tsx', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewContent() {
   return readFile(
     new URL('../src/renderer/src/components/PreviewContent.tsx', import.meta.url),
@@ -696,6 +707,80 @@ test('file view modes expose preview, code, and split editing without discarding
   )
 })
 
+test('file view modes expose blame as a lazy read-only source history view', async () => {
+  const source = await readWorkspaceView()
+  const fileViewModeHook = await readFileViewModeHook()
+  const blameHook = await readGitBlameHook()
+  const blamePreview = await readBlamePreview()
+  const css = await readMainCss()
+
+  assert.match(
+    fileViewModeHook,
+    /export type FileViewMode = 'preview' \| 'code' \| 'split' \| 'blame'/,
+    'file view mode should include a read-only blame mode'
+  )
+  assert.match(
+    source,
+    /selectFileViewMode\('blame'\)[\s\S]*t\('fileView\.blame'\)/,
+    'file view controls should expose a Blame tab next to source views'
+  )
+  assert.match(
+    source,
+    /useGitBlame\(\{[\s\S]*repository,[\s\S]*target: editablePreviewTarget,[\s\S]*active: effectiveFileViewMode === 'blame'[\s\S]*\}\)/,
+    'workspace should load blame only when the Blame tab is active'
+  )
+  assert.match(
+    blameHook,
+    /window\.api[\s\S]*\.getBlame\(repositoryPath,\s*targetPath,[\s\S]*source: repositorySource,[\s\S]*rootPath: repositoryRootPath/,
+    'blame loading should preserve the active workspace context'
+  )
+  assert.doesNotMatch(
+    blameHook,
+    /\[[^\]]*\brepository\b[^\]]*\btarget\b[^\]]*\]/,
+    'blame loading should not depend on unstable repository or target object identities'
+  )
+  assert.match(
+    blamePreview,
+    /const segments = getBlameSegments\(blame\.lines\)[\s\S]*segments\.map\(\(segment\)[\s\S]*segment\.lines\.map\(\(line\)[\s\S]*line\.lineNumber[\s\S]*line\.content/,
+    'blame preview should group contiguous lines by commit like GitHub blame'
+  )
+  assert.match(
+    blamePreview,
+    /hour: '2-digit'[\s\S]*minute: '2-digit'[\s\S]*second: '2-digit'/,
+    'blame dates should include full time details'
+  )
+  assert.match(
+    blamePreview,
+    /authorAvatarUrl[\s\S]*<img[\s\S]*src=\{contributor\.authorAvatarUrl\}/,
+    'blame metadata should show avatar images returned by the blame service'
+  )
+  assert.match(
+    blamePreview,
+    /className="blame-segment-date"[\s\S]*<BlameAvatar contributor=\{segment\} \/>[\s\S]*className="blame-segment-author"/,
+    'blame metadata should place the avatar after the timestamp like GitHub'
+  )
+  assert.match(
+    blamePreview,
+    /className="blame-segment-subject"[\s\S]*title=\{segment\.subject\}/,
+    'truncated blame commit messages should expose the full subject on hover'
+  )
+  assert.match(
+    blamePreview,
+    /const contributors = getBlameContributors\(segments\)[\s\S]*className="blame-toolbar"[\s\S]*className="blame-age-legend"[\s\S]*className="blame-contributors"/,
+    'blame preview should include a GitHub-like age legend and contributors toolbar'
+  )
+  assert.match(
+    blamePreview,
+    /style=\{getBlameAgeStyle\(segment,\s*ageRange\)\}/,
+    'blame segment age indicators should use relative commit age colors'
+  )
+  assert.match(
+    css,
+    /\.blame-toolbar\s*\{[\s\S]*\.blame-age-legend[\s\S]*\.blame-contributors[\s\S]*\.blame-segment\s*\{[\s\S]*grid-template-columns:\s*430px\s+minmax\(560px,\s*1fr\);[\s\S]*\.blame-age-indicator[\s\S]*\.blame-avatar[\s\S]*\.blame-code-line/,
+    'blame preview should keep a GitHub-like commit column and source column'
+  )
+})
+
 test('split editing lets users drag the editor and preview divider', async () => {
   const source = await readWorkspaceView()
   const splitResizeHook = await readSplitEditorResizeHook()
@@ -785,8 +870,8 @@ test('stale code mode falls back to preview after editing ends', async () => {
   )
   assert.match(
     source,
-    /setFileViewModeState\(\{[\s\S]*editing: Boolean\(mode !== 'preview'\),[\s\S]*mode,[\s\S]*path: editablePreviewTarget\?\.path[\s\S]*\}\)/,
-    'view mode state should record whether it belongs to an active edit session'
+    /setFileViewModeState\(\{[\s\S]*editing: Boolean\(mode !== 'preview' && mode !== 'blame'\),[\s\S]*mode,[\s\S]*path: editablePreviewTarget\?\.path[\s\S]*\}\)/,
+    'view mode state should record only code and split as active edit sessions'
   )
 })
 
