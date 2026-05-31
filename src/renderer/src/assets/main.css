@@ -40,6 +40,20 @@
   --table-row-alt-bg: #f6f8fa;
   --table-border: #d0d7de;
   --table-text: #24292f;
+  --syntax-text: #24292e;
+  --syntax-keyword: #d73a49;
+  --syntax-entity: #6f42c1;
+  --syntax-constant: #005cc5;
+  --syntax-string: #032f62;
+  --syntax-variable: #e36209;
+  --syntax-comment: #6a737d;
+  --syntax-tag: #22863a;
+  --syntax-heading: #005cc5;
+  --syntax-list: #735c0f;
+  --syntax-addition-text: #22863a;
+  --syntax-addition-bg: #f0fff4;
+  --syntax-deletion-text: #b31d28;
+  --syntax-deletion-bg: #ffeef0;
   --top-bar-height: 40px;
   --status-bar-height: 28px;
   --top-bar-bg: var(--border);
@@ -90,6 +104,20 @@
     --table-row-alt-bg: #182232;
     --table-border: #405168;
     --table-text: #e5e7eb;
+    --syntax-text: #c9d1d9;
+    --syntax-keyword: #ff7b72;
+    --syntax-entity: #d2a8ff;
+    --syntax-constant: #79c0ff;
+    --syntax-string: #a5d6ff;
+    --syntax-variable: #ffa657;
+    --syntax-comment: #8b949e;
+    --syntax-tag: #7ee787;
+    --syntax-heading: #1f6feb;
+    --syntax-list: #f2cc60;
+    --syntax-addition-text: #aff5b4;
+    --syntax-addition-bg: #033a16;
+    --syntax-deletion-text: #ffdcd7;
+    --syntax-deletion-bg: #67060c;
     --top-bar-bg: #253140;
     --top-bar-hover: #334155;
     --top-bar-hover-strong: #415167;
@@ -134,6 +162,20 @@
   --table-row-alt-bg: #182232;
   --table-border: #405168;
   --table-text: #e5e7eb;
+  --syntax-text: #c9d1d9;
+  --syntax-keyword: #ff7b72;
+  --syntax-entity: #d2a8ff;
+  --syntax-constant: #79c0ff;
+  --syntax-string: #a5d6ff;
+  --syntax-variable: #ffa657;
+  --syntax-comment: #8b949e;
+  --syntax-tag: #7ee787;
+  --syntax-heading: #1f6feb;
+  --syntax-list: #f2cc60;
+  --syntax-addition-text: #aff5b4;
+  --syntax-addition-bg: #033a16;
+  --syntax-deletion-text: #ffdcd7;
+  --syntax-deletion-bg: #67060c;
   --top-bar-bg: #253140;
   --top-bar-hover: #334155;
   --top-bar-hover-strong: #415167;
@@ -2192,6 +2234,89 @@ kbd {
   font: inherit;
   line-height: inherit;
   white-space: pre;
+}
+
+.code-source .hljs {
+  color: var(--syntax-text);
+  background: transparent;
+}
+
+.code-source .hljs-doctag,
+.code-source .hljs-keyword,
+.code-source .hljs-meta .hljs-keyword,
+.code-source .hljs-template-tag,
+.code-source .hljs-template-variable,
+.code-source .hljs-type,
+.code-source .hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+
+.code-source .hljs-title,
+.code-source .hljs-title.class_,
+.code-source .hljs-title.class_.inherited__,
+.code-source .hljs-title.function_ {
+  color: var(--syntax-entity);
+}
+
+.code-source .hljs-attr,
+.code-source .hljs-attribute,
+.code-source .hljs-literal,
+.code-source .hljs-meta,
+.code-source .hljs-number,
+.code-source .hljs-operator,
+.code-source .hljs-variable,
+.code-source .hljs-selector-attr,
+.code-source .hljs-selector-class,
+.code-source .hljs-selector-id {
+  color: var(--syntax-constant);
+}
+
+.code-source .hljs-regexp,
+.code-source .hljs-string,
+.code-source .hljs-meta .hljs-string {
+  color: var(--syntax-string);
+}
+
+.code-source .hljs-built_in,
+.code-source .hljs-symbol {
+  color: var(--syntax-variable);
+}
+
+.code-source .hljs-comment,
+.code-source .hljs-code,
+.code-source .hljs-formula {
+  color: var(--syntax-comment);
+}
+
+.code-source .hljs-name,
+.code-source .hljs-quote,
+.code-source .hljs-selector-tag,
+.code-source .hljs-selector-pseudo {
+  color: var(--syntax-tag);
+}
+
+.code-source .hljs-subst,
+.code-source .hljs-emphasis,
+.code-source .hljs-strong {
+  color: var(--syntax-text);
+}
+
+.code-source .hljs-section {
+  color: var(--syntax-heading);
+}
+
+.code-source .hljs-bullet {
+  color: var(--syntax-list);
+}
+
+.code-source .hljs-addition {
+  color: var(--syntax-addition-text);
+  background-color: var(--syntax-addition-bg);
+}
+
+.code-source .hljs-deletion {
+  color: var(--syntax-deletion-text);
+  background-color: var(--syntax-deletion-bg);
 }
 
 .markdown-body > pre,

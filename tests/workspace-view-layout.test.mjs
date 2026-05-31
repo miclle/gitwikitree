@@ -483,6 +483,21 @@ test('dark appearance uses theme variables for shell chrome and settings control
   )
   assert.match(
     css,
+    /--syntax-text:[\s\S]*--syntax-keyword:[\s\S]*--syntax-entity:[\s\S]*--syntax-constant:[\s\S]*--syntax-string:[\s\S]*--syntax-comment:/,
+    'syntax-highlighted code previews should use theme variables'
+  )
+  assert.match(
+    css,
+    /\.code-source \.hljs\s*\{[^}]*color:\s*var\(--syntax-text\);[^}]*background:\s*transparent;/,
+    'code preview syntax roots should not inherit the light highlight.js background'
+  )
+  assert.match(
+    css,
+    /:root\[data-app-appearance='dark'\]\s*\{[\s\S]*--syntax-text:\s*#c9d1d9;[\s\S]*--syntax-keyword:\s*#ff7b72;[\s\S]*--syntax-string:\s*#a5d6ff;/,
+    'dark mode should provide readable highlight.js token colors for code previews'
+  )
+  assert.match(
+    css,
     /--table-bg:[\s\S]*--table-header-bg:[\s\S]*--table-row-alt-bg:[\s\S]*--table-border:[\s\S]*--table-text:/,
     'markdown table surfaces should use theme variables'
   )
