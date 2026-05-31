@@ -1,11 +1,23 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { loadSingleTranspiledModule } from './helpers/transpile-modules.mjs'
+import { loadSingleTranspiledModule, loadTranspiledModule } from './helpers/transpile-modules.mjs'
 
 async function loadAppNavigation() {
   const { module } = await loadSingleTranspiledModule('src/renderer/src/app-navigation.ts')
   return module
+}
+
+async function loadWorkspaceNavigation() {
+  const { module, tempDir } = await loadTranspiledModule({
+    entry: 'src/renderer/src/workspace-navigation.ts',
+    modules: [
+      'src/renderer/src/workspace-navigation.ts',
+      'src/renderer/src/app-navigation.ts',
+      'src/shared/types.ts'
+    ]
+  })
+  return { module, tempDir }
 }
 
 test('navigateFileTabs replaces the active tab for ordinary navigation and records history', async () => {
@@ -92,4 +104,71 @@ test('moveActiveTabHistory navigates backward and forward within the active tab'
   const forward = moveActiveTabHistory(back.tabs, 'tab-readme', 1)
   assert.deepEqual(forward.target, { path: 'docs/guide.md', name: 'guide.md' })
   assert.equal(forward.tabs[0].historyIndex, 1)
+})
+
+test('createWorkspaceNavigationPatch keeps tab and selected-file state together', async () => {
+  const { module } = await loadWorkspaceNavigation()
+  const initialTabs = [
+    {
+      id: 'tab-readme',
+      path: 'README.md',
+      name: 'README.md',
+      type: 'file',
+      history: [{ path: 'README.md', name: 'README.md', type: 'file' }],
+      historyIndex: 0
+    }
+  ]
+
+  const next = module.createWorkspaceNavigationPatch({
+    openFileTabs: initialTabs,
+    activeFileTabId: 'tab-readme',
+    target: { path: 'docs', name: 'docs', type: 'directory' },
+    openInNewTab: false,
+    nextTabId: 'tab-docs'
+  })
+
+  assert.equal(next.selectedPath, 'docs')
+  assert.equal(next.activeFilePath, undefined)
+  assert.equal(next.activeFileTabId, 'tab-readme')
+  assert.deepEqual(
+    next.openFileTabs[0].history.map((item) => item.path),
+    ['README.md', 'docs']
+  )
+})
+
+test('createCloseFileTabPatch selects the adjacent tab when closing the active tab', async () => {
+  const { module } = await loadWorkspaceNavigation()
+  const tabs = [
+    {
+      id: 'tab-readme',
+      path: 'README.md',
+      name: 'README.md',
+      type: 'file',
+      history: [{ path: 'README.md', name: 'README.md', type: 'file' }],
+      historyIndex: 0
+    },
+    {
+      id: 'tab-docs',
+      path: 'docs',
+      name: 'docs',
+      type: 'directory',
+      history: [{ path: 'docs', name: 'docs', type: 'directory' }],
+      historyIndex: 0
+    }
+  ]
+
+  const next = module.createCloseFileTabPatch({
+    openFileTabs: tabs,
+    activeFileTabId: 'tab-readme',
+    closingTabId: 'tab-readme'
+  })
+
+  assert.equal(next.selectedPath, 'docs')
+  assert.equal(next.activeFilePath, undefined)
+  assert.equal(next.activeFileTabId, 'tab-docs')
+  assert.equal(next.previewPath, 'docs')
+  assert.deepEqual(
+    next.openFileTabs.map((tab) => tab.id),
+    ['tab-docs']
+  )
 })

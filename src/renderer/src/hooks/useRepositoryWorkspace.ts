@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  canMoveTabHistory,
-  createFileTab,
-  moveActiveTabHistory,
-  navigateFileTabs,
-  type OpenFileTab
-} from '../app-navigation'
+import { canMoveTabHistory, type OpenFileTab } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
 import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
 import { usePendingMarkdownAnchor } from './usePendingMarkdownAnchor'
@@ -16,6 +10,14 @@ import { useTabPopover } from './useTabPopover'
 import { useWorkspaceSettings } from './useWorkspaceSettings'
 import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
+import {
+  createCloseFileTabPatch,
+  createHistoryNavigationPatch,
+  createResetNavigationPatch,
+  createSingleFileTabPatch,
+  createWorkspaceNavigationPatch,
+  type WorkspaceNavigationPatch
+} from '../workspace-navigation'
 import type {
   GitLastChange,
   NavigationTarget,
@@ -269,6 +271,13 @@ export function useRepositoryWorkspace(): {
     setDraftModifiedAt(undefined)
   }, [])
 
+  const applyNavigationPatch = useCallback((patch: WorkspaceNavigationPatch): void => {
+    setSelectedPath(patch.selectedPath)
+    setActiveFilePath(patch.activeFilePath)
+    setActiveFileTabId(patch.activeFileTabId)
+    setOpenFileTabs(patch.openFileTabs)
+  }, [])
+
   const confirmDiscardEditing = useCallback((): boolean => {
     if (!hasUnsavedChanges) return true
 
@@ -360,11 +369,8 @@ export function useRepositoryWorkspace(): {
 
       setRepository(nextRepository)
       resetRepositoryLayout()
-      setSelectedPath('')
       setExpandedPaths(defaultExpanded)
-      setOpenFileTabs([])
-      setActiveFilePath(undefined)
-      setActiveFileTabId(undefined)
+      applyNavigationPatch(createResetNavigationPatch())
       await loadPreview('', nextRepository)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -372,6 +378,7 @@ export function useRepositoryWorkspace(): {
       setLoading(false)
     }
   }, [
+    applyNavigationPatch,
     discardEditingIfAllowed,
     loadPreview,
     resetRepositoryLayout,
@@ -411,11 +418,8 @@ export function useRepositoryWorkspace(): {
 
         setRepository(nextRepository)
         resetRepositoryLayout()
-        setSelectedPath('')
         setExpandedPaths(defaultExpanded)
-        setOpenFileTabs([])
-        setActiveFilePath(undefined)
-        setActiveFileTabId(undefined)
+        applyNavigationPatch(createResetNavigationPatch())
         await loadPreview('', nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -424,6 +428,7 @@ export function useRepositoryWorkspace(): {
       }
     },
     [
+      applyNavigationPatch,
       discardEditingIfAllowed,
       loadPreview,
       resetRepositoryLayout,
@@ -473,20 +478,23 @@ export function useRepositoryWorkspace(): {
 
         if (resolved) {
           const { target } = resolved
-          setSelectedPath(target.path)
-          setActiveFilePath(target.type === 'directory' ? undefined : target.path)
-          const tab = createFileTab(target, createNextTabId())
-          setActiveFileTabId(tab.id)
-          setOpenFileTabs((current) =>
-            repository?.path === nextRepository.path
-              ? [...current.filter((item) => item.path !== target.path), tab]
-              : [tab]
-          )
+          const patch = createSingleFileTabPatch(target, createNextTabId())
+          applyNavigationPatch({
+            ...patch,
+            openFileTabs:
+              repository?.path === nextRepository.path
+                ? [
+                    ...openFileTabs.filter((item) => item.path !== target.path),
+                    ...patch.openFileTabs
+                  ]
+                : patch.openFileTabs
+          })
           await loadPreview(target.path, nextRepository)
         } else {
-          setSelectedPath('')
-          setActiveFilePath(undefined)
-          setActiveFileTabId(undefined)
+          applyNavigationPatch({
+            ...createResetNavigationPatch(),
+            openFileTabs: repository?.path === nextRepository.path ? openFileTabs : []
+          })
           await loadPreview('', nextRepository)
           setError(`${fileNameFromPath(filePath)} is no longer available in this repository.`)
         }
@@ -496,7 +504,15 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview, repository?.path, setError]
+    [
+      applyNavigationPatch,
+      createNextTabId,
+      discardEditingIfAllowed,
+      loadPreview,
+      openFileTabs,
+      repository,
+      setError
+    ]
   )
 
   const openTreeItem = useCallback(
@@ -514,10 +530,7 @@ export function useRepositoryWorkspace(): {
         setExpandedPaths(new Set(['', ...parentPaths(item.path)]))
 
         if (!resolved) {
-          setSelectedPath('')
-          setActiveFilePath(undefined)
-          setActiveFileTabId(undefined)
-          setOpenFileTabs([])
+          applyNavigationPatch(createResetNavigationPatch())
           await loadPreview('', nextRepository)
           setError(`${fileNameFromPath(item.path)} is no longer available in this repository.`)
           return
@@ -527,11 +540,7 @@ export function useRepositoryWorkspace(): {
         if (item.anchor) {
           queuePendingMarkdownAnchor(target.path, item.anchor)
         }
-        setSelectedPath(target.path)
-        setActiveFilePath(target.type === 'directory' ? undefined : target.path)
-        const tab = createFileTab(target, createNextTabId())
-        setActiveFileTabId(tab.id)
-        setOpenFileTabs([tab])
+        applyNavigationPatch(createSingleFileTabPatch(target, createNextTabId()))
         await loadPreview(target.path, nextRepository)
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -539,7 +548,14 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview, queuePendingMarkdownAnchor, setError]
+    [
+      applyNavigationPatch,
+      createNextTabId,
+      discardEditingIfAllowed,
+      loadPreview,
+      queuePendingMarkdownAnchor,
+      setError
+    ]
   )
 
   useRepositoryLaunchIntents({
@@ -565,19 +581,18 @@ export function useRepositoryWorkspace(): {
     async (node: TreeNode, options: { openInNewTab?: boolean } = {}): Promise<void> => {
       if (!isEditingTargetPath(node.path) && !discardEditingIfAllowed()) return
 
-      setSelectedPath(node.path)
-
-      if (node.type === 'directory') {
-        setActiveFilePath(undefined)
-        const result = navigateFileTabs({
-          tabs: openFileTabs,
-          activeTabId: activeFileTabId,
-          target: { path: node.path, name: node.name, type: 'directory' },
+      const target = { path: node.path, name: node.name, type: node.type }
+      applyNavigationPatch(
+        createWorkspaceNavigationPatch({
+          openFileTabs,
+          activeFileTabId,
+          target,
           openInNewTab: Boolean(options.openInNewTab),
           nextTabId: createNextTabId()
         })
-        setOpenFileTabs(result.tabs)
-        setActiveFileTabId(result.activeTabId)
+      )
+
+      if (node.type === 'directory') {
         if (node.children?.length) {
           setExpandedPaths((current) => {
             if (current.has(node.path)) return current
@@ -587,23 +602,13 @@ export function useRepositoryWorkspace(): {
             return next
           })
         }
-      } else {
-        setActiveFilePath(node.path)
-        const result = navigateFileTabs({
-          tabs: openFileTabs,
-          activeTabId: activeFileTabId,
-          target: { path: node.path, name: node.name, type: 'file' },
-          openInNewTab: Boolean(options.openInNewTab),
-          nextTabId: createNextTabId()
-        })
-        setOpenFileTabs(result.tabs)
-        setActiveFileTabId(result.activeTabId)
       }
 
       await loadPreview(node.path)
     },
     [
       activeFileTabId,
+      applyNavigationPatch,
       createNextTabId,
       discardEditingIfAllowed,
       isEditingTargetPath,
@@ -674,27 +679,22 @@ export function useRepositoryWorkspace(): {
       const closingTab = openFileTabs.find((tab) => tab.id === id)
       if (closingTab && isEditingTargetPath(closingTab.path) && !discardEditingIfAllowed()) return
 
-      const tabIndex = openFileTabs.findIndex((tab) => tab.id === id)
-      const nextTabs = openFileTabs.filter((tab) => tab.id !== id)
-
-      setOpenFileTabs(nextTabs)
-
-      if (activeFileTabId !== id) return
-
-      const nextTab = nextTabs[Math.min(tabIndex, nextTabs.length - 1)]
-      if (nextTab) {
-        setActiveFileTabId(nextTab.id)
-        setActiveFilePath(nextTab.type === 'directory' ? undefined : nextTab.path)
-        setSelectedPath(nextTab.path)
-        void loadPreview(nextTab.path)
-      } else {
-        setActiveFileTabId(undefined)
-        setActiveFilePath(undefined)
-        setSelectedPath('')
-        void loadPreview('')
-      }
+      const patch = createCloseFileTabPatch({
+        openFileTabs,
+        activeFileTabId,
+        closingTabId: id
+      })
+      applyNavigationPatch(patch)
+      if (activeFileTabId === id) void loadPreview(patch.previewPath)
     },
-    [activeFileTabId, discardEditingIfAllowed, isEditingTargetPath, loadPreview, openFileTabs]
+    [
+      activeFileTabId,
+      applyNavigationPatch,
+      discardEditingIfAllowed,
+      isEditingTargetPath,
+      loadPreview,
+      openFileTabs
+    ]
   )
 
   const closeCurrentTabOrWindow = useCallback((): void => {
@@ -713,16 +713,21 @@ export function useRepositoryWorkspace(): {
 
   const navigateActiveTabHistory = useCallback(
     async (delta: -1 | 1): Promise<void> => {
-      const result = moveActiveTabHistory(openFileTabs, activeFileTabId, delta)
-      if (!result.target) return
-      if (!isEditingTargetPath(result.target.path) && !discardEditingIfAllowed()) return
+      const patch = createHistoryNavigationPatch(openFileTabs, activeFileTabId, delta)
+      if (!patch?.target) return
+      if (!isEditingTargetPath(patch.target.path) && !discardEditingIfAllowed()) return
 
-      setOpenFileTabs(result.tabs)
-      setActiveFilePath(result.target.type === 'directory' ? undefined : result.target.path)
-      setSelectedPath(result.target.path)
-      await loadPreview(result.target.path)
+      applyNavigationPatch(patch)
+      await loadPreview(patch.target.path)
     },
-    [activeFileTabId, discardEditingIfAllowed, isEditingTargetPath, loadPreview, openFileTabs]
+    [
+      activeFileTabId,
+      applyNavigationPatch,
+      discardEditingIfAllowed,
+      isEditingTargetPath,
+      loadPreview,
+      openFileTabs
+    ]
   )
 
   useEffect(() => {
@@ -732,14 +737,11 @@ export function useRepositoryWorkspace(): {
   const replaceRepositoryWorkspace = useCallback(
     async (nextRepository: RepositoryPayload): Promise<void> => {
       setRepository(nextRepository)
-      setSelectedPath('')
       setExpandedPaths(defaultExpanded)
-      setOpenFileTabs([])
-      setActiveFilePath(undefined)
-      setActiveFileTabId(undefined)
+      applyNavigationPatch(createResetNavigationPatch())
       await loadPreview('', nextRepository)
     },
-    [loadPreview]
+    [applyNavigationPatch, loadPreview]
   )
 
   const checkoutBranch = useCallback(
@@ -789,20 +791,19 @@ export function useRepositoryWorkspace(): {
     const resolved = resolveRepositoryNavigationTarget(repository, '')
     if (!resolved) return
 
-    setSelectedPath(resolved.target.path)
-    setActiveFilePath(undefined)
-    const result = navigateFileTabs({
-      tabs: openFileTabs,
-      activeTabId: activeFileTabId,
-      target: resolved.target,
-      openInNewTab: false,
-      nextTabId: createNextTabId()
-    })
-    setOpenFileTabs(result.tabs)
-    setActiveFileTabId(result.activeTabId)
+    applyNavigationPatch(
+      createWorkspaceNavigationPatch({
+        openFileTabs,
+        activeFileTabId,
+        target: resolved.target,
+        openInNewTab: false,
+        nextTabId: createNextTabId()
+      })
+    )
     void loadPreview(resolved.target.path)
   }, [
     activeFileTabId,
+    applyNavigationPatch,
     createNextTabId,
     discardEditingIfAllowed,
     isEditingTargetPath,
@@ -824,21 +825,20 @@ export function useRepositoryWorkspace(): {
 
       if (!resolved) return
 
-      setSelectedPath(resolved.target.path)
-      setActiveFilePath(undefined)
-      const result = navigateFileTabs({
-        tabs: openFileTabs,
-        activeTabId: activeFileTabId,
-        target: resolved.target,
-        openInNewTab: false,
-        nextTabId: createNextTabId()
-      })
-      setOpenFileTabs(result.tabs)
-      setActiveFileTabId(result.activeTabId)
+      applyNavigationPatch(
+        createWorkspaceNavigationPatch({
+          openFileTabs,
+          activeFileTabId,
+          target: resolved.target,
+          openInNewTab: false,
+          nextTabId: createNextTabId()
+        })
+      )
       void loadPreview(resolved.target.path)
     },
     [
       activeFileTabId,
+      applyNavigationPatch,
       createNextTabId,
       discardEditingIfAllowed,
       handleSelect,
@@ -872,17 +872,15 @@ export function useRepositoryWorkspace(): {
         setExpandedPaths(
           (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
         )
-        setSelectedPath(resolved.target.path)
-        setActiveFilePath(undefined)
-        const result = navigateFileTabs({
-          tabs: openFileTabs,
-          activeTabId: activeFileTabId,
-          target: resolved.target,
-          openInNewTab,
-          nextTabId: createNextTabId()
-        })
-        setOpenFileTabs(result.tabs)
-        setActiveFileTabId(result.activeTabId)
+        applyNavigationPatch(
+          createWorkspaceNavigationPatch({
+            openFileTabs,
+            activeFileTabId,
+            target: resolved.target,
+            openInNewTab,
+            nextTabId: createNextTabId()
+          })
+        )
         void loadPreview(resolved.target.path)
         return true
       }
@@ -892,6 +890,7 @@ export function useRepositoryWorkspace(): {
     },
     [
       activeFileTabId,
+      applyNavigationPatch,
       createNextTabId,
       discardEditingIfAllowed,
       handleSelect,
