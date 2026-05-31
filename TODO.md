@@ -11,9 +11,11 @@ Current implementation:
 - The app menu exposes `Settings...` with `Command/Ctrl+,`; macOS places it in
   the app menu, and other platforms expose it from the Edit menu.
 - The renderer includes a settings dialog that immediately applies appearance,
-  homepage file candidates, preview font family/size, editor font family/size,
-  and editor indentation style/size as each control changes.
+  app language, homepage file candidates, preview font family/size, editor font
+  family/size, and editor indentation style/size as each control changes.
 - Appearance supports light, dark, and system modes.
+- App language supports English and Simplified Chinese across renderer labels,
+  Electron menus, context menus, and status-bar formatting.
 - Directory homepage candidates default to `README.md`, `README.markdown`,
   `index.md`, and `_index.md`, and the configured order is used when building
   repository trees and directory previews.
@@ -32,6 +34,8 @@ Known limitations:
 - Search excludes and file-size limits are not configurable yet.
 - Font selection is limited to built-in families rather than arbitrary installed
   fonts.
+- Localization is limited to English and Simplified Chinese, and new UI strings
+  must still be added to both dictionaries manually.
 - Settings import/export and reset-to-default actions are not implemented yet.
 - The settings dialog is a single modal surface; there is no dedicated settings
   window or per-section navigation yet.
@@ -44,6 +48,95 @@ Future direction:
   save-state feedback.
 - Add reset controls for individual settings sections.
 - Consider import/export once settings include repository-specific overrides.
+
+## File Editing and Preview Workflow
+
+Current implementation:
+
+- Editable previews are derived from file previews and directory index previews,
+  so README/index-style directory pages can be edited through the same editor as
+  normal files.
+- Text-like preview content can be edited with CodeMirror. Markdown, JavaScript,
+  TypeScript, HTML, CSS, and JSON use language-aware editing through CodeMirror
+  packages, while plain text remains editable without a language package.
+- File views support preview, code, and split modes. Split mode is available for
+  editable Markdown-like content and includes a keyboard-accessible resizer
+  between editor and preview panes.
+- Markdown editing uses a document-oriented syntax highlight style while the
+  live preview renders the current draft.
+- Save flows call `repository:save-file` with the current workspace context and
+  an expected modified timestamp, then refresh the repository tree and preview.
+- The main process rejects stale saves when the file changed on disk after the
+  preview was loaded.
+- Unsaved editor state is marked in the active tab, breadcrumb, and file tree.
+  Git-modified files are marked separately in the tree when there is no unsaved
+  editor draft for that path.
+- The app menu exposes Save with `Command/Ctrl+S` and routes the command to the
+  active editable file.
+
+Known limitations:
+
+- Only existing text-like files and directory index files can be edited; creating
+  new files, renaming files, deleting files, and moving files are not implemented.
+- Autosave is not implemented and save conflict handling is limited to rejecting
+  stale writes with an error.
+- Editor state is local to the active workspace session; unsaved drafts are not
+  persisted across app restarts.
+- CodeMirror language coverage is intentionally small and does not yet include
+  every previewable text format.
+- Directory listing previews are read-only unless the directory has an editable
+  index/homepage file.
+
+Future direction:
+
+- Add explicit file creation, rename, delete, and move commands with repository
+  boundary checks and clear Git status feedback.
+- Add a richer save-conflict flow with reload, compare, and overwrite choices.
+- Persist recoverable unsaved drafts once conflict handling is robust enough.
+- Expand editor language support based on real repository usage.
+- Add find-and-replace inside the editor after current-tab preview search and
+  global repository search remain stable.
+
+## Localization and Status Metadata
+
+Current implementation:
+
+- The renderer uses i18next with English and Simplified Chinese dictionaries,
+  and tests assert that supported languages expose the same translation keys.
+- Electron app menus, tree context menus, Markdown-link context menus, and
+  browser context menus are translated from the same language setting.
+- The status bar shows active ref, workspace source, active path, preview type,
+  directory item counts, text word/line counts, PDF page counts, file size,
+  encoding, modified time, and latest Git author metadata when available.
+- While editing, the status bar switches to editor facts such as cursor line and
+  column, selection counts, character count, indentation style/size, encoding,
+  and file change metadata.
+- Repository loading annotates modified tracked files in the tree, and preview
+  loading attaches filesystem modification timestamps plus latest Git change
+  metadata.
+
+Known limitations:
+
+- Localization is a static in-repo dictionary; there is no external translation
+  extraction, coverage report, or runtime language pack loading.
+- Git status decoration currently focuses on modified tracked files. Added,
+  deleted, renamed, conflicted, ignored, and untracked states are not represented
+  in the tree.
+- The status bar is informational only; it does not yet expose commands such as
+  opening Git history, viewing diffs, or changing indentation from the status
+  indicators.
+- Latest-change metadata comes from `git log -1` per preview path and is not
+  cached as a repository-wide blame/history index.
+
+Future direction:
+
+- Add a lightweight translation maintenance workflow that catches missing keys
+  before runtime.
+- Expand Git status modeling beyond modified tracked files.
+- Connect status-bar Git metadata to diff/history actions once those workflows
+  exist.
+- Cache or batch Git metadata reads if status display becomes a bottleneck in
+  large repositories.
 
 ## Optimize Global Search
 

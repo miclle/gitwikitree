@@ -13,12 +13,14 @@
 - Put complex state in hooks or pure functions; components should compose UI and events.
 - Local JSX handlers are acceptable, but frequently rendered large lists need stable keys and care around unnecessary recomputation.
 - Icon buttons must provide accessible names. Form controls should use labels or `aria-label`.
+- User-facing renderer strings should go through `src/renderer/src/i18n.ts`. Add or update every supported language together, and keep menu/context-menu translation helpers aligned when the same concept appears outside React.
 
 ## State and Persistence
 
 - Treat `SessionState` and `ProjectSessionState` as the source of truth for session state. Do not add parallel implicit storage without a clear reason.
 - Preserve `rootPath`, `activeRef`, and `source` when saving window state, opening tabs, recording recent files, and handling repository sources.
 - Prevent stale async requests from overwriting newer state. Use the existing loading/error patterns where appropriate.
+- Editing state should keep dirty indicators, save commands, preview refreshes, and status-bar metadata in sync with the active file or editable directory index.
 
 ## Styling
 

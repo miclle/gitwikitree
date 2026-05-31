@@ -13,6 +13,8 @@ npm run build
 - TypeScript or IPC contract changes should run at least `npm run typecheck`.
 - Pure logic, path handling, session, menu, or preview behavior changes should run `npm test`; when useful, run a focused `node --test tests/<name>.test.mjs`.
 - UI/CSS changes should run at least `npm run lint`; high-risk layout changes should start `npm run dev` and check the main flow.
+- Settings or localization changes should include the matching settings, i18n, menu, and context-menu tests where relevant.
+- Editing or save-flow changes should check stale-write protection, dirty indicators, editable directory index previews, status-bar metadata, and menu-driven save behavior.
 
 ## Test Patterns
 

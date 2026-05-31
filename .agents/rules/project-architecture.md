@@ -22,11 +22,12 @@ Git/repository svc    event subscriptions/IPC       interactions/state hooks
 - Opening repositories, switching local branches, opening worktrees, opening recent files, and restoring window state can all affect `repoPath`, `rootPath`, `activeRef`, and `source`.
 - File tabs store `history` and `historyIndex`; when changing open/close/navigation logic, verify back, forward, and menu-driven close-current-tab-or-window behavior.
 - Directory previews prefer README/index-style files. Breadcrumbs and Markdown internal links must preserve the same path/ref/source context.
+- Directory index previews can be editable. When changing editing, saving, or preview refresh behavior, check both direct file previews and directory README/index previews.
 
 ## File and Preview Safety
 
 - Re-validate every repository-relative path received from the renderer on the main side. Do not trust UI state.
 - Preview reads must stay inside the selected repository or worktree root. Reject escape paths such as `../`.
 - The primary workspace should be a local working tree or worktree. Git should be used for explicit version-control actions such as branch checkout, worktree creation, sync, and commit flows.
-- Preview and search should read local workspace files. Do not reintroduce Git object reads for primary workspace content.
+- Preview and search should read local workspace files. Save flows should write only inside the selected workspace and use stale-write protection. Do not reintroduce Git object reads for primary workspace content.
 - Open external URLs through `shell.openExternal`; handle Markdown internal links through the app's own context menu and open logic.

@@ -5,24 +5,43 @@ React, and TypeScript. It opens local Git repositories, presents the repository
 as a navigable file tree, and gives Markdown-heavy projects a fast preview
 surface with branch, worktree, tab, and session-aware navigation.
 
+## Current Status
+
+The app is an active local-first desktop workspace rather than a Git history
+browser. Repository trees, previews, search, editing, branch switching, and
+worktree workflows operate on local working tree files with explicit Git
+actions where needed. The current codebase has 36 Node.js test suites covering
+main-process repository services, IPC contracts, renderer workspace behavior,
+preview helpers, settings, session restoration, menus, and status metadata.
+
 ## Features
 
 - Open local Git repositories from the app UI, menu, or startup path.
 - Build the repository tree from local workspace files while ignoring Git
   internals, `.worktrees`, and dependency directories.
 - Preview directories through README/index files or compact directory listings.
-- Preview Markdown, HTML, SVG, common image formats, and text-like files.
+- Preview Markdown, HTML, SVG, PDF, common image formats, and text-like files.
 - Search and preview workspace content from local files rather than Git object
   snapshots.
 - Render Markdown with GitHub-flavored Markdown, syntax highlighting, heading
-  anchors, copy-code buttons, and intercepted repository links.
+  anchors, copy-code buttons, Mermaid diagrams, local image assets, and
+  intercepted repository links.
+- Open image previews in an in-app lightbox with keyboard navigation and zoom.
+- Edit text-like files and directory index files with CodeMirror, stale-write
+  protection, preview/code/split modes, resizable editor panes, and dirty
+  indicators in tabs, breadcrumbs, and the file tree.
 - Choose a branch action explicitly: switch the current local workspace, or open
   the selected branch as an editable worktree under `.worktrees`.
 - Keep multiple file and directory tabs, including per-tab back/forward history.
 - Persist project sessions, expanded paths, active tabs, recent repositories,
   recent files, and window bounds.
+- Configure appearance, app language, homepage file candidates, preview
+  typography, editor typography, and editor indentation.
+- Show workspace, branch, path, file facts, editor cursor/selection facts,
+  modified timestamps, and latest Git author metadata in the status bar.
 - Provide Electron menus and context menus for repository files, Markdown links,
   browser content, recent items, and tab/window closing.
+- Localize the renderer UI and menus in English and Simplified Chinese.
 - Share IPC payload types across main, preload, and renderer layers to keep the
   desktop contract explicit.
 
