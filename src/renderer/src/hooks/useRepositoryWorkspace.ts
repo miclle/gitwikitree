@@ -12,6 +12,7 @@ import { useWorkspaceSettings } from './useWorkspaceSettings'
 import { getRepositoryLabel } from '../repository-label'
 import { fileNameFromPath, parentPaths } from '../workspace-paths'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
+import { createPreviewPathNavigation } from '../workspace-preview-navigation'
 import { createRestoredRepositorySession } from '../workspace-session-restore'
 import {
   createCloseFileTabPatch,
@@ -668,19 +669,19 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     if (!repository) return
     if (!isEditingTargetPath('') && !discardEditingIfAllowed()) return
 
-    const resolved = resolveRepositoryNavigationTarget(repository, '')
-    if (!resolved) return
+    const navigation = createPreviewPathNavigation({
+      repository,
+      path: '',
+      openInNewTab: false,
+      activeFileTabId,
+      openFileTabs,
+      nextTabId: createNextTabId(),
+      expandAncestors: false
+    })
+    if (navigation.kind !== 'patch') return
 
-    applyNavigationPatch(
-      createWorkspaceNavigationPatch({
-        openFileTabs,
-        activeFileTabId,
-        target: resolved.target,
-        openInNewTab: false,
-        nextTabId: createNextTabId()
-      })
-    )
-    void loadPreview(resolved.target.path)
+    applyNavigationPatch(navigation.patch)
+    void loadPreview(navigation.previewPath)
   }, [
     activeFileTabId,
     applyNavigationPatch,
@@ -697,24 +698,24 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
       if (!repository) return
       if (!isEditingTargetPath(path) && !discardEditingIfAllowed()) return
 
-      const resolved = resolveRepositoryNavigationTarget(repository, path)
-      if (resolved?.node) {
-        void handleSelect(resolved.node)
+      const navigation = createPreviewPathNavigation({
+        repository,
+        path,
+        openInNewTab: false,
+        activeFileTabId,
+        openFileTabs,
+        nextTabId: createNextTabId(),
+        expandAncestors: false
+      })
+      if (navigation.kind === 'node') {
+        void handleSelect(navigation.node)
         return
       }
 
-      if (!resolved) return
+      if (navigation.kind !== 'patch') return
 
-      applyNavigationPatch(
-        createWorkspaceNavigationPatch({
-          openFileTabs,
-          activeFileTabId,
-          target: resolved.target,
-          openInNewTab: false,
-          nextTabId: createNextTabId()
-        })
-      )
-      void loadPreview(resolved.target.path)
+      applyNavigationPatch(navigation.patch)
+      void loadPreview(navigation.previewPath)
     },
     [
       activeFileTabId,
@@ -733,35 +734,33 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     (path: string, openInNewTab = false, hash?: string): boolean => {
       if (!isEditingTargetPath(path) && !discardEditingIfAllowed()) return false
 
-      const resolved = repository ? resolveRepositoryNavigationTarget(repository, path) : undefined
-      if (resolved?.node) {
+      if (!repository) return false
+
+      const navigation = createPreviewPathNavigation({
+        repository,
+        path,
+        openInNewTab,
+        activeFileTabId,
+        openFileTabs,
+        nextTabId: createNextTabId(),
+        expandAncestors: true
+      })
+      if (navigation.kind === 'node') {
         if (hash) {
-          queuePendingMarkdownAnchor(resolved.target.path, hash)
+          queuePendingMarkdownAnchor(navigation.node.path, hash)
         }
-        setExpandedPaths(
-          (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
-        )
-        void handleSelect(resolved.node, { openInNewTab })
+        setExpandedPaths((current) => new Set([...current, ...(navigation.expandedPaths ?? [])]))
+        void handleSelect(navigation.node, { openInNewTab })
         return true
       }
 
-      if (resolved) {
+      if (navigation.kind === 'patch') {
         if (hash) {
-          queuePendingMarkdownAnchor(resolved.target.path, hash)
+          queuePendingMarkdownAnchor(navigation.previewPath, hash)
         }
-        setExpandedPaths(
-          (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
-        )
-        applyNavigationPatch(
-          createWorkspaceNavigationPatch({
-            openFileTabs,
-            activeFileTabId,
-            target: resolved.target,
-            openInNewTab,
-            nextTabId: createNextTabId()
-          })
-        )
-        void loadPreview(resolved.target.path)
+        setExpandedPaths((current) => new Set([...current, ...(navigation.expandedPaths ?? [])]))
+        applyNavigationPatch(navigation.patch)
+        void loadPreview(navigation.previewPath)
         return true
       }
 

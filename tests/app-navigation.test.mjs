@@ -33,6 +33,21 @@ async function loadWorkspaceSessionRestore() {
   return { module, tempDir }
 }
 
+async function loadWorkspacePreviewNavigation() {
+  const { module, tempDir } = await loadTranspiledModule({
+    entry: 'src/renderer/src/workspace-preview-navigation.ts',
+    modules: [
+      'src/renderer/src/workspace-preview-navigation.ts',
+      'src/renderer/src/workspace-navigation.ts',
+      'src/renderer/src/workspace-paths.ts',
+      'src/renderer/src/repository-navigation.ts',
+      'src/renderer/src/app-navigation.ts',
+      'src/shared/types.ts'
+    ]
+  })
+  return { module, tempDir }
+}
+
 test('navigateFileTabs replaces the active tab for ordinary navigation and records history', async () => {
   const { navigateFileTabs } = await loadAppNavigation()
   const initialTabs = [
@@ -281,4 +296,78 @@ test('createRestoredRepositorySession resolves tabs and expands active ancestors
     ['README.md', 'docs/guide.md']
   )
   assert.deepEqual([...restored.expandedPaths], ['', 'docs'])
+})
+
+test('createPreviewPathNavigation resolves preview paths into tree or tab actions', async () => {
+  const { module } = await loadWorkspacePreviewNavigation()
+  const repository = {
+    name: 'wiki',
+    path: '/repo',
+    rootPath: '/repo',
+    branch: 'main',
+    activeRef: 'main',
+    source: 'working-tree',
+    editable: true,
+    refs: [],
+    tree: [
+      {
+        name: 'docs',
+        path: 'docs',
+        type: 'directory',
+        children: [{ name: 'guide.md', path: 'docs/guide.md', type: 'file' }]
+      }
+    ]
+  }
+  const openFileTabs = [
+    {
+      id: 'tab-readme',
+      path: 'README.md',
+      name: 'README.md',
+      type: 'file',
+      history: [{ path: 'README.md', name: 'README.md', type: 'file' }],
+      historyIndex: 0
+    }
+  ]
+
+  const fileNavigation = module.createPreviewPathNavigation({
+    repository,
+    path: 'docs/guide.md',
+    openInNewTab: true,
+    activeFileTabId: 'tab-readme',
+    openFileTabs,
+    nextTabId: 'tab-guide',
+    expandAncestors: true
+  })
+
+  assert.equal(fileNavigation.kind, 'node')
+  assert.equal(fileNavigation.node.path, 'docs/guide.md')
+  assert.deepEqual(fileNavigation.expandedPaths, ['', 'docs'])
+
+  const rootNavigation = module.createPreviewPathNavigation({
+    repository,
+    path: '',
+    openInNewTab: false,
+    activeFileTabId: 'tab-readme',
+    openFileTabs,
+    nextTabId: 'tab-root',
+    expandAncestors: false
+  })
+
+  assert.equal(rootNavigation.kind, 'patch')
+  assert.equal(rootNavigation.previewPath, '')
+  assert.equal(rootNavigation.patch.selectedPath, '')
+  assert.equal(rootNavigation.patch.activeFileTabId, 'tab-readme')
+
+  assert.deepEqual(
+    module.createPreviewPathNavigation({
+      repository,
+      path: 'missing.md',
+      openInNewTab: false,
+      activeFileTabId: 'tab-readme',
+      openFileTabs,
+      nextTabId: 'tab-missing',
+      expandAncestors: true
+    }),
+    { kind: 'missing' }
+  )
 })

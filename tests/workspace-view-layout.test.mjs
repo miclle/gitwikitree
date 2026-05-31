@@ -915,11 +915,20 @@ test('global repository search resets when the active branch changes', async () 
 })
 
 test('global repository search opens reveal the selected file in the tree', async () => {
-  const source = await readRepositoryWorkspaceHook()
+  const workspaceSource = await readRepositoryWorkspaceHook()
+  const navigationSource = await readFile(
+    new URL('../src/renderer/src/workspace-preview-navigation.ts', import.meta.url),
+    'utf8'
+  )
 
   assert.match(
-    source,
-    /selectPreviewPath[\s\S]*setExpandedPaths\([\s\S]*\(current\) => new Set\(\[\.\.\.current, '', \.\.\.parentPaths\(resolved\.target\.path\)\]\)[\s\S]*\)[\s\S]*handleSelect\(resolved\.node, \{ openInNewTab \}\)/,
+    navigationSource,
+    /expandedPathsForTarget[\s\S]*return expandAncestors \? \['', \.\.\.parentPaths\(path\)\] : undefined/,
+    'preview path navigation should calculate ancestor folders for selected paths'
+  )
+  assert.match(
+    workspaceSource,
+    /selectPreviewPath[\s\S]*setExpandedPaths\(\(current\) => new Set\(\[\.\.\.current, \.\.\.\(navigation\.expandedPaths \?\? \[\]\)\]\)\)[\s\S]*handleSelect\(navigation\.node, \{ openInNewTab \}\)/,
     'opening a search result should expand ancestor folders before selecting the matching file'
   )
 })
