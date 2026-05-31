@@ -1616,7 +1616,7 @@ kbd {
 
 .file-workspace.split {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(260px, var(--split-editor-width, 50%)) 8px minmax(260px, 1fr);
 }
 
 .file-editor-pane {
@@ -1630,12 +1630,47 @@ kbd {
 
 .file-workspace.split > .file-editor-pane {
   min-width: 0;
-  border-right: 1px solid var(--border-muted);
 }
 
-.file-workspace.split > .markdown-body {
+.file-preview-pane {
+  min-height: 0;
+}
+
+.file-workspace.split > .file-preview-pane {
   min-width: 0;
   overflow: auto;
+}
+
+.file-split-resizer {
+  position: relative;
+  min-width: 8px;
+  height: 100%;
+  border: 0;
+  border-inline: 1px solid transparent;
+  background: #f6f8fa;
+  cursor: col-resize;
+}
+
+.file-split-resizer::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-muted);
+  content: '';
+}
+
+.file-split-resizer:hover,
+.file-split-resizer:focus-visible {
+  border-color: rgba(9, 105, 218, 0.24);
+  background: #eef6ff;
+  outline: 0;
+}
+
+.file-split-resizer:hover::before,
+.file-split-resizer:focus-visible::before {
+  background: var(--accent);
 }
 
 @media (max-width: 820px) {
@@ -1647,6 +1682,10 @@ kbd {
   .file-workspace.split > .file-editor-pane {
     border-right: 0;
     border-bottom: 1px solid var(--border-muted);
+  }
+
+  .file-split-resizer {
+    display: none;
   }
 }
 

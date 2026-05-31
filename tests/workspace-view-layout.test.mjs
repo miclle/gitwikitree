@@ -285,13 +285,54 @@ test('file view modes expose preview, code, and split editing without discarding
   )
   assert.match(
     source,
-    /className=\{fileWorkspaceClassName\}[\s\S]*<FileEditor[\s\S]*<PreviewContent/,
+    /className=\{fileWorkspaceClassName\}[\s\S]*<FileEditor[\s\S]*className="file-preview-pane"[\s\S]*\{previewContentElement\}/,
     'split mode should show the editor and preview side by side'
   )
   assert.match(
     css,
-    /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*1fr\)\s*minmax\(260px,\s*1fr\);/,
+    /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*var\(--split-editor-width,\s*50%\)\)\s*8px\s*minmax\(260px,\s*1fr\);/,
     'split editing should keep both panes usable at desktop widths'
+  )
+})
+
+test('split editing lets users drag the editor and preview divider', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /const \[splitEditorPaneWidthPct, setSplitEditorPaneWidthPct\] = useState\(50\)/,
+    'split editing should remember the current editor pane width during the session'
+  )
+  assert.match(
+    source,
+    /const handleSplitResizerPointerDown = useCallback[\s\S]*setSplitEditorPaneWidthPct\(\(nextWidth \/ rect\.width\) \* 100\)[\s\S]*setPointerCapture\(event\.pointerId\)/,
+    'split divider dragging should calculate a clamped percentage from pointer movement'
+  )
+  assert.match(
+    source,
+    /const splitWorkspaceStyle =[\s\S]*'--split-editor-width': `\$\{splitEditorPaneWidthPct\}%`[\s\S]*as React\.CSSProperties[\s\S]*style=\{splitWorkspaceStyle\}/,
+    'the split workspace should expose the remembered width to CSS'
+  )
+  assert.match(
+    source,
+    /<div[\s\S]*aria-label="Resize editor and preview"[\s\S]*aria-orientation="vertical"[\s\S]*className="file-split-resizer"[\s\S]*role="separator"[\s\S]*onPointerDown=\{handleSplitResizerPointerDown\}/,
+    'split editing should render an accessible divider between the editor and preview'
+  )
+  assert.match(
+    source,
+    /aria-valuemax=\{100\}[\s\S]*aria-valuemin=\{0\}[\s\S]*aria-valuenow=\{Math\.round\(splitEditorPaneWidthPct\)\}[\s\S]*onKeyDown=\{handleSplitResizerKeyDown\}/,
+    'keyboard-focusable split dividers should expose their value and handle keyboard resizing'
+  )
+  assert.match(
+    source,
+    /const handleSplitResizerKeyDown = useCallback[\s\S]*event\.key === 'ArrowLeft'[\s\S]*event\.key === 'ArrowRight'[\s\S]*MIN_SPLIT_PANE_WIDTH[\s\S]*setSplitEditorPaneWidthPct\(\(currentWidth\) =>[\s\S]*Math\.min\([\s\S]*SPLIT_KEYBOARD_STEP[\s\S]*Math\.max\(/,
+    'split divider keyboard resizing should adjust the stored editor width while preserving pane minimums'
+  )
+  assert.match(
+    css,
+    /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*var\(--split-editor-width,\s*50%\)\)\s*8px\s*minmax\(260px,\s*1fr\);/,
+    'split editing should size panes with a draggable divider column and usable minimums'
   )
 })
 

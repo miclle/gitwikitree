@@ -30,6 +30,9 @@ import type { RepositoryRef } from '../../../shared/types'
 
 type FileViewMode = 'preview' | 'code' | 'split'
 
+const MIN_SPLIT_PANE_WIDTH = 260
+const SPLIT_KEYBOARD_STEP = 5
+
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
   const {
     repository,
@@ -100,6 +103,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const [branchPickerTab, setBranchPickerTab] = useState<'branches' | 'remotes'>('branches')
   const [branchQuery, setBranchQuery] = useState('')
   const [branchActionRef, setBranchActionRef] = useState<string | undefined>()
+  const [splitEditorPaneWidthPct, setSplitEditorPaneWidthPct] = useState(50)
   const selectedBranchAction = repository?.refs.find((ref) => ref.name === branchActionRef)
   const primaryWorkspaceBranch =
     repository?.refs.find((ref) => ref.type === 'local' && ref.worktreePath === repository.rootPath)
@@ -149,6 +153,12 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     editablePreviewTarget && isEditing ? applyDraftToPreview(preview, draftContent) : preview
   const fileWorkspaceClassName =
     effectiveFileViewMode === 'split' ? 'file-workspace split' : 'file-workspace'
+  const splitWorkspaceStyle =
+    effectiveFileViewMode === 'split'
+      ? ({
+          '--split-editor-width': `${splitEditorPaneWidthPct}%`
+        } as React.CSSProperties)
+      : undefined
   const editorPaneClassName =
     effectiveFileViewMode === 'split' ? 'file-editor-pane split' : 'file-editor-pane'
   const editorStatusWithFileMetadata =
@@ -216,6 +226,68 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
       path: editablePreviewTarget?.path
     })
   }
+  const handleSplitResizerPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      const workspaceElement = event.currentTarget.parentElement
+      if (!workspaceElement) return
+
+      event.preventDefault()
+
+      const resizerElement = event.currentTarget
+      const rect = workspaceElement.getBoundingClientRect()
+      const dividerWidth = resizerElement.getBoundingClientRect().width
+      const maxEditorWidth = rect.width - MIN_SPLIT_PANE_WIDTH - dividerWidth
+      if (rect.width <= 0 || maxEditorWidth < MIN_SPLIT_PANE_WIDTH) return
+
+      const updateSplitWidth = (clientX: number): void => {
+        const nextWidth = Math.min(
+          Math.max(clientX - rect.left, MIN_SPLIT_PANE_WIDTH),
+          maxEditorWidth
+        )
+
+        setSplitEditorPaneWidthPct((nextWidth / rect.width) * 100)
+      }
+      const handlePointerMove = (pointerEvent: PointerEvent): void => {
+        updateSplitWidth(pointerEvent.clientX)
+      }
+      const handlePointerUp = (pointerEvent: PointerEvent): void => {
+        resizerElement.releasePointerCapture(pointerEvent.pointerId)
+        resizerElement.removeEventListener('pointermove', handlePointerMove)
+        resizerElement.removeEventListener('pointerup', handlePointerUp)
+        resizerElement.removeEventListener('pointercancel', handlePointerUp)
+      }
+
+      updateSplitWidth(event.clientX)
+      resizerElement.setPointerCapture(event.pointerId)
+      resizerElement.addEventListener('pointermove', handlePointerMove)
+      resizerElement.addEventListener('pointerup', handlePointerUp)
+      resizerElement.addEventListener('pointercancel', handlePointerUp)
+    },
+    []
+  )
+  const handleSplitResizerKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>): void => {
+      const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+      if (direction === 0) return
+
+      event.preventDefault()
+
+      const workspaceElement = event.currentTarget.parentElement
+      const rectWidth = workspaceElement?.getBoundingClientRect().width ?? 0
+      const dividerWidth = event.currentTarget.getBoundingClientRect().width
+      const minWidthPct = rectWidth > 0 ? (MIN_SPLIT_PANE_WIDTH / rectWidth) * 100 : 0
+      const maxWidthPct =
+        rectWidth > 0 ? ((rectWidth - MIN_SPLIT_PANE_WIDTH - dividerWidth) / rectWidth) * 100 : 100
+
+      setSplitEditorPaneWidthPct((currentWidth) =>
+        Math.min(
+          Math.max(currentWidth + direction * SPLIT_KEYBOARD_STEP, minWidthPct),
+          Math.max(minWidthPct, maxWidthPct)
+        )
+      )
+    },
+    []
+  )
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
@@ -307,6 +379,20 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const closeBranchActionModal = (): void => {
     setBranchActionRef(undefined)
   }
+  const previewContentElement =
+    showsPreview && previewForDisplay ? (
+      <PreviewContent
+        pendingAnchor={pendingMarkdownAnchor}
+        preview={previewForDisplay}
+        searchQuery={appliedSearchQuery}
+        activeSearchIndex={activeSearchIndex}
+        onSearchMatchCountChange={handleSearchMatchCountChange}
+        onPdfPageCountChange={handlePdfPageCountChange}
+        onSelectPath={selectPreviewPath}
+        onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
+        onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+      />
+    ) : undefined
 
   const fileTabsNav = (
     <nav
@@ -742,7 +828,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   </div>
                 )}
                 {!previewLoading && preview && (
-                  <div className={fileWorkspaceClassName}>
+                  <div className={fileWorkspaceClassName} style={splitWorkspaceStyle}>
                     {isEditorMounted && editablePreviewTarget && (
                       <div className={editorPaneClassName} hidden={!showsEditor}>
                         <FileEditor
@@ -756,18 +842,24 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         />
                       </div>
                     )}
-                    {showsPreview && previewForDisplay && (
-                      <PreviewContent
-                        pendingAnchor={pendingMarkdownAnchor}
-                        preview={previewForDisplay}
-                        searchQuery={appliedSearchQuery}
-                        activeSearchIndex={activeSearchIndex}
-                        onSearchMatchCountChange={handleSearchMatchCountChange}
-                        onPdfPageCountChange={handlePdfPageCountChange}
-                        onSelectPath={selectPreviewPath}
-                        onOpenMarkdownLinkContextMenu={showMarkdownLinkContextMenu}
-                        onMarkdownAnchorHandled={clearPendingMarkdownAnchor}
+                    {effectiveFileViewMode === 'split' && showsEditor && showsPreview && (
+                      <div
+                        aria-label="Resize editor and preview"
+                        aria-orientation="vertical"
+                        aria-valuemax={100}
+                        aria-valuemin={0}
+                        aria-valuenow={Math.round(splitEditorPaneWidthPct)}
+                        className="file-split-resizer"
+                        role="separator"
+                        tabIndex={0}
+                        onKeyDown={handleSplitResizerKeyDown}
+                        onPointerDown={handleSplitResizerPointerDown}
                       />
+                    )}
+                    {effectiveFileViewMode === 'split' && previewContentElement ? (
+                      <div className="file-preview-pane">{previewContentElement}</div>
+                    ) : (
+                      previewContentElement
                     )}
                   </div>
                 )}
