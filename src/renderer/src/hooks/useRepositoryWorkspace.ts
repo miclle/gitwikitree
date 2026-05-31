@@ -8,6 +8,7 @@ import {
 } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
 import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
+import { usePendingMarkdownAnchor } from './usePendingMarkdownAnchor'
 import { useRepositoryLaunchIntents } from './useRepositoryLaunchIntents'
 import { useRepositoryPreviewLoader } from './useRepositoryPreviewLoader'
 import { useSessionPersistence } from './useSessionPersistence'
@@ -212,7 +213,6 @@ export function useRepositoryWorkspace(): {
   canNavigateForward: boolean
 } {
   const nextTabId = useRef(0)
-  const nextAnchorToken = useRef(0)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -225,9 +225,8 @@ export function useRepositoryWorkspace(): {
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
   const [activeFileTabId, setActiveFileTabId] = useState<string | undefined>()
-  const [pendingMarkdownAnchor, setPendingMarkdownAnchor] = useState<
-    { path: string; hash: string; token: number } | undefined
-  >()
+  const { pendingMarkdownAnchor, queuePendingMarkdownAnchor, clearPendingMarkdownAnchor } =
+    usePendingMarkdownAnchor()
   const { sidebarWidth, setSidebarWidth, isResizing, startResizing } = usePanelResize()
   const {
     titlebarTabsRef,
@@ -526,12 +525,7 @@ export function useRepositoryWorkspace(): {
 
         const { target } = resolved
         if (item.anchor) {
-          nextAnchorToken.current += 1
-          setPendingMarkdownAnchor({
-            path: target.path,
-            hash: item.anchor,
-            token: nextAnchorToken.current
-          })
+          queuePendingMarkdownAnchor(target.path, item.anchor)
         }
         setSelectedPath(target.path)
         setActiveFilePath(target.type === 'directory' ? undefined : target.path)
@@ -545,7 +539,7 @@ export function useRepositoryWorkspace(): {
         setLoading(false)
       }
     },
-    [createNextTabId, discardEditingIfAllowed, loadPreview, setError]
+    [createNextTabId, discardEditingIfAllowed, loadPreview, queuePendingMarkdownAnchor, setError]
   )
 
   useRepositoryLaunchIntents({
@@ -862,12 +856,7 @@ export function useRepositoryWorkspace(): {
       const resolved = repository ? resolveRepositoryNavigationTarget(repository, path) : undefined
       if (resolved?.node) {
         if (hash) {
-          nextAnchorToken.current += 1
-          setPendingMarkdownAnchor({
-            path: resolved.target.path,
-            hash,
-            token: nextAnchorToken.current
-          })
+          queuePendingMarkdownAnchor(resolved.target.path, hash)
         }
         setExpandedPaths(
           (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
@@ -878,12 +867,7 @@ export function useRepositoryWorkspace(): {
 
       if (resolved) {
         if (hash) {
-          nextAnchorToken.current += 1
-          setPendingMarkdownAnchor({
-            path: resolved.target.path,
-            hash,
-            token: nextAnchorToken.current
-          })
+          queuePendingMarkdownAnchor(resolved.target.path, hash)
         }
         setExpandedPaths(
           (current) => new Set([...current, '', ...parentPaths(resolved.target.path)])
@@ -914,14 +898,11 @@ export function useRepositoryWorkspace(): {
       isEditingTargetPath,
       loadPreview,
       openFileTabs,
+      queuePendingMarkdownAnchor,
       repository,
       setError
     ]
   )
-
-  const clearPendingMarkdownAnchor = useCallback((token: number): void => {
-    setPendingMarkdownAnchor((current) => (current?.token === token ? undefined : current))
-  }, [])
 
   const showMarkdownLinkContextMenu = useCallback(
     async (item: MarkdownLinkContext): Promise<void> => {

@@ -57,6 +57,13 @@ async function readRepositoryPreviewLoaderHook() {
   )
 }
 
+async function readPendingMarkdownAnchorHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/usePendingMarkdownAnchor.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readWorkspaceSettingsHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/useWorkspaceSettings.ts', import.meta.url),
@@ -356,6 +363,37 @@ test('repository preview loading state lives in a focused hook', async () => {
     workspaceHook,
     /const \[previewLoading, setPreviewLoading\] = useState\(false\)/,
     'repository workspace should not duplicate preview loading state'
+  )
+})
+
+test('markdown anchor navigation state lives in a focused hook', async () => {
+  const workspaceHook = await readRepositoryWorkspaceHook()
+  const pendingAnchorHook = await readPendingMarkdownAnchorHook()
+
+  assert.match(
+    workspaceHook,
+    /usePendingMarkdownAnchor\(\)/,
+    'repository workspace should delegate pending Markdown anchor state to a focused hook'
+  )
+  assert.match(
+    pendingAnchorHook,
+    /const nextAnchorToken = useRef\(0\)/,
+    'pending anchor hook should own monotonic anchor tokens'
+  )
+  assert.match(
+    pendingAnchorHook,
+    /queuePendingMarkdownAnchor[\s\S]*setPendingMarkdownAnchor\(\{[\s\S]*path,[\s\S]*hash,[\s\S]*token: nextAnchorToken\.current/,
+    'pending anchor hook should queue target path, hash, and token together'
+  )
+  assert.match(
+    pendingAnchorHook,
+    /clearPendingMarkdownAnchor[\s\S]*current\?\.token === token \? undefined : current/,
+    'pending anchor hook should only clear the handled anchor token'
+  )
+  assert.doesNotMatch(
+    workspaceHook,
+    /nextAnchorToken/,
+    'repository workspace should not own anchor token state'
   )
 })
 
