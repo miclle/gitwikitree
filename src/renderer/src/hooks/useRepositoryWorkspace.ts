@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   canMoveTabHistory,
   createFileTab,
@@ -7,11 +7,12 @@ import {
   type OpenFileTab
 } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
+import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
 import { useSessionPersistence } from './useSessionPersistence'
 import { useTabPopover } from './useTabPopover'
+import { useWorkspaceSettings } from './useWorkspaceSettings'
 import { fileNameFromPath, getRepositoryLabel, hydrateOpenFileTab, parentPaths } from '../app-utils'
 import { resolveRepositoryNavigationTarget } from '../repository-navigation'
-import { changeAppLanguage, createTranslator } from '../i18n'
 import type {
   GitLastChange,
   NavigationTarget,
@@ -27,10 +28,8 @@ import type {
   TreeNode,
   AppSettings
 } from '../../../shared/types'
-import { defaultAppSettings } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
-const homeFilePreviewReloadDelayMs = 450
 
 export type EditablePreviewTarget = {
   path: string
@@ -48,13 +47,6 @@ function extensionFromPath(path: string): string {
   const dotIndex = name.lastIndexOf('.')
 
   return dotIndex > 0 ? name.slice(dotIndex).toLocaleLowerCase() : ''
-}
-
-function fontFamilyForSetting(fontFamily: AppSettings['previewFontFamily']): string {
-  if (fontFamily === 'mono') return 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-  if (fontFamily === 'serif') return 'Georgia, Cambria, "Times New Roman", Times, serif'
-
-  return 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 }
 
 export function getEditablePreviewTarget(
@@ -221,7 +213,6 @@ export function useRepositoryWorkspace(): {
   const didReceiveOpenIntent = useRef(false)
   const nextTabId = useRef(0)
   const nextAnchorToken = useRef(0)
-  const homeFilePreviewReloadTimeoutRef = useRef<number | undefined>(undefined)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -233,8 +224,6 @@ export function useRepositoryWorkspace(): {
   const [draftModifiedAt, setDraftModifiedAt] = useState<string | undefined>()
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const [settings, setSettings] = useState<AppSettings>(defaultAppSettings)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [openFileTabs, setOpenFileTabs] = useState<OpenFileTab[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
@@ -254,65 +243,9 @@ export function useRepositoryWorkspace(): {
   const editablePreviewTarget = getEditablePreviewTarget(preview)
   const isEditing = Boolean(editablePreviewTarget && editingPath === editablePreviewTarget.path)
   const canEditPreview = Boolean(editablePreviewTarget)
-  const t = useMemo(() => createTranslator(settings.language), [settings.language])
   const hasUnsavedChanges = Boolean(
     isEditing && editablePreviewTarget && draftContent !== editablePreviewTarget.content
   )
-
-  const isEditingTargetPath = useCallback(
-    (path: string): boolean =>
-      path === editingPath ||
-      Boolean(isEditing && preview?.kind === 'directory' && path === preview.path),
-    [editingPath, isEditing, preview]
-  )
-
-  const clearEditing = useCallback((): void => {
-    setEditingPath(undefined)
-    setDraftContent('')
-    setDraftModifiedAt(undefined)
-  }, [])
-
-  const confirmDiscardEditing = useCallback((): boolean => {
-    if (!hasUnsavedChanges) return true
-
-    return window.confirm(t('app.discardUnsaved'))
-  }, [hasUnsavedChanges, t])
-
-  useEffect(() => {
-    changeAppLanguage(settings.language)
-    document.documentElement.lang = settings.language === 'zh-CN' ? 'zh-CN' : 'en'
-    document.documentElement.dataset.appAppearance = settings.appearance
-    document.documentElement.style.setProperty(
-      '--preview-font-size',
-      `${settings.previewFontSize}px`
-    )
-    document.documentElement.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`)
-    document.documentElement.style.setProperty(
-      '--preview-font-family',
-      fontFamilyForSetting(settings.previewFontFamily)
-    )
-    document.documentElement.style.setProperty(
-      '--editor-font-family',
-      fontFamilyForSetting(settings.editorFontFamily)
-    )
-  }, [settings])
-
-  const discardEditingIfAllowed = useCallback((): boolean => {
-    if (!confirmDiscardEditing()) return false
-
-    clearEditing()
-    return true
-  }, [clearEditing, confirmDiscardEditing])
-
-  const createNextTabId = useCallback((): string => {
-    nextTabId.current += 1
-    return `tab-${Date.now().toString(36)}-${nextTabId.current}`
-  }, [])
-
-  const resetRepositoryLayout = useCallback((): void => {
-    setSidebarWidth(250)
-    setIsSidebarOpen(true)
-  }, [setSidebarWidth])
 
   const loadPreview = useCallback(
     async (path: string, repo = repository): Promise<PreviewPayload | undefined> => {
@@ -338,34 +271,52 @@ export function useRepositoryWorkspace(): {
     [repository]
   )
 
-  const clearHomeFileDirectoryPreviewReload = useCallback((): void => {
-    if (homeFilePreviewReloadTimeoutRef.current) {
-      window.clearTimeout(homeFilePreviewReloadTimeoutRef.current)
-      homeFilePreviewReloadTimeoutRef.current = undefined
-    }
+  const { scheduleHomeFileDirectoryPreviewReload } = useHomeFileDirectoryPreviewReload({
+    preview,
+    selectedPath,
+    loadPreview
+  })
+
+  const { settings, isSettingsOpen, openSettings, closeSettings, saveSettings, t } =
+    useWorkspaceSettings({
+      onHomeFileNamesChange: scheduleHomeFileDirectoryPreviewReload
+    })
+
+  const isEditingTargetPath = useCallback(
+    (path: string): boolean =>
+      path === editingPath ||
+      Boolean(isEditing && preview?.kind === 'directory' && path === preview.path),
+    [editingPath, isEditing, preview]
+  )
+
+  const clearEditing = useCallback((): void => {
+    setEditingPath(undefined)
+    setDraftContent('')
+    setDraftModifiedAt(undefined)
   }, [])
 
-  const scheduleHomeFileDirectoryPreviewReload = useCallback((): void => {
-    clearHomeFileDirectoryPreviewReload()
+  const confirmDiscardEditing = useCallback((): boolean => {
+    if (!hasUnsavedChanges) return true
 
-    if (preview?.kind !== 'directory') return
+    return window.confirm(t('app.discardUnsaved'))
+  }, [hasUnsavedChanges, t])
 
-    const directoryPath = preview.path
-    homeFilePreviewReloadTimeoutRef.current = window.setTimeout(() => {
-      homeFilePreviewReloadTimeoutRef.current = undefined
-      void loadPreview(directoryPath)
-    }, homeFilePreviewReloadDelayMs)
-  }, [clearHomeFileDirectoryPreviewReload, loadPreview, preview])
+  const discardEditingIfAllowed = useCallback((): boolean => {
+    if (!confirmDiscardEditing()) return false
 
-  useEffect(() => {
-    if (preview?.kind === 'directory' && preview.path === selectedPath) return
+    clearEditing()
+    return true
+  }, [clearEditing, confirmDiscardEditing])
 
-    clearHomeFileDirectoryPreviewReload()
-  }, [clearHomeFileDirectoryPreviewReload, preview, selectedPath])
+  const createNextTabId = useCallback((): string => {
+    nextTabId.current += 1
+    return `tab-${Date.now().toString(36)}-${nextTabId.current}`
+  }, [])
 
-  useEffect(() => {
-    return clearHomeFileDirectoryPreviewReload
-  }, [clearHomeFileDirectoryPreviewReload])
+  const resetRepositoryLayout = useCallback((): void => {
+    setSidebarWidth(250)
+    setIsSidebarOpen(true)
+  }, [setSidebarWidth])
 
   const restoreRepositorySession = useCallback(
     async (nextRepository: RepositoryPayload, session: ProjectSessionState): Promise<void> => {
@@ -634,14 +585,6 @@ export function useRepositoryWorkspace(): {
       removeOpenRequestListener()
     }
   }, [loadRepositoryPath, openFilePath, openRepository, openTreeItem])
-
-  useEffect(() => {
-    void window.api.getSettings().then(setSettings)
-
-    return window.api.onOpenSettings(() => {
-      setIsSettingsOpen(true)
-    })
-  }, [])
 
   useEffect(() => {
     if (didRestoreSession.current) return
@@ -1124,28 +1067,6 @@ export function useRepositoryWorkspace(): {
     preview,
     repository
   ])
-
-  const openSettings = useCallback((): void => {
-    setIsSettingsOpen(true)
-  }, [])
-
-  const closeSettings = useCallback((): void => {
-    setIsSettingsOpen(false)
-  }, [])
-
-  const saveSettings = useCallback(
-    async (nextSettings: Partial<AppSettings>): Promise<void> => {
-      const previousHomeFileNames = settings.homeFileNames.join('\0')
-      const savedSettings = await window.api.saveSettings(nextSettings)
-
-      setSettings(savedSettings)
-
-      if (previousHomeFileNames !== savedSettings.homeFileNames.join('\0')) {
-        scheduleHomeFileDirectoryPreviewReload()
-      }
-    },
-    [scheduleHomeFileDirectoryPreviewReload, settings.homeFileNames]
-  )
 
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {
