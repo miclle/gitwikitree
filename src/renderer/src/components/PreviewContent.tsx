@@ -48,11 +48,13 @@ export function PreviewContent({
   }, [])
 
   const handlePreviewImageClick =
-    (container: HTMLElement) => (event: ReactMouseEvent<HTMLElement>) => {
+    (container: ParentNode) =>
+    (event: ReactMouseEvent<HTMLElement>, targetImage?: HTMLImageElement) => {
       if (!isPrimaryClick(event)) return
-      if (!(event.target instanceof Element)) return
 
-      const image = event.target.closest<HTMLImageElement>('img')
+      const image =
+        targetImage ??
+        (event.target instanceof Element ? event.target.closest<HTMLImageElement>('img') : null)
       if (!image || !container.contains(image)) return
 
       event.preventDefault()
@@ -112,7 +114,9 @@ export function PreviewContent({
           markdownAssetAbsolutePaths={preview.readme.markdownAssetAbsolutePaths}
           rootRef={setPreviewSearchRoot}
           onContentReady={markPreviewSearchRootReady}
-          onPreviewImageClick={(container, event) => handlePreviewImageClick(container)(event)}
+          onPreviewImageClick={(container, event, targetImage) =>
+            handlePreviewImageClick(container)(event, targetImage)
+          }
           onSelectPath={onSelectPath}
           onOpenMarkdownLinkContextMenu={onOpenMarkdownLinkContextMenu}
           onMarkdownAnchorHandled={onMarkdownAnchorHandled}
@@ -141,7 +145,9 @@ export function PreviewContent({
         markdownAssetAbsolutePaths={preview.markdownAssetAbsolutePaths}
         rootRef={setPreviewSearchRoot}
         onContentReady={markPreviewSearchRootReady}
-        onPreviewImageClick={(container, event) => handlePreviewImageClick(container)(event)}
+        onPreviewImageClick={(container, event, targetImage) =>
+          handlePreviewImageClick(container)(event, targetImage)
+        }
         onSelectPath={onSelectPath}
         onOpenMarkdownLinkContextMenu={onOpenMarkdownLinkContextMenu}
         onMarkdownAnchorHandled={onMarkdownAnchorHandled}

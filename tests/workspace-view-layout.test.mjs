@@ -120,6 +120,10 @@ async function readPreviewSearchControlsHook() {
   )
 }
 
+async function readPreviewSearch() {
+  return readFile(new URL('../src/renderer/src/preview-search.ts', import.meta.url), 'utf8')
+}
+
 async function readFileViewModeHook() {
   return readFile(new URL('../src/renderer/src/hooks/useFileViewMode.ts', import.meta.url), 'utf8')
 }
@@ -907,7 +911,7 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
-    /querySelector<HTMLElement>\('\.file-editor \.cm-scroller'\)[\s\S]*querySelector<HTMLElement>\('\.file-preview-pane'\)/,
+    /querySelector<HTMLElement>\(\s*'\.file-editor \.cm-scroller'\s*\)[\s\S]*querySelector<HTMLElement>\(\s*'\.file-preview-pane'\s*\)/,
     'split scroll sync should target the CodeMirror scroller and preview pane'
   )
   assert.match(
@@ -1304,6 +1308,103 @@ test('Mermaid previews render diagrams directly without stale processed markers'
   )
 })
 
+test('Marp Markdown previews use isolated slide rendering when opted in', async () => {
+  const source = await readMarkdownPreview()
+  const previewSearch = await readPreviewSearch()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /isMarpMarkdown\(content\)/,
+    'Markdown preview should detect Marp front matter before choosing the renderer'
+  )
+  assert.match(
+    source,
+    /marpMarkdownToHtml\(content,/,
+    'Marp Markdown should render with Marp instead of the regular Markdown renderer'
+  )
+  assert.match(
+    source,
+    /function sanitizeMarpHtml\(html: string\): string \{\s*return html\s*\}/,
+    'Marp Core output should keep its SVG foreignObject slide structure intact'
+  )
+  assert.match(
+    source,
+    /className=\{isMarpPreview \? 'marp-preview' : 'markdown-body'\}/,
+    'Marp slides should not inherit the ordinary markdown-body document styles'
+  )
+  assert.match(
+    source,
+    /--marp-slide-max-width/,
+    'Marp slides should receive the height-constrained preview width as a CSS sizing variable'
+  )
+  assert.match(
+    source,
+    /const slideBreathingRoom = 40[\s\S]*container\.clientHeight - verticalPadding - slideBreathingRoom/,
+    'Marp slide sizing should leave breathing room below tall slides'
+  )
+  assert.match(
+    source,
+    /new ResizeObserver\(updateMarpSlideMaxWidth\)/,
+    'Marp slide sizing should respond to preview pane resizes'
+  )
+  assert.match(
+    source,
+    /function MarpPreviewContent[\s\S]*attachShadow\(\{ mode: 'open' \}\)[\s\S]*<style>\$\{rendered\.css\}<\/style>/,
+    'Marp slides should render in a shadow root so app shell CSS resets do not leak into SVG foreignObject content'
+  )
+  assert.match(
+    source,
+    /event\.nativeEvent\.composedPath\(\)[\s\S]*pathItem\.closest<T>\(selector\)/,
+    'Marp slide interactions should resolve links and images through the shadow DOM event path'
+  )
+  assert.match(
+    source,
+    /<MarpPreviewContent rendered=\{marpPreview\} onReady=\{onContentReady\} \/>/,
+    'Marp previews should mark content ready after the shadow root has been populated'
+  )
+  assert.match(
+    previewSearch,
+    /collectShadowRoots\(container\)[\s\S]*doc\.createTreeWalker\(root,/,
+    'preview search should traverse open shadow roots used by Marp slide rendering'
+  )
+  assert.match(
+    previewSearch,
+    /root\.prepend\(createSearchHighlightStyle\(doc\)\)/,
+    'preview search highlights should install styles inside shadow roots'
+  )
+  assert.match(
+    source,
+    /function getMarpSlideAspectRatio\(html:[\s\S]*getMarpSlideMaxHeight\(container\) \* getMarpSlideAspectRatio\(html\)/,
+    'Marp slide sizing should derive the height-constrained width from the rendered slide aspect ratio'
+  )
+  assert.match(
+    css,
+    /\.marp-preview\s*\{[\s\S]*height:\s*100%;[\s\S]*overflow:\s*auto;/,
+    'Marp preview should size to the visible preview area and provide a scrollable slide surface'
+  )
+  assert.match(
+    source,
+    /\.marpit\s*\{[\s\S]*display:\s*grid;/,
+    'Marp deck output should be laid out as slide pages'
+  )
+  assert.match(
+    source,
+    /\.marpit\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*100%\);/,
+    'Marp slide pages should size against the available preview width'
+  )
+  assert.match(
+    source,
+    /\.marpit > svg\s*\{[\s\S]*width:\s*min\(100%,\s*var\(--marp-slide-max-width,\s*100%\)\);[\s\S]*max-width:\s*100%;/,
+    'Marp slide SVGs should fit inside both the preview width and height-constrained preview width'
+  )
+  assert.match(
+    css,
+    /\.marp-preview-shadow\s*\{[\s\S]*display:\s*block;[\s\S]*width:\s*100%;/,
+    'Marp shadow host should fill the preview width'
+  )
+})
+
 test('PDF previews render in-app without Electron PDF viewer frames', async () => {
   const source = await readPreviewContent()
 
@@ -1432,17 +1533,17 @@ test('image preview lightbox supports click, keyboard, and adjacent image naviga
 
   assert.match(
     imageLightboxHookSource,
-    /collectPreviewImages\(container\.querySelectorAll\('img'\)\)/,
-    'image lightbox should collect images from the current preview only'
+    /openImageLightbox: \(image: HTMLImageElement, container: ParentNode\) => void[\s\S]*collectPreviewImages\(container\.querySelectorAll\('img'\)\)/,
+    'image lightbox should collect images from the current preview or shadow root only'
   )
   assert.match(
     markdownPreviewSource,
-    /onPreviewImageClick\(event\.currentTarget, event\)[\s\S]*if \(event\.defaultPrevented\) return[\s\S]*handleMarkdownLinkClick\(event\)/,
+    /getPreviewImageContainer\(image, event\.currentTarget\)[\s\S]*if \(event\.defaultPrevented\) return[\s\S]*handleMarkdownLinkClick\(event\)/,
     'markdown image clicks should open the lightbox before linked images can navigate'
   )
   assert.match(
     markdownPreviewSource,
-    /if \(event\.target\.closest\('img'\)\) return[\s\S]*const link = event\.target\.closest<HTMLAnchorElement>\('a\[data-markdown-link\]'\)/,
+    /findEventPathElement<HTMLImageElement>\(event, 'img'\)[\s\S]*findEventPathElement<HTMLAnchorElement>\(event, 'a\[data-markdown-link\]'\)/,
     'linked image context menus should fall through to the browser image menu'
   )
   assert.match(

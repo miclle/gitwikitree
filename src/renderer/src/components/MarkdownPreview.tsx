@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import DOMPurify from 'dompurify'
 import {
   getMarkdownPreview,
   isExternalLink,
+  isMarpMarkdown,
+  marpMarkdownToHtml,
   markdownHeadingId,
   markdownToHtml
 } from '../markdown-preview'
@@ -27,6 +36,105 @@ function sanitizeMarkdownHtml(html: string): string {
     ],
     ALLOW_DATA_ATTR: true
   })
+}
+
+function sanitizeMarpHtml(html: string): string {
+  return html
+}
+
+function getMarpSlideMaxHeight(container: HTMLElement): number {
+  const style = window.getComputedStyle(container)
+  const verticalPadding =
+    Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+  const slideBreathingRoom = 40
+
+  return Math.max(240, container.clientHeight - verticalPadding - slideBreathingRoom)
+}
+
+function getMarpSlideAspectRatio(html: string | undefined): number {
+  const viewBox = html?.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/)
+  const width = viewBox ? Number.parseFloat(viewBox[1]) : 16
+  const height = viewBox ? Number.parseFloat(viewBox[2]) : 9
+
+  return width > 0 && height > 0 ? width / height : 16 / 9
+}
+
+function getMarpSlideMaxWidth(container: HTMLElement, html: string | undefined): number {
+  return getMarpSlideMaxHeight(container) * getMarpSlideAspectRatio(html)
+}
+
+function findEventPathElement<T extends Element>(
+  event: ReactMouseEvent<HTMLElement>,
+  selector: string
+): T | undefined {
+  const path = event.nativeEvent.composedPath()
+
+  for (const pathItem of path) {
+    if (!(pathItem instanceof Element)) continue
+
+    const match = pathItem.closest<T>(selector)
+    if (match && path.includes(match)) return match
+  }
+
+  return undefined
+}
+
+function getPreviewImageContainer(image: HTMLImageElement, fallback: HTMLElement): ParentNode {
+  const root = image.getRootNode()
+
+  return typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot ? root : fallback
+}
+
+function MarpPreviewContent({
+  rendered,
+  onReady
+}: {
+  rendered: { html: string; css: string }
+  onReady: () => void
+}): React.JSX.Element {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' })
+    shadowRoot.innerHTML = `
+      <style>${rendered.css}</style>
+      <style>
+        :host {
+          display: block;
+          width: 100%;
+        }
+
+        .marpit {
+          display: grid;
+          grid-template-columns: minmax(0, 100%);
+          justify-content: center;
+          align-content: start;
+          gap: 20px;
+          width: 100%;
+        }
+
+        .marpit > svg {
+          display: block;
+          width: min(100%, var(--marp-slide-max-width, 100%));
+          max-width: 100%;
+          height: auto;
+          background: #ffffff;
+          box-shadow: 0 1px 4px rgba(31, 35, 40, 0.18);
+        }
+
+        img {
+          cursor: zoom-in;
+        }
+      </style>
+      ${rendered.html}
+    `
+    onReady()
+  }, [onReady, rendered])
+
+  return <div ref={hostRef} className="marp-preview-shadow" />
 }
 
 async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
@@ -108,6 +216,29 @@ function renderMarkdownHtml({
   )
 }
 
+async function renderMarpHtml({
+  content,
+  markdownAssetDataUrls,
+  markdownAssetPaths,
+  markdownAssetAbsolutePaths
+}: {
+  content: string
+  markdownAssetDataUrls?: Record<string, string>
+  markdownAssetPaths?: Record<string, string>
+  markdownAssetAbsolutePaths?: Record<string, string>
+}): Promise<{ html: string; css: string }> {
+  const rendered = await marpMarkdownToHtml(content, {
+    resolveImageSrc: (href) => markdownAssetDataUrls?.[href],
+    resolveImagePath: (href) => markdownAssetPaths?.[href],
+    resolveImageAbsolutePath: (href) => markdownAssetAbsolutePaths?.[href]
+  })
+
+  return {
+    html: sanitizeMarpHtml(rendered.html),
+    css: rendered.css
+  }
+}
+
 function scrollToMarkdownAnchor(hash: string, container: HTMLElement): void {
   if (!hash) return
 
@@ -142,23 +273,68 @@ export function MarkdownPreview({
   markdownAssetAbsolutePaths?: Record<string, string>
   rootRef: (element: HTMLElement | null) => void
   onContentReady: () => void
-  onPreviewImageClick: (container: HTMLElement, event: ReactMouseEvent<HTMLElement>) => void
+  onPreviewImageClick: (
+    container: ParentNode,
+    event: ReactMouseEvent<HTMLElement>,
+    targetImage?: HTMLImageElement
+  ) => void
   onSelectPath: (path: string, openInNewTab?: boolean, hash?: string) => boolean
   onOpenMarkdownLinkContextMenu: (item: MarkdownLinkContext) => Promise<void>
   onMarkdownAnchorHandled: (token: number) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const markdownBodyRef = useRef<HTMLElement | null>(null)
-  const markdownPreview = getMarkdownPreview(content)
+  const isMarpPreview = isMarpMarkdown(content)
+  const [marpSlideMaxWidth, setMarpSlideMaxWidth] = useState<number | undefined>()
+  const [marpPreviewState, setMarpPreviewState] = useState<
+    | {
+        content: string
+        markdownAssetDataUrls?: Record<string, string>
+        markdownAssetPaths?: Record<string, string>
+        markdownAssetAbsolutePaths?: Record<string, string>
+        rendered: { html: string; css: string }
+      }
+    | undefined
+  >()
+  const markdownPreview = isMarpPreview ? undefined : getMarkdownPreview(content)
+  const marpPreview =
+    isMarpPreview &&
+    marpPreviewState?.content === content &&
+    marpPreviewState.markdownAssetDataUrls === markdownAssetDataUrls &&
+    marpPreviewState.markdownAssetPaths === markdownAssetPaths &&
+    marpPreviewState.markdownAssetAbsolutePaths === markdownAssetAbsolutePaths
+      ? marpPreviewState.rendered
+      : undefined
 
   const setMarkdownPreviewRoot = (element: HTMLElement | null): void => {
     markdownBodyRef.current = element
     rootRef(element)
 
-    if (element) {
+    if (element && !isMarpPreview) {
       void renderMermaidDiagrams(element)
     }
   }
+
+  useEffect(() => {
+    const container = markdownBodyRef.current
+    if (!isMarpPreview || !container) {
+      setMarpSlideMaxWidth(undefined)
+      return
+    }
+
+    const updateMarpSlideMaxWidth = (): void => {
+      setMarpSlideMaxWidth(getMarpSlideMaxWidth(container, marpPreview?.html))
+    }
+
+    updateMarpSlideMaxWidth()
+
+    const resizeObserver = new ResizeObserver(updateMarpSlideMaxWidth)
+    resizeObserver.observe(container)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [isMarpPreview, marpPreview])
 
   const localizeMarkdownCodeCopyButtons = useCallback(
     (container: HTMLElement): void => {
@@ -211,18 +387,16 @@ export function MarkdownPreview({
   }
 
   const handleMarkdownLinkClick = (event: ReactMouseEvent<HTMLElement>): void => {
-    if (!(event.target instanceof Element)) return
-
-    const copyButton = event.target.closest<HTMLButtonElement>('button[data-copy-code]')
-    if (copyButton && event.currentTarget.contains(copyButton)) {
+    const copyButton = findEventPathElement<HTMLButtonElement>(event, 'button[data-copy-code]')
+    if (copyButton) {
       if (!isPrimaryClick(event)) return
       event.preventDefault()
       void handleMarkdownCodeCopy(copyButton)
       return
     }
 
-    const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
-    if (!link || !event.currentTarget.contains(link)) return
+    const link = findEventPathElement<HTMLAnchorElement>(event, 'a[data-markdown-link]')
+    if (!link) return
     if (!shouldHandleNavigationClick(event)) return
 
     const href = link.getAttribute('href') ?? ''
@@ -251,18 +425,22 @@ export function MarkdownPreview({
   }
 
   const handleMarkdownPreviewClick = (event: ReactMouseEvent<HTMLElement>): void => {
-    onPreviewImageClick(event.currentTarget, event)
+    const image = findEventPathElement<HTMLImageElement>(event, 'img')
+    onPreviewImageClick(
+      image ? getPreviewImageContainer(image, event.currentTarget) : event.currentTarget,
+      event,
+      image
+    )
     if (event.defaultPrevented) return
 
     handleMarkdownLinkClick(event)
   }
 
   const handleMarkdownLinkContextMenu = (event: ReactMouseEvent<HTMLElement>): void => {
-    if (!(event.target instanceof Element)) return
-    if (event.target.closest('img')) return
+    if (findEventPathElement<HTMLImageElement>(event, 'img')) return
 
-    const link = event.target.closest<HTMLAnchorElement>('a[data-markdown-link]')
-    if (!link || !event.currentTarget.contains(link)) return
+    const link = findEventPathElement<HTMLAnchorElement>(event, 'a[data-markdown-link]')
+    if (!link) return
 
     const target = createMarkdownLinkTarget({
       href: link.getAttribute('href') ?? '',
@@ -286,6 +464,10 @@ export function MarkdownPreview({
     const container = markdownBodyRef.current
     if (!container) return
 
+    if (isMarpPreview) {
+      return
+    }
+
     localizeMarkdownCodeCopyButtons(container)
 
     let isCancelled = false
@@ -296,29 +478,70 @@ export function MarkdownPreview({
     return () => {
       isCancelled = true
     }
-  }, [content, localizeMarkdownCodeCopyButtons, onContentReady])
+  }, [content, isMarpPreview, localizeMarkdownCodeCopyButtons, onContentReady])
+
+  useEffect(() => {
+    if (!isMarpPreview) return
+
+    let isCancelled = false
+
+    void renderMarpHtml({
+      content,
+      markdownAssetDataUrls,
+      markdownAssetPaths,
+      markdownAssetAbsolutePaths
+    }).then((rendered) => {
+      if (!isCancelled) {
+        setMarpPreviewState({
+          content,
+          markdownAssetDataUrls,
+          markdownAssetPaths,
+          markdownAssetAbsolutePaths,
+          rendered
+        })
+      }
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [
+    content,
+    isMarpPreview,
+    markdownAssetAbsolutePaths,
+    markdownAssetDataUrls,
+    markdownAssetPaths
+  ])
 
   return (
     <article
       ref={setMarkdownPreviewRoot}
-      className="markdown-body"
+      className={isMarpPreview ? 'marp-preview' : 'markdown-body'}
+      style={
+        isMarpPreview && marpSlideMaxWidth !== undefined
+          ? ({ '--marp-slide-max-width': `${marpSlideMaxWidth}px` } as CSSProperties)
+          : undefined
+      }
       onAuxClick={handleMarkdownLinkClick}
       onClick={handleMarkdownPreviewClick}
       onContextMenu={handleMarkdownLinkContextMenu}
     >
-      {markdownPreview.title && (
+      {marpPreview && <MarpPreviewContent rendered={marpPreview} onReady={onContentReady} />}
+      {markdownPreview?.title && (
         <h1 id={markdownHeadingId(markdownPreview.title)}>{markdownPreview.title}</h1>
       )}
-      <div
-        dangerouslySetInnerHTML={{
-          __html: renderMarkdownHtml({
-            content: markdownPreview.content,
-            markdownAssetDataUrls,
-            markdownAssetPaths,
-            markdownAssetAbsolutePaths
-          })
-        }}
-      />
+      {markdownPreview && (
+        <div
+          dangerouslySetInnerHTML={{
+            __html: renderMarkdownHtml({
+              content: markdownPreview.content,
+              markdownAssetDataUrls,
+              markdownAssetPaths,
+              markdownAssetAbsolutePaths
+            })
+          }}
+        />
+      )}
     </article>
   )
 }

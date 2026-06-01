@@ -22,7 +22,7 @@ export function usePreviewImageLightbox({
   previewPath: string
 }): {
   activeImageLightbox: ImageLightboxState | undefined
-  openImageLightbox: (image: HTMLImageElement, container: HTMLElement) => void
+  openImageLightbox: (image: HTMLImageElement, container: ParentNode) => void
   closeImageLightbox: () => void
   stepImageLightbox: (delta: number) => void
 } {
@@ -48,7 +48,7 @@ export function usePreviewImageLightbox({
   }, [])
 
   const openImageLightbox = useCallback(
-    (image: HTMLImageElement, container: HTMLElement): void => {
+    (image: HTMLImageElement, container: ParentNode): void => {
       const images = collectPreviewImages(container.querySelectorAll('img'))
       if (images.length === 0) return
 

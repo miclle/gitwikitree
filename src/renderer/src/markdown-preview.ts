@@ -6,10 +6,30 @@ export type MarkdownPreview = {
   content: string
 }
 
+export type MarpMarkdownRenderResult = {
+  html: string
+  css: string
+}
+
 export type MarkdownRenderOptions = {
   resolveImageSrc?: (href: string) => string | undefined
   resolveImagePath?: (href: string) => string | undefined
   resolveImageAbsolutePath?: (href: string) => string | undefined
+}
+
+const marpHtmlAllowlist = {
+  br: [],
+  code: ['class'],
+  div: ['class'],
+  em: ['class'],
+  h1: ['class'],
+  h2: ['class'],
+  h3: ['class'],
+  img: ['alt', 'class', 'src'],
+  p: ['class'],
+  small: ['class'],
+  span: ['class'],
+  strong: ['class']
 }
 
 function unquoteYamlValue(value: string): string {
@@ -108,6 +128,13 @@ function rewriteRawHtmlImageSources(html: string, options: MarkdownRenderOptions
 
       return `${prefix}${quote}${escapeHtml(src)}${closingQuote} data-preview-image-src="${escapeHtml(imagePath)}"${absolutePathAttribute}${suffix}`
     }
+  )
+}
+
+function markRawHtmlMarkdownLinks(html: string): string {
+  return html.replace(
+    /<a\b(?![^>]*\bdata-markdown-link=)([^>]*?\bhref\s*=\s*["'][^"']+["'][^>]*)>/gi,
+    '<a$1 data-markdown-link="true">'
   )
 }
 
@@ -239,6 +266,27 @@ export function markdownToHtml(markdown: string, options: MarkdownRenderOptions 
   return parser.parse(markdown) as string
 }
 
+export async function marpMarkdownToHtml(
+  markdown: string,
+  options: MarkdownRenderOptions = {}
+): Promise<MarpMarkdownRenderResult> {
+  const { Marp } = await import('@marp-team/marp-core')
+  const marp = new Marp({
+    html: marpHtmlAllowlist,
+    math: false,
+    script: false
+  })
+  const rendered = marp.render(markdown)
+  const htmlWithImages = options.resolveImageSrc
+    ? rewriteRawHtmlImageSources(rendered.html, options)
+    : rendered.html
+
+  return {
+    html: markRawHtmlMarkdownLinks(htmlWithImages),
+    css: rendered.css
+  }
+}
+
 export function isExternalLink(href: string): boolean {
   return /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith('//')
 }
@@ -258,6 +306,29 @@ export function resolveMarkdownLinkPath(href: string, sourcePath: string): strin
   return normalizeRepositoryPath([sourceDirectory, decodedPath].filter(Boolean).join('/'))
 }
 
+function getMarkdownFrontMatter(markdown: string): string | undefined {
+  const normalized = markdown.replace(/\r\n/g, '\n')
+
+  if (!normalized.startsWith('---\n')) return undefined
+
+  const endIndex = normalized.indexOf('\n---', 4)
+  if (endIndex === -1) return undefined
+
+  return normalized.slice(4, endIndex)
+}
+
+export function isMarpMarkdown(markdown: string): boolean {
+  const frontMatter = getMarkdownFrontMatter(markdown)
+  if (!frontMatter) return false
+
+  const marpLine = frontMatter
+    .split('\n')
+    .find((line) => line.trimStart().toLowerCase().startsWith('marp:'))
+  if (!marpLine) return false
+
+  return unquoteYamlValue(marpLine.split(':').slice(1).join(':')).toLowerCase() === 'true'
+}
+
 export function getMarkdownPreview(markdown: string): MarkdownPreview {
   const normalized = markdown.replace(/\r\n/g, '\n')
 
@@ -270,7 +341,10 @@ export function getMarkdownPreview(markdown: string): MarkdownPreview {
     return { content: markdown }
   }
 
-  const frontMatter = normalized.slice(4, endIndex)
+  const frontMatter = getMarkdownFrontMatter(markdown)
+  if (!frontMatter) {
+    return { content: markdown }
+  }
   const titleLine = frontMatter
     .split('\n')
     .find((line) => line.trimStart().toLowerCase().startsWith('title:'))

@@ -45,6 +45,71 @@ title: "模块功能及状态"
   assert.equal(preview.content, '# 模块功能及状态\n\n正文内容')
 })
 
+test('isMarpMarkdown detects Marp front matter opt-in only', async () => {
+  const { isMarpMarkdown } = await loadMarkdownPreview()
+
+  assert.equal(
+    isMarpMarkdown(`---
+marp: true
+theme: default
+---
+
+# Slide`),
+    true
+  )
+  assert.equal(
+    isMarpMarkdown(`---
+marp: false
+---
+
+# Note`),
+    false
+  )
+  assert.equal(isMarpMarkdown('# Plain Markdown'), false)
+})
+
+test('marpMarkdownToHtml renders slides and rewrites local image sources', async () => {
+  const { marpMarkdownToHtml } = await loadMarkdownPreview()
+  const rendered = await marpMarkdownToHtml(
+    `---
+marp: true
+theme: default
+paginate: true
+---
+
+# First
+
+![Diagram](../assets/diagram.png)
+<img src="../assets/diagram.png" class="cover">
+[Guide](guide.md)
+
+---
+
+## Second`,
+    {
+      resolveImageSrc: (href) =>
+        href === '../assets/diagram.png' ? 'data:image/png;base64,ZmFrZQ==' : undefined,
+      resolveImagePath: (href) =>
+        href === '../assets/diagram.png' ? 'content/assets/diagram.png' : undefined,
+      resolveImageAbsolutePath: (href) =>
+        href === '../assets/diagram.png' ? '/Users/test/repo/content/assets/diagram.png' : undefined
+    }
+  )
+
+  assert.match(rendered.html, /<section/)
+  assert.match(rendered.html, /First/)
+  assert.match(rendered.html, /Second/)
+  assert.match(rendered.html, /src="data:image\/png;base64,ZmFrZQ=="/)
+  assert.doesNotMatch(rendered.html, /&lt;img src=/)
+  assert.match(rendered.html, /data-preview-image-src="content\/assets\/diagram\.png"/)
+  assert.match(
+    rendered.html,
+    /data-preview-image-absolute-src="\/Users\/test\/repo\/content\/assets\/diagram\.png"/
+  )
+  assert.match(rendered.html, /href="guide\.md" data-markdown-link="true"/)
+  assert.match(rendered.css, /section/)
+})
+
 test('markdownToHtml marks links so the preview can intercept clicks', async () => {
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('[Design doc](docs/design.md)')

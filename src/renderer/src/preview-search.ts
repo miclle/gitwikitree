@@ -49,24 +49,45 @@ export function getSelectedPreviewSearchText(
   return text
 }
 
-function clearSearchHighlights(container: HTMLElement): void {
-  const marks = Array.from(container.querySelectorAll<HTMLElement>('mark.preview-search-match'))
+type PreviewSearchRoot = HTMLElement | ShadowRoot
+
+function isSearchShadowRoot(root: PreviewSearchRoot): root is ShadowRoot {
+  return typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot
+}
+
+function getSearchRoots(container: HTMLElement): PreviewSearchRoot[] {
+  const roots: PreviewSearchRoot[] = [container]
+
+  const collectShadowRoots = (root: ParentNode): void => {
+    for (const element of root.querySelectorAll<HTMLElement>('*')) {
+      if (!element.shadowRoot) continue
+
+      roots.push(element.shadowRoot)
+      collectShadowRoots(element.shadowRoot)
+    }
+  }
+
+  collectShadowRoots(container)
+
+  return roots
+}
+
+function clearSearchHighlights(root: PreviewSearchRoot): void {
+  const marks = Array.from(root.querySelectorAll<HTMLElement>('mark.preview-search-match'))
 
   for (const mark of marks) {
     const parent = mark.parentNode
     if (!parent) continue
 
-    parent.replaceChild(container.ownerDocument.createTextNode(mark.textContent ?? ''), mark)
+    parent.replaceChild(root.ownerDocument.createTextNode(mark.textContent ?? ''), mark)
     parent.normalize()
   }
 }
 
-function ensureSearchHighlightStyle(container: HTMLElement): void {
-  const doc = container.ownerDocument
-  if (doc.getElementById('preview-search-highlight-style')) return
-
+function createSearchHighlightStyle(doc: Document): HTMLStyleElement {
   const style = doc.createElement('style')
   style.id = 'preview-search-highlight-style'
+
   style.textContent = `
     .preview-search-match {
       border-radius: 2px;
@@ -80,18 +101,61 @@ function ensureSearchHighlightStyle(container: HTMLElement): void {
       box-shadow: 0 0 0 1px rgba(154, 103, 0, 0.32);
     }
   `
-  doc.head.append(style)
+
+  return style
 }
 
-function shouldSearchTextNode(node: Text, container: HTMLElement): boolean {
+function ensureSearchHighlightStyle(root: PreviewSearchRoot): void {
+  const doc = root.ownerDocument
+
+  if (isSearchShadowRoot(root)) {
+    if (root.getElementById('preview-search-highlight-style')) return
+
+    root.prepend(createSearchHighlightStyle(doc))
+    return
+  }
+
+  if (doc.getElementById('preview-search-highlight-style')) return
+
+  doc.head.append(createSearchHighlightStyle(doc))
+}
+
+function shouldSearchTextNode(node: Text, root: PreviewSearchRoot): boolean {
   if (!node.textContent?.trim()) return false
 
   const parent = node.parentElement
-  if (!parent || !container.contains(parent)) return false
+  if (!parent || !root.contains(parent)) return false
 
   return !parent.closest(
     'mark.preview-search-match, .code-line-gutter, .markdown-code-copy, [aria-hidden="true"]'
   )
+}
+
+function collectSearchTextNodes(
+  root: PreviewSearchRoot,
+  textNodes: Array<{ node: Text; start: number; end: number }>,
+  fullTextLength: number
+): number {
+  const doc = root.ownerDocument
+  const nodeFilter = doc.defaultView?.NodeFilter
+  const textNodeFilter = nodeFilter?.SHOW_TEXT ?? 4
+  const filterAccept = nodeFilter?.FILTER_ACCEPT ?? 1
+  const filterReject = nodeFilter?.FILTER_REJECT ?? 2
+  const walker = doc.createTreeWalker(root, textNodeFilter, {
+    acceptNode(node) {
+      return shouldSearchTextNode(node as Text, root) ? filterAccept : filterReject
+    }
+  })
+  let length = fullTextLength
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text
+    const text = node.textContent ?? ''
+    textNodes.push({ node, start: length, end: length + text.length })
+    length += text.length
+  }
+
+  return length
 }
 
 export function applyPreviewSearchHighlights({
@@ -103,33 +167,26 @@ export function applyPreviewSearchHighlights({
   query: string
   activeIndex: number
 }): number {
-  clearSearchHighlights(container)
+  const roots = getSearchRoots(container)
+  for (const root of roots) {
+    clearSearchHighlights(root)
+  }
 
   const normalizedQuery = query.trim().toLocaleLowerCase()
   if (!normalizedQuery) return 0
 
-  ensureSearchHighlightStyle(container)
-
-  const doc = container.ownerDocument
-  const nodeFilter = doc.defaultView?.NodeFilter
-  const textNodeFilter = nodeFilter?.SHOW_TEXT ?? 4
-  const filterAccept = nodeFilter?.FILTER_ACCEPT ?? 1
-  const filterReject = nodeFilter?.FILTER_REJECT ?? 2
-  const walker = doc.createTreeWalker(container, textNodeFilter, {
-    acceptNode(node) {
-      return shouldSearchTextNode(node as Text, container) ? filterAccept : filterReject
-    }
-  })
-  const textNodes: Array<{ node: Text; start: number; end: number }> = []
-  let fullText = ''
-
-  while (walker.nextNode()) {
-    const node = walker.currentNode as Text
-    const text = node.textContent ?? ''
-    textNodes.push({ node, start: fullText.length, end: fullText.length + text.length })
-    fullText += text
+  for (const root of roots) {
+    ensureSearchHighlightStyle(root)
   }
 
+  const textNodes: Array<{ node: Text; start: number; end: number }> = []
+  let fullTextLength = 0
+
+  for (const root of roots) {
+    fullTextLength = collectSearchTextNodes(root, textNodes, fullTextLength)
+  }
+
+  const fullText = textNodes.map(({ node }) => node.textContent ?? '').join('')
   const matchRanges = findSearchMatchRanges(fullText, normalizedQuery)
   let activeMatch: HTMLElement | undefined
 
@@ -140,6 +197,7 @@ export function applyPreviewSearchHighlights({
     if (!overlappingRanges.length) continue
 
     const text = node.textContent ?? ''
+    const doc = node.ownerDocument
     const fragment = doc.createDocumentFragment()
     let cursor = 0
 
