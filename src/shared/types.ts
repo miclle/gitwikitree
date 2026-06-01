@@ -6,6 +6,8 @@ export type AppAppearance = 'system' | 'light' | 'dark'
 
 export type AppLanguage = 'en' | 'zh-CN'
 
+export type FileTabShortcutPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
 export type AppFontFamily = 'system' | 'sans' | 'serif' | 'mono'
 
 export type EditorIndentStyle = 'tab' | 'space'

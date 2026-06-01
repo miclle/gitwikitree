@@ -23,6 +23,9 @@ export type MenuTranslationKey =
   | 'menu.selectAll'
   | 'menu.find'
   | 'menu.searchRepository'
+  | 'menu.navigate'
+  | 'menu.selectTab'
+  | 'menu.selectLastTab'
   | 'menu.view'
   | 'menu.reload'
   | 'menu.toggleDeveloperTools'
@@ -60,6 +63,9 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.selectAll': 'Select All',
     'menu.find': 'Find',
     'menu.searchRepository': 'Search Repository...',
+    'menu.navigate': 'Navigate',
+    'menu.selectTab': 'Select Tab',
+    'menu.selectLastTab': 'Select Last Tab',
     'menu.view': 'View',
     'menu.reload': 'Reload',
     'menu.toggleDeveloperTools': 'Toggle Developer Tools',
@@ -96,6 +102,9 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.selectAll': '全选',
     'menu.find': '查找',
     'menu.searchRepository': '搜索仓库...',
+    'menu.navigate': '导航',
+    'menu.selectTab': '选择标签',
+    'menu.selectLastTab': '选择最后一个标签',
     'menu.view': '视图',
     'menu.reload': '重新加载',
     'menu.toggleDeveloperTools': '切换开发者工具',

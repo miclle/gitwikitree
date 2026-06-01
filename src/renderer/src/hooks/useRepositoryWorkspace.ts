@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { canMoveTabHistory, type OpenFileTab } from '../app-navigation'
+import {
+  canMoveTabHistory,
+  getFileTabForShortcutPosition,
+  type OpenFileTab
+} from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
 import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
 import { usePendingMarkdownAnchor } from './usePendingMarkdownAnchor'
@@ -32,6 +36,7 @@ import type {
   RepositoryPayload,
   RepositorySource,
   SessionState,
+  FileTabShortcutPosition,
   TreeItemOpenPayload,
   TreeNode,
   AppSettings
@@ -595,6 +600,16 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     closeFileTab(tabToClose.id)
   }, [activeFileTabId, closeFileTab, openFileTabs])
 
+  const selectFileTabByShortcut = useCallback(
+    (position: FileTabShortcutPosition): void => {
+      const tab = getFileTabForShortcutPosition(openFileTabs, position)
+      if (!tab || tab.id === activeFileTabId) return
+
+      void selectFileTab(tab)
+    },
+    [activeFileTabId, openFileTabs, selectFileTab]
+  )
+
   const navigateActiveTabHistory = useCallback(
     async (delta: -1 | 1): Promise<void> => {
       const patch = createHistoryNavigationPatch(openFileTabs, activeFileTabId, delta)
@@ -617,6 +632,10 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
   useEffect(() => {
     return window.api.onCloseCurrentTabOrWindow(closeCurrentTabOrWindow)
   }, [closeCurrentTabOrWindow])
+
+  useEffect(() => {
+    return window.api.onSelectFileTabByShortcut(selectFileTabByShortcut)
+  }, [selectFileTabByShortcut])
 
   const replaceRepositoryWorkspace = useCallback(
     async (nextRepository: RepositoryPayload): Promise<void> => {

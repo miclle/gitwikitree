@@ -2,7 +2,12 @@ import type { MenuItemConstructorOptions } from 'electron'
 import { basename } from 'path'
 import { translateMenu } from './menu-i18n'
 import { getRecentRepositories } from './session-store'
-import type { AppLanguage, RecentFileState, RecentRepositoryState } from '../shared/types'
+import type {
+  AppLanguage,
+  FileTabShortcutPosition,
+  RecentFileState,
+  RecentRepositoryState
+} from '../shared/types'
 
 export type MenuClickEvent = Parameters<NonNullable<MenuItemConstructorOptions['click']>>[2]
 
@@ -17,6 +22,7 @@ type AppMenuTemplateOptions = {
   openRecentFile: (file: RecentFileState, event: MenuClickEvent) => void
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
+  selectFileTabByShortcut: (position: FileTabShortcutPosition) => void
   saveCurrentFile: () => void
   openSettings: () => void
   openCurrentTabSearch: () => void
@@ -35,6 +41,7 @@ export function createAppMenuTemplate({
   openRecentFile,
   clearRecent,
   closeCurrentTabOrWindow,
+  selectFileTabByShortcut,
   saveCurrentFile,
   openSettings,
   openCurrentTabSearch,
@@ -71,6 +78,13 @@ export function createAppMenuTemplate({
       click: () => clearRecent()
     }
   ]
+  const tabShortcutItems: MenuItemConstructorOptions[] = [1, 2, 3, 4, 5, 6, 7, 8].map(
+    (position) => ({
+      label: `${t('menu.selectTab')} ${position}`,
+      accelerator: `CommandOrControl+${position}`,
+      click: () => selectFileTabByShortcut(position as FileTabShortcutPosition)
+    })
+  )
 
   return [
     ...(platform === 'darwin'
@@ -151,6 +165,17 @@ export function createAppMenuTemplate({
           click: openSettings
         },
         { role: 'selectAll', label: t('menu.selectAll') }
+      ]
+    },
+    {
+      label: t('menu.navigate'),
+      submenu: [
+        ...tabShortcutItems,
+        {
+          label: t('menu.selectLastTab'),
+          accelerator: 'CommandOrControl+9',
+          click: () => selectFileTabByShortcut(9)
+        }
       ]
     },
     {

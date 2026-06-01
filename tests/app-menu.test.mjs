@@ -28,6 +28,7 @@ function createActions() {
       openRecentFile: (file, event) => calls.push(['openRecentFile', file.filePath, event]),
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
+      selectFileTabByShortcut: (position) => calls.push(['selectFileTabByShortcut', position]),
       saveCurrentFile: () => calls.push(['saveCurrentFile']),
       openSettings: () => calls.push(['openSettings']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
@@ -119,10 +120,6 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
       'Select All'
     ]
   )
-  assert.equal(
-    template.find((item) => item.label === 'Navigate'),
-    undefined
-  )
   assert.deepEqual(
     editMenu.submenu
       .filter((item) => item.label === 'Find' || item.label === 'Search Repository...')
@@ -132,6 +129,44 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
       ['Search Repository...', 'Shift+CommandOrControl+F']
     ]
   )
+})
+
+test('createAppMenuTemplate exposes tab selection shortcuts', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions, calls } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const navigateMenu = template.find((item) => item.label === 'Navigate')
+
+  assert.deepEqual(
+    navigateMenu.submenu.map((item) => [item.label, item.accelerator]),
+    [
+      ['Select Tab 1', 'CommandOrControl+1'],
+      ['Select Tab 2', 'CommandOrControl+2'],
+      ['Select Tab 3', 'CommandOrControl+3'],
+      ['Select Tab 4', 'CommandOrControl+4'],
+      ['Select Tab 5', 'CommandOrControl+5'],
+      ['Select Tab 6', 'CommandOrControl+6'],
+      ['Select Tab 7', 'CommandOrControl+7'],
+      ['Select Tab 8', 'CommandOrControl+8'],
+      ['Select Last Tab', 'CommandOrControl+9']
+    ]
+  )
+
+  navigateMenu.submenu[0].click()
+  navigateMenu.submenu[7].click()
+  navigateMenu.submenu[8].click()
+
+  assert.deepEqual(calls, [
+    ['selectFileTabByShortcut', 1],
+    ['selectFileTabByShortcut', 8],
+    ['selectFileTabByShortcut', 9]
+  ])
 })
 
 test('createAppMenuTemplate exposes save in the file menu', async () => {

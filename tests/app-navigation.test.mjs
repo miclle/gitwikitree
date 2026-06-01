@@ -134,6 +134,23 @@ test('moveActiveTabHistory navigates backward and forward within the active tab'
   assert.equal(forward.tabs[0].historyIndex, 1)
 })
 
+test('getFileTabForShortcutPosition maps 1-8 to tab positions and 9 to the last tab', async () => {
+  const { getFileTabForShortcutPosition } = await loadAppNavigation()
+  const tabs = Array.from({ length: 10 }, (_, index) => ({
+    id: `tab-${index + 1}`,
+    path: `file-${index + 1}.md`,
+    name: `file-${index + 1}.md`,
+    history: [{ path: `file-${index + 1}.md`, name: `file-${index + 1}.md` }],
+    historyIndex: 0
+  }))
+
+  assert.equal(getFileTabForShortcutPosition(tabs, 1)?.id, 'tab-1')
+  assert.equal(getFileTabForShortcutPosition(tabs, 8)?.id, 'tab-8')
+  assert.equal(getFileTabForShortcutPosition(tabs, 9)?.id, 'tab-10')
+  assert.equal(getFileTabForShortcutPosition(tabs, 0), undefined)
+  assert.equal(getFileTabForShortcutPosition(tabs.slice(0, 3), 8), undefined)
+})
+
 test('createWorkspaceNavigationPatch keeps tab and selected-file state together', async () => {
   const { module } = await loadWorkspaceNavigation()
   const initialTabs = [

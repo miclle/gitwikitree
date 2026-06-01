@@ -48,7 +48,13 @@ import {
   mergeWindowStateIntoSession,
   readWindowState
 } from './window-state'
-import type { AppSettings, RecentFileState, RepositoryPayload, SessionState } from '../shared/types'
+import type {
+  AppSettings,
+  FileTabShortcutPosition,
+  RecentFileState,
+  RepositoryPayload,
+  SessionState
+} from '../shared/types'
 import { defaultAppSettings } from '../shared/types'
 
 const appName = 'Git Wikitree'
@@ -128,6 +134,10 @@ function closeFocusedFileTabOrWindow(): void {
   if (!targetWindow) return
 
   targetWindow.webContents.send('tab:close-current-or-window')
+}
+
+function selectFocusedFileTabByShortcut(position: FileTabShortcutPosition): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('tab:select-by-shortcut', position)
 }
 
 function openGlobalSearch(): void {
@@ -317,6 +327,7 @@ function createAppMenu(): void {
         openRecentFile: openRecentFileMenuItem,
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
+        selectFileTabByShortcut: selectFocusedFileTabByShortcut,
         saveCurrentFile,
         openSettings,
         openCurrentTabSearch,

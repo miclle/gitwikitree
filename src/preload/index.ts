@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   AppSettings,
+  FileTabShortcutPosition,
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
   RepositoryLoadOptions,
@@ -125,6 +126,13 @@ const api = {
     ipcRenderer.on('tab:close-current-or-window', listener)
 
     return () => ipcRenderer.removeListener('tab:close-current-or-window', listener)
+  },
+  onSelectFileTabByShortcut: (callback: (position: FileTabShortcutPosition) => void) => {
+    const listener = (_event: IpcRendererEvent, position: FileTabShortcutPosition): void =>
+      callback(position)
+    ipcRenderer.on('tab:select-by-shortcut', listener)
+
+    return () => ipcRenderer.removeListener('tab:select-by-shortcut', listener)
   },
   onOpenCurrentTabSearch: (callback: () => void) => {
     const listener = (): void => callback()

@@ -1,4 +1,4 @@
-import type { NavigationTarget } from '../../shared/types'
+import type { FileTabShortcutPosition, NavigationTarget } from '../../shared/types'
 
 export type { NavigationTarget }
 
@@ -103,4 +103,13 @@ export function canMoveTabHistory(
 
   const nextIndex = activeTab.historyIndex + delta
   return nextIndex >= 0 && nextIndex < activeTab.history.length
+}
+
+export function getFileTabForShortcutPosition(
+  tabs: OpenFileTab[],
+  position: FileTabShortcutPosition
+): OpenFileTab | undefined {
+  if (position === 9) return tabs.at(-1)
+
+  return tabs[position - 1]
 }
