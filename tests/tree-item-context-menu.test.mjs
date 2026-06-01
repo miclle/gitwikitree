@@ -44,16 +44,18 @@ test('tree item context menu exposes new tab and new window actions', async () =
 
   assert.deepEqual(
     items.map((menuItem) => menuItem.label),
-    ['Open in New Tab', 'Open in New Window', 'Copy Path', 'Copy Relative Path']
+    ['Open in New Tab', 'Open in New Window', 'Copy Path', 'Copy Relative Path', 'Rename']
   )
 
   items[0].click()
   items[1].click()
   items[2].click()
   items[3].click()
+  items[4].click()
 
   assert.deepEqual(sentMessages, [
-    { channel: 'tree-item:open-in-new-tab', payload: 'docs/guide.md' }
+    { channel: 'tree-item:open-in-new-tab', payload: 'docs/guide.md' },
+    { channel: 'tree-item:rename', payload: 'docs/guide.md' }
   ])
   assert.deepEqual(openedWindows, [item])
   assert.deepEqual(copiedText, ['/repo/docs/guide.md', 'docs/guide.md'])
@@ -83,7 +85,7 @@ test('tree item context menu localizes actions', async () => {
 
   assert.deepEqual(
     items.map((menuItem) => menuItem.label),
-    ['在新标签中打开', '在新窗口中打开', '复制路径', '复制相对路径']
+    ['在新标签中打开', '在新窗口中打开', '复制路径', '复制相对路径', '重命名']
   )
 })
 

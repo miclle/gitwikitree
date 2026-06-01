@@ -30,6 +30,7 @@ import {
 import type {
   MarkdownLinkContext,
   MarkdownLinkOpenPayload,
+  NavigationTarget,
   PreviewPayload,
   ProjectSessionState,
   RecentFileState,
@@ -57,6 +58,48 @@ async function loadRepositoryFromContext({
   repoPath
 }: RepositoryLoadContext): Promise<RepositoryPayload> {
   return window.api.loadRepository(repoPath)
+}
+
+function renamedPathFor(path: string, nextName: string): string {
+  const parts = path.split('/').filter(Boolean)
+  parts[parts.length - 1] = nextName
+  return parts.join('/')
+}
+
+function replaceMovedPath(
+  path: string | undefined,
+  fromPath: string,
+  toPath: string
+): string | undefined {
+  if (!path) return path
+  if (path === fromPath) return toPath
+  if (path.startsWith(`${fromPath}/`)) return `${toPath}${path.slice(fromPath.length)}`
+  return path
+}
+
+function replaceMovedTarget<T extends NavigationTarget>(
+  target: T,
+  fromPath: string,
+  toPath: string
+): T {
+  const nextPath = replaceMovedPath(target.path, fromPath, toPath)
+  if (!nextPath || nextPath === target.path) return target
+
+  return {
+    ...target,
+    path: nextPath,
+    name: fileNameFromPath(nextPath)
+  }
+}
+
+function replaceMovedTab(tab: OpenFileTab, fromPath: string, toPath: string): OpenFileTab {
+  const nextTarget = replaceMovedTarget(tab, fromPath, toPath)
+
+  return {
+    ...tab,
+    ...nextTarget,
+    history: tab.history?.map((target) => replaceMovedTarget(target, fromPath, toPath))
+  }
 }
 
 async function loadRepositoryForProjectSession(
@@ -883,11 +926,45 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     [selectPreviewPath]
   )
 
+  const renameTreeItem = useCallback(
+    async (path: string): Promise<void> => {
+      if (!repository || !path || !discardEditingIfAllowed()) return
+
+      const currentName = fileNameFromPath(path)
+      const nextName = window.prompt(t('tree.renamePrompt', { name: currentName }), currentName)
+      const trimmedName = nextName?.trim()
+      if (!trimmedName || trimmedName === currentName) return
+
+      await runRepositoryLoading(async () => {
+        const nextRepository = await window.api.renamePath(repository.path, path, trimmedName, {
+          source: repository.source,
+          rootPath: repository.rootPath
+        })
+        const nextPath = renamedPathFor(path, trimmedName)
+        const nextSelectedPath = replaceMovedPath(selectedPathRef.current, path, nextPath) ?? ''
+
+        setRepository(nextRepository)
+        setExpandedPaths((current) => new Set([...current, ...parentPaths(nextPath)]))
+        setSelectedPath(nextSelectedPath)
+        setActiveFilePath((current) => replaceMovedPath(current, path, nextPath))
+        setOpenFileTabs((current) => current.map((tab) => replaceMovedTab(tab, path, nextPath)))
+        await loadPreview(nextSelectedPath, nextRepository)
+      })
+    },
+    [discardEditingIfAllowed, loadPreview, repository, runRepositoryLoading, t]
+  )
+
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {
       selectPreviewPath(path, true)
     })
   }, [selectPreviewPath])
+
+  useEffect(() => {
+    return window.api.onRenameTreeItem((path) => {
+      void renameTreeItem(path)
+    })
+  }, [renameTreeItem])
 
   useEffect(() => {
     return window.api.onOpenMarkdownLink(openMarkdownLink)

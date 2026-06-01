@@ -50,6 +50,12 @@ const api = {
     ipcRenderer.invoke('repository:blame', repoPath, relativePath, options),
   saveFile: (repoPath: string, relativePath: string, content: string, options?: SaveFileOptions) =>
     ipcRenderer.invoke('repository:save-file', repoPath, relativePath, content, options),
+  renamePath: (
+    repoPath: string,
+    relativePath: string,
+    nextName: string,
+    options?: RepositoryLoadOptions
+  ) => ipcRenderer.invoke('repository:rename-path', repoPath, relativePath, nextName, options),
   searchRepository: (repoPath: string, query: string, options?: RepositoryLoadOptions) =>
     ipcRenderer.invoke('repository:search', repoPath, query, options),
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -114,6 +120,12 @@ const api = {
     ipcRenderer.on('tree-item:open-in-new-tab', listener)
 
     return () => ipcRenderer.removeListener('tree-item:open-in-new-tab', listener)
+  },
+  onRenameTreeItem: (callback: (path: string) => void) => {
+    const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
+    ipcRenderer.on('tree-item:rename', listener)
+
+    return () => ipcRenderer.removeListener('tree-item:rename', listener)
   },
   onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => {
     const listener = (_event: IpcRendererEvent, payload: MarkdownLinkOpenPayload): void =>

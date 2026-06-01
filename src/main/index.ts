@@ -29,6 +29,7 @@ import {
   loadRepository,
   openWorktree,
   saveFile,
+  renamePath,
   searchRepository
 } from './repository-service'
 import { registerRepositoryIpcHandlers } from './repository-ipc'
@@ -397,6 +398,7 @@ app.whenReady().then(async () => {
     getPreview,
     getBlame,
     saveFile,
+    renamePath,
     searchRepository,
     activateRepositoryInWindow
   })

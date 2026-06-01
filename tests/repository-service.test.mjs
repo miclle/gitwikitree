@@ -20,6 +20,7 @@ async function loadRepositoryService() {
       'src/main/repository-blame.ts',
       'src/main/repository-files.ts',
       'src/main/repository-preview.ts',
+      'src/main/repository-file-actions.ts',
       'src/main/repository-search.ts',
       'src/main/repository-worktree.ts',
       'src/main/repository-workspace.ts',
@@ -259,6 +260,26 @@ test('saveFile rejects stale edits when the file changed on disk', async () => {
       /changed on disk/i
     )
     assert.equal(await readFile(join(repoPath, 'docs', 'guide.md'), 'utf8'), '# External\n')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('renamePath renames an item inside the selected workspace', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const repository = await service.renamePath(repoPath, 'docs/guide.md', 'manual.md')
+
+    assert.equal(await readFile(join(repoPath, 'docs', 'manual.md'), 'utf8'), '# Guide\n\nContent')
+    await assert.rejects(() => readFile(join(repoPath, 'docs', 'guide.md'), 'utf8'), /ENOENT/)
+    assert.ok(
+      repository.tree
+        .find((node) => node.path === 'docs')
+        ?.children?.some((node) => node.path === 'docs/manual.md')
+    )
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

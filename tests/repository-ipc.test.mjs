@@ -79,6 +79,15 @@ function createHarness() {
         content,
         options
       }),
+      renamePath: async (repoPath, relativePath, nextName, options) => ({
+        ...loadedRepository,
+        path: repoPath,
+        renamed: {
+          relativePath,
+          nextName,
+          options
+        }
+      }),
       searchRepository: async (repoPath, query, options) => ({
         repoPath,
         query,
@@ -107,6 +116,7 @@ test('registerRepositoryIpcHandlers registers all repository load channels', asy
       'repository:preview',
       'repository:blame',
       'repository:save-file',
+      'repository:rename-path',
       'repository:search'
     ]
   )
@@ -228,4 +238,31 @@ test('repository:search searches within the requested local workspace', async ()
       rootPath: '/repo'
     }
   })
+})
+
+test('repository:rename-path renames within the selected workspace and activates it', async () => {
+  const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
+  const { handlers, activated, dependencies } = createHarness()
+
+  registerRepositoryIpcHandlers(dependencies)
+  const repository = await handlers.get('repository:rename-path')(
+    { sender: {} },
+    '/repo',
+    'docs/index.md',
+    'guide.md',
+    {
+      source: 'worktree',
+      rootPath: '/root'
+    }
+  )
+
+  assert.deepEqual(repository.renamed, {
+    relativePath: 'docs/index.md',
+    nextName: 'guide.md',
+    options: {
+      source: 'worktree',
+      rootPath: '/root'
+    }
+  })
+  assert.deepEqual(activated, [{ sourceWindow: { id: 'sender-window' }, repository }])
 })

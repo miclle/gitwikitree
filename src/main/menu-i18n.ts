@@ -22,6 +22,7 @@ export type MenuTranslationKey =
   | 'menu.paste'
   | 'menu.pasteAndMatchStyle'
   | 'menu.delete'
+  | 'menu.rename'
   | 'menu.selectAll'
   | 'menu.find'
   | 'menu.searchRepository'
@@ -65,6 +66,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.paste': 'Paste',
     'menu.pasteAndMatchStyle': 'Paste and Match Style',
     'menu.delete': 'Delete',
+    'menu.rename': 'Rename',
     'menu.selectAll': 'Select All',
     'menu.find': 'Find',
     'menu.searchRepository': 'Search Repository...',
@@ -107,6 +109,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.paste': '粘贴',
     'menu.pasteAndMatchStyle': '粘贴并匹配样式',
     'menu.delete': '删除',
+    'menu.rename': '重命名',
     'menu.selectAll': '全选',
     'menu.find': '查找',
     'menu.searchRepository': '搜索仓库...',

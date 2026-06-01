@@ -4,9 +4,9 @@ import type {
   PreviewPayload,
   RepositoryPayload,
   RepositorySearchResult,
+  RepositoryLoadOptions,
   SaveFileOptions
 } from '../shared/types'
-import type { RepositoryLoadOptions } from '../shared/types'
 
 type OpenDialogResult = {
   canceled: boolean
@@ -40,6 +40,12 @@ type RepositoryIpcDependencies = {
     content: string,
     options?: SaveFileOptions
   ) => Promise<PreviewPayload>
+  renamePath: (
+    repoPath: string,
+    relativePath: string,
+    nextName: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<RepositoryPayload>
   searchRepository: (
     repoPath: string,
     query: string,
@@ -62,6 +68,7 @@ export function registerRepositoryIpcHandlers({
   getPreview,
   getBlame,
   saveFile,
+  renamePath,
   searchRepository,
   activateRepositoryInWindow
 }: RepositoryIpcDependencies): void {
@@ -127,6 +134,22 @@ export function registerRepositoryIpcHandlers({
       options?: SaveFileOptions
     ) => {
       return saveFile(repoPath, relativePath, content, options)
+    }
+  )
+
+  ipcMain.handle(
+    'repository:rename-path',
+    async (
+      event,
+      repoPath: string,
+      relativePath: string,
+      nextName: string,
+      options?: RepositoryLoadOptions
+    ) => {
+      const repository = await renamePath(repoPath, relativePath, nextName, options)
+      const sourceWindow = getWindowFromWebContents(event.sender)
+      await activateRepositoryInWindow(sourceWindow, repository)
+      return repository
     }
   )
 

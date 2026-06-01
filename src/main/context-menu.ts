@@ -43,6 +43,10 @@ export function createTreeItemContextMenuItems({
     {
       label: t('menu.copyRelativePath'),
       click: () => writeClipboardText(item.path)
+    },
+    {
+      label: t('menu.rename'),
+      click: () => sender.send('tree-item:rename', item.path)
     }
   ]
 }
