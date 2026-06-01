@@ -158,7 +158,7 @@ export function BlamePreview({ blame }: { blame: GitBlamePayload }): React.JSX.E
   const ageRange = getBlameAgeRange(segments)
 
   return (
-    <div className="blame-preview-shell" aria-label={t('preview.blame')}>
+    <div className="blame-preview" aria-label={t('preview.blame')}>
       <div className="blame-toolbar">
         <div className="blame-age-legend" aria-label={t('preview.ageLegend')}>
           <span>{t('preview.older')}</span>
@@ -189,47 +189,49 @@ export function BlamePreview({ blame }: { blame: GitBlamePayload }): React.JSX.E
           </span>
         </div>
       </div>
-      {segments.map((segment) => (
-        <div className="blame-segment" key={`${segment.lineNumber}:${segment.shortHash}`}>
-          <div
-            className="blame-segment-meta"
-            title={[
-              segment.authorName,
-              segment.authorEmail,
-              segment.shortHash || t('preview.uncommitted'),
-              segment.subject,
-              formatBlameDate(segment.committedAt)
-            ]
-              .filter(Boolean)
-              .join('\n')}
-          >
-            <span
-              className="blame-age-indicator"
-              style={getBlameAgeStyle(segment, ageRange)}
-              aria-hidden="true"
-            />
-            <span className="blame-segment-date">{formatBlameDate(segment.committedAt)}</span>
-            <BlameAvatar contributor={segment} />
-            <span className="blame-segment-author">{segment.authorName}</span>
-            <span className="blame-segment-subject" title={segment.subject}>
-              {segment.subject}
-            </span>
-            <span className="blame-segment-commit">
-              {segment.shortHash || t('preview.uncommitted')}
-            </span>
+      <div className="blame-preview-shell">
+        {segments.map((segment) => (
+          <div className="blame-segment" key={`${segment.lineNumber}:${segment.shortHash}`}>
+            <div
+              className="blame-segment-meta"
+              title={[
+                segment.authorName,
+                segment.authorEmail,
+                segment.shortHash || t('preview.uncommitted'),
+                segment.subject,
+                formatBlameDate(segment.committedAt)
+              ]
+                .filter(Boolean)
+                .join('\n')}
+            >
+              <span
+                className="blame-age-indicator"
+                style={getBlameAgeStyle(segment, ageRange)}
+                aria-hidden="true"
+              />
+              <span className="blame-segment-date">{formatBlameDate(segment.committedAt)}</span>
+              <BlameAvatar contributor={segment} />
+              <span className="blame-segment-author">{segment.authorName}</span>
+              <span className="blame-segment-subject" title={segment.subject}>
+                {segment.subject}
+              </span>
+              <span className="blame-segment-commit">
+                {segment.shortHash || t('preview.uncommitted')}
+              </span>
+            </div>
+            <div className="blame-code-lines">
+              {segment.lines.map((line) => (
+                <div className="blame-code-line" key={`${line.lineNumber}:${line.shortHash}`}>
+                  <pre className="blame-line-number" aria-hidden="true">
+                    {line.lineNumber}
+                  </pre>
+                  <pre className="blame-line-content">{line.content || ' '}</pre>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="blame-code-lines">
-            {segment.lines.map((line) => (
-              <div className="blame-code-line" key={`${line.lineNumber}:${line.shortHash}`}>
-                <pre className="blame-line-number" aria-hidden="true">
-                  {line.lineNumber}
-                </pre>
-                <pre className="blame-line-content">{line.content || ' '}</pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }

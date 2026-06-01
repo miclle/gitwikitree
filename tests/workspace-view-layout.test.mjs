@@ -682,8 +682,8 @@ test('file view modes expose preview, code, and split editing without discarding
 
   assert.match(
     fileViewModeHook,
-    /const \[fileViewModeState, setFileViewModeState\] = useState<FileViewModeState>\(\{[\s\S]*editing: false,[\s\S]*mode: 'preview'[\s\S]*\}\)/,
-    'file view controls should keep a simple GitHub-like mode scoped to the active edit session'
+    /const \[preferredFileViewMode, setPreferredFileViewMode\] = useState<FileViewMode>\('preview'\)/,
+    'file view controls should keep the selected mode as a session preference'
   )
   assert.match(
     source,
@@ -766,7 +766,7 @@ test('file view modes expose blame as a lazy read-only source history view', asy
   )
   assert.match(
     blamePreview,
-    /const contributors = getBlameContributors\(segments\)[\s\S]*className="blame-toolbar"[\s\S]*className="blame-age-legend"[\s\S]*className="blame-contributors"/,
+    /const contributors = getBlameContributors\(segments\)[\s\S]*className="blame-preview"[\s\S]*className="blame-toolbar"[\s\S]*className="blame-age-legend"[\s\S]*className="blame-contributors"[\s\S]*className="blame-preview-shell"/,
     'blame preview should include a GitHub-like age legend and contributors toolbar'
   )
   assert.match(
@@ -778,6 +778,41 @@ test('file view modes expose blame as a lazy read-only source history view', asy
     css,
     /\.blame-toolbar\s*\{[\s\S]*\.blame-age-legend[\s\S]*\.blame-contributors[\s\S]*\.blame-segment\s*\{[\s\S]*grid-template-columns:\s*430px\s+minmax\(560px,\s*1fr\);[\s\S]*\.blame-age-indicator[\s\S]*\.blame-avatar[\s\S]*\.blame-code-line/,
     'blame preview should keep a GitHub-like commit column and source column'
+  )
+})
+
+test('blame toolbar sticks to the top while scrolling source history', async () => {
+  const css = await readMainCss()
+
+  assert.match(
+    css,
+    /\.preview-body\s*\{(?:(?!\}).)*container-type:\s*inline-size;(?:(?!\}).)*overflow:\s*auto;/s,
+    'preview body should expose its inline size for sticky controls inside horizontally scrollable previews'
+  )
+  assert.match(
+    css,
+    /\.blame-preview\s*\{(?:(?!\}).)*width:\s*100%;(?:(?!\}).)*min-width:\s*max-content;(?:(?!\}).)*background:\s*var\(--bg\);/s,
+    'blame preview should allow source rows to outgrow the visible pane'
+  )
+  assert.doesNotMatch(
+    css,
+    /\.blame-preview-shell\s*\{(?:(?!\}).)*overflow:\s*auto;/,
+    'blame shell should not become a nested scroll container that breaks sticky positioning'
+  )
+  assert.match(
+    css,
+    /\.blame-preview-shell\s*\{(?:(?!\}).)*min-width:\s*max-content;/s,
+    'blame source rows should still be allowed to create horizontal overflow'
+  )
+  assert.match(
+    css,
+    /\.blame-toolbar\s*\{(?:(?!\}).)*position:\s*sticky;(?:(?!\}).)*top:\s*0;(?:(?!\}).)*left:\s*0;(?:(?!\}).)*z-index:\s*1;(?:(?!\}).)*width:\s*100%;(?:(?!\}).)*width:\s*100cqw;(?:(?!\}).)*box-sizing:\s*border-box;/s,
+    'blame toolbar should remain visible and span the visible blame pane while content scrolls horizontally'
+  )
+  assert.match(
+    css,
+    /\.blame-segment\s*\{(?:(?!\}).)*min-width:\s*100%;/s,
+    'blame rows should still create horizontal overflow for wide source lines'
   )
 })
 
@@ -855,23 +890,28 @@ test('directory index previews reuse file editing controls and drafts', async ()
   )
 })
 
-test('stale code mode falls back to preview after editing ends', async () => {
+test('sticky file view mode restarts editing and degrades safely', async () => {
   const source = await readFileViewModeHook()
 
   assert.match(
     source,
-    /fileViewModeState\.editing === isEditing/,
-    'file view mode should not reuse code mode from an ended editing session'
+    /useEffect\(\(\) => \{[\s\S]*shouldEditPreferredMode && canEditPreview && !isEditing[\s\S]*startEditing\(\)/,
+    'code and split preferences should start editing again when another editable file opens'
   )
   assert.match(
     source,
-    /fileViewMode === 'code' && \(!canEditPreview \|\| !isEditing\)[\s\S]*\? 'preview'/,
+    /preferredMode === 'code' && \(!canEditPreview \|\| !isEditing\)[\s\S]*return 'preview'/,
     'code mode should never hide both editor and preview when the file is no longer being edited'
   )
   assert.match(
     source,
-    /setFileViewModeState\(\{[\s\S]*editing: Boolean\(mode !== 'preview' && mode !== 'blame'\),[\s\S]*mode,[\s\S]*path: editablePreviewTarget\?\.path[\s\S]*\}\)/,
-    'view mode state should record only code and split as active edit sessions'
+    /preferredMode === 'split' && !canSplitPreview[\s\S]*return canEditPreview && isEditing \? 'code' : 'preview'/,
+    'split preference should fall back to code for editable non-Markdown files and preview otherwise'
+  )
+  assert.match(
+    source,
+    /setPreferredFileViewMode\(mode\)/,
+    'selecting a file view tab should update the sticky session preference'
   )
 })
 

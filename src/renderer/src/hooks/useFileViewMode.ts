@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   applyDraftToPreview,
   getEditablePreviewTarget,
@@ -7,12 +7,6 @@ import {
 import type { PreviewPayload } from '../../../shared/types'
 
 export type FileViewMode = 'preview' | 'code' | 'split' | 'blame'
-
-interface FileViewModeState {
-  editing: boolean
-  mode: FileViewMode
-  path?: string
-}
 
 interface FileViewModeOptions {
   preview: PreviewPayload | undefined
@@ -35,6 +29,36 @@ interface FileViewModeControls {
   selectFileViewMode: (mode: FileViewMode) => void
 }
 
+interface ResolveFileViewModeOptions {
+  preferredMode: FileViewMode
+  canEditPreview: boolean
+  canSplitPreview: boolean
+  hasEditablePreviewTarget: boolean
+  isEditing: boolean
+}
+
+export function resolveFileViewMode({
+  preferredMode,
+  canEditPreview,
+  canSplitPreview,
+  hasEditablePreviewTarget,
+  isEditing
+}: ResolveFileViewModeOptions): FileViewMode {
+  if (preferredMode === 'split' && !canSplitPreview) {
+    return canEditPreview && isEditing ? 'code' : 'preview'
+  }
+
+  if (preferredMode === 'blame' && !hasEditablePreviewTarget) {
+    return 'preview'
+  }
+
+  if (preferredMode === 'code' && (!canEditPreview || !isEditing)) {
+    return 'preview'
+  }
+
+  return preferredMode
+}
+
 export function useFileViewMode({
   preview,
   draftContent,
@@ -42,29 +66,22 @@ export function useFileViewMode({
   canEditPreview,
   startEditing
 }: FileViewModeOptions): FileViewModeControls {
-  const [fileViewModeState, setFileViewModeState] = useState<FileViewModeState>({
-    editing: false,
-    mode: 'preview'
-  })
+  const [preferredFileViewMode, setPreferredFileViewMode] = useState<FileViewMode>('preview')
   const editablePreviewTarget = getEditablePreviewTarget(preview)
-  const fileViewMode =
-    fileViewModeState.path === editablePreviewTarget?.path &&
-    (fileViewModeState.mode === 'blame' || fileViewModeState.editing === isEditing)
-      ? fileViewModeState.mode
-      : 'preview'
   const canSplitPreview = Boolean(
     canEditPreview &&
     editablePreviewTarget &&
     ['.md', '.markdown', '.mdx'].includes(editablePreviewTarget.extension.toLocaleLowerCase())
   )
-  const effectiveFileViewMode =
-    fileViewMode === 'split' && !canSplitPreview
-      ? 'code'
-      : fileViewMode === 'blame' && !editablePreviewTarget
-        ? 'preview'
-        : fileViewMode === 'code' && (!canEditPreview || !isEditing)
-          ? 'preview'
-          : fileViewMode
+  const shouldEditPreferredMode =
+    preferredFileViewMode === 'code' || preferredFileViewMode === 'split'
+  const effectiveFileViewMode = resolveFileViewMode({
+    preferredMode: preferredFileViewMode,
+    canEditPreview,
+    canSplitPreview,
+    hasEditablePreviewTarget: Boolean(editablePreviewTarget),
+    isEditing
+  })
   const isEditorMounted = Boolean(editablePreviewTarget && isEditing)
   const showsEditor = Boolean(
     editablePreviewTarget &&
@@ -81,19 +98,27 @@ export function useFileViewMode({
   const editorPaneClassName =
     effectiveFileViewMode === 'split' ? 'file-editor-pane split' : 'file-editor-pane'
 
+  useEffect(() => {
+    if (shouldEditPreferredMode && canEditPreview && !isEditing) {
+      startEditing()
+    }
+  }, [
+    canEditPreview,
+    editablePreviewTarget?.path,
+    isEditing,
+    shouldEditPreferredMode,
+    startEditing
+  ])
+
   const selectFileViewMode = useCallback(
     (mode: FileViewMode): void => {
       if ((mode === 'code' || mode === 'split') && canEditPreview && !isEditing) {
         startEditing()
       }
 
-      setFileViewModeState({
-        editing: Boolean(mode !== 'preview' && mode !== 'blame'),
-        mode,
-        path: editablePreviewTarget?.path
-      })
+      setPreferredFileViewMode(mode)
     },
-    [canEditPreview, editablePreviewTarget?.path, isEditing, startEditing]
+    [canEditPreview, isEditing, startEditing]
   )
 
   return {

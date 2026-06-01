@@ -1535,18 +1535,28 @@ kbd {
   box-shadow: 0 0 0 1px rgba(154, 103, 0, 0.32);
 }
 
-.blame-preview-shell {
-  display: grid;
+.blame-preview {
+  width: 100%;
   min-width: max-content;
-  overflow: auto;
   background: var(--bg);
   font-family: var(--editor-font-family);
   font-size: 13px;
   line-height: 1.55;
 }
 
+.blame-preview-shell {
+  min-width: max-content;
+}
+
 .blame-toolbar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 1;
   display: flex;
+  width: 100%;
+  width: 100cqw;
+  box-sizing: border-box;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
@@ -1596,6 +1606,7 @@ kbd {
 
 .blame-segment {
   display: grid;
+  min-width: 100%;
   grid-template-columns: 430px minmax(560px, 1fr);
   border-bottom: 1px solid var(--border-muted);
 }
@@ -1968,6 +1979,7 @@ kbd {
 }
 
 .preview-body {
+  container-type: inline-size;
   flex: 1;
   min-height: 0;
   overflow: auto;

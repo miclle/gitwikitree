@@ -59,7 +59,9 @@ Current implementation:
 - Text-like preview content can be edited with CodeMirror. Markdown, JavaScript,
   TypeScript, HTML, CSS, and JSON use language-aware editing through CodeMirror
   packages, while plain text remains editable without a language package.
-- File views support preview, code, and split modes. Split mode is available for
+- File views support preview, code, split, and blame modes. The selected view
+  mode is sticky for the current workspace session and degrades to the closest
+  supported mode when the next file cannot use it. Split mode is available for
   editable Markdown-like content and includes a keyboard-accessible resizer
   between editor and preview panes.
 - Markdown editing uses a document-oriented syntax highlight style while the

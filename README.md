@@ -28,8 +28,9 @@ preview helpers, settings, session restoration, menus, and status metadata.
   intercepted repository links.
 - Open image previews in an in-app lightbox with keyboard navigation and zoom.
 - Edit text-like files and directory index files with CodeMirror, stale-write
-  protection, preview/code/split modes, resizable editor panes, and dirty
-  indicators in tabs, breadcrumbs, and the file tree.
+  protection, preview/code/split/blame modes, session-sticky view mode
+  selection, resizable editor panes, and dirty indicators in tabs, breadcrumbs,
+  and the file tree.
 - Choose a branch action explicitly: switch the current local workspace, or open
   the selected branch as an editable worktree under `.worktrees`.
 - Keep multiple file and directory tabs, including per-tab back/forward history.
