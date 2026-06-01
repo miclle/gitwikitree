@@ -106,6 +106,13 @@ async function readSplitEditorResizeHook() {
   )
 }
 
+async function readSplitScrollSyncHook() {
+  return readFile(
+    new URL('../src/renderer/src/hooks/useSplitScrollSync.ts', import.meta.url),
+    'utf8'
+  )
+}
+
 async function readPreviewSearchControlsHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/usePreviewSearchControls.ts', import.meta.url),
@@ -886,6 +893,42 @@ test('split editing lets users drag the editor and preview divider', async () =>
     css,
     /\.file-workspace\.split\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*var\(--split-editor-width,\s*50%\)\)\s*8px\s*minmax\(260px,\s*1fr\);/,
     'split editing should size panes with a draggable divider column and usable minimums'
+  )
+})
+
+test('split editing keeps editor and preview scrolling together', async () => {
+  const source = await readWorkspaceView()
+  const splitScrollHook = await readSplitScrollSyncHook()
+
+  assert.match(
+    source,
+    /useSplitScrollSync\(effectiveFileViewMode === 'split'\)[\s\S]*ref=\{splitScrollSyncRef\}/,
+    'split workspaces should attach scroll synchronization to the editor and preview panes'
+  )
+  assert.match(
+    splitScrollHook,
+    /querySelector<HTMLElement>\('\.file-editor \.cm-scroller'\)[\s\S]*querySelector<HTMLElement>\('\.file-preview-pane'\)/,
+    'split scroll sync should target the CodeMirror scroller and preview pane'
+  )
+  assert.match(
+    splitScrollHook,
+    /const attachScrollSync = \(\): void =>[\s\S]*syncFrame = window\.requestAnimationFrame\(attachScrollSync\)/,
+    'split scroll sync should wait for CodeMirror to mount its internal scroller'
+  )
+  assert.match(
+    splitScrollHook,
+    /const \[splitScrollSyncElement, setSplitScrollSyncElement\] = useState<HTMLDivElement \| null>\(null\)[\s\S]*useCallback\(\(element: HTMLDivElement \| null\): void =>[\s\S]*setSplitScrollSyncElement\(element\)/,
+    'split scroll sync should rebind when the split workspace DOM node remounts'
+  )
+  assert.match(
+    splitScrollHook,
+    /source\.scrollTop \/ sourceMaxScrollTop[\s\S]*target\.scrollTop = targetMaxScrollTop \* scrollRatio/,
+    'split scroll sync should preserve relative scroll position between panes'
+  )
+  assert.match(
+    splitScrollHook,
+    /editorScroller\.addEventListener\('scroll', handleEditorScroll[\s\S]*previewPane\.addEventListener\('scroll', handlePreviewScroll[\s\S]*removeEventListener\('scroll', handleEditorScroll[\s\S]*removeEventListener\('scroll', handlePreviewScroll/s,
+    'split scroll sync should install and clean up both scroll listeners'
   )
 })
 

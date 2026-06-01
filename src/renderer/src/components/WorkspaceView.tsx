@@ -19,6 +19,7 @@ import { useFileViewMode } from '../hooks/useFileViewMode'
 import { usePreviewSearchControls } from '../hooks/usePreviewSearchControls'
 import { usePreviewStatusMetadata } from '../hooks/usePreviewStatusMetadata'
 import { useSplitEditorResize } from '../hooks/useSplitEditorResize'
+import { useSplitScrollSync } from '../hooks/useSplitScrollSync'
 import type { RepositoryWorkspace } from '../hooks/useRepositoryWorkspace'
 
 export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element {
@@ -126,6 +127,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     handleSplitResizerPointerDown,
     handleSplitResizerKeyDown
   } = useSplitEditorResize(effectiveFileViewMode === 'split')
+  const splitScrollSyncRef = useSplitScrollSync(effectiveFileViewMode === 'split')
   const {
     activePdfPageCount,
     editorStatusForStatusBar,
@@ -395,7 +397,11 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                   </div>
                 )}
                 {!previewLoading && preview && (
-                  <div className={fileWorkspaceClassName} style={splitWorkspaceStyle}>
+                  <div
+                    className={fileWorkspaceClassName}
+                    ref={splitScrollSyncRef}
+                    style={splitWorkspaceStyle}
+                  >
                     {isEditorMounted && editablePreviewTarget && (
                       <div className={editorPaneClassName} hidden={!showsEditor}>
                         <FileEditor
