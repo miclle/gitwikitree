@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefCallback } from 'react'
+import { useCallback, useLayoutEffect, useState, type RefCallback } from 'react'
 
 type ScrollAnchor = {
   line: number
@@ -55,9 +55,10 @@ function getEditorLineAnchors(editorScroller: HTMLElement): ScrollAnchor[] {
     .map((element) => ({
       element,
       line: Number.parseInt(element.textContent?.trim() ?? '', 10),
-      top: getElementTopInScroller(element, editorScroller)
+      top: getElementTopInScroller(element, editorScroller),
+      height: element.getBoundingClientRect().height
     }))
-    .filter((entry) => Number.isFinite(entry.line))
+    .filter((entry) => Number.isFinite(entry.line) && entry.height > 0)
 
   return lines
     .map((element) => {
@@ -85,14 +86,29 @@ function getEditorLineAnchors(editorScroller: HTMLElement): ScrollAnchor[] {
 }
 
 function getPreviewLineAnchorElements(previewScroller: HTMLElement): PreviewLineAnchorElement[] {
-  return Array.from(previewScroller.querySelectorAll<HTMLElement>('[data-source-line]'))
-    .map((element) => {
-      const line = Number.parseInt(element.dataset.sourceLine ?? '', 10)
-      if (!Number.isFinite(line)) return undefined
+  const roots: ParentNode[] = [previewScroller]
 
-      return { element, line }
-    })
-    .filter((anchor): anchor is PreviewLineAnchorElement => anchor !== undefined)
+  const collectShadowRoots = (root: ParentNode): void => {
+    for (const element of root.querySelectorAll<HTMLElement>('*')) {
+      if (!element.shadowRoot) continue
+
+      roots.push(element.shadowRoot)
+      collectShadowRoots(element.shadowRoot)
+    }
+  }
+
+  collectShadowRoots(previewScroller)
+
+  return roots.flatMap((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>('[data-source-line]'))
+      .map((element) => {
+        const line = Number.parseInt(element.dataset.sourceLine ?? '', 10)
+        if (!Number.isFinite(line)) return undefined
+
+        return { element, line }
+      })
+      .filter((anchor): anchor is PreviewLineAnchorElement => anchor !== undefined)
+  )
 }
 
 function measurePreviewLineAnchors(
@@ -121,6 +137,7 @@ function createPreviewLineAnchorCache(previewScroller: HTMLElement): PreviewLine
   const resizeObserver = new ResizeObserver(invalidateAnchors)
   resizeObserver.observe(previewScroller)
   previewScroller.addEventListener('load', invalidateAnchors, true)
+  previewScroller.addEventListener('preview-source-lines-change', invalidateAnchors, true)
 
   return {
     getAnchors: () => {
@@ -132,6 +149,7 @@ function createPreviewLineAnchorCache(previewScroller: HTMLElement): PreviewLine
       mutationObserver.disconnect()
       resizeObserver.disconnect()
       previewScroller.removeEventListener('load', invalidateAnchors, true)
+      previewScroller.removeEventListener('preview-source-lines-change', invalidateAnchors, true)
     }
   }
 }
@@ -328,17 +346,22 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
     setSplitScrollSyncElement(element)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isSplitMode || !splitScrollSyncElement) return undefined
 
     let isSyncing = false
-    let syncFrame = 0
-    let releaseSyncFrame = 0
-    let pendingSyncFrame = 0
+    let syncTimer = 0
+    let releaseSyncTimer = 0
+    let pendingSyncTimer = 0
     let clearActiveScrollSourceTimer = 0
+    let refreshPreviewScrollerTimer = 0
     let activeScrollSource: ScrollSourceId | undefined
     let cleanupScrollSync: (() => void) | undefined
+    let cleanupPreviewPaneSync: (() => void) | undefined
     let previewMutationObserver: MutationObserver | undefined
+    let activeEditorScroller: HTMLElement | undefined
+    let activePreviewPane: HTMLElement | undefined
+    let activePreviewScroller: HTMLElement | undefined
 
     const markActiveScrollSource = (source: ScrollSourceId): void => {
       activeScrollSource = source
@@ -361,19 +384,21 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
       markActiveScrollSource(source)
       if (isSyncing) return
 
-      if (pendingSyncFrame) window.cancelAnimationFrame(pendingSyncFrame)
-      pendingSyncFrame = window.requestAnimationFrame(() => {
-        pendingSyncFrame = 0
+      if (pendingSyncTimer) window.clearTimeout(pendingSyncTimer)
+      pendingSyncTimer = window.setTimeout(() => {
+        pendingSyncTimer = 0
         const nextScrollTop = getNextScrollTop()
         if (nextScrollTop === undefined) return
         if (Math.abs(target.scrollTop - nextScrollTop) < minimumScrollSyncDelta) return
 
         isSyncing = true
         target.scrollTop = nextScrollTop
-        releaseSyncFrame = window.requestAnimationFrame(() => {
+        if (releaseSyncTimer) window.clearTimeout(releaseSyncTimer)
+        releaseSyncTimer = window.setTimeout(() => {
           isSyncing = false
-        })
-      })
+          releaseSyncTimer = 0
+        }, activeScrollSourceQuietMs)
+      }, 0)
     }
 
     const bindScrollSync = (editorScroller: HTMLElement, previewScroller: HTMLElement): void => {
@@ -435,42 +460,63 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
       }
     }
 
-    const attachScrollSync = (): void => {
+    const bindCurrentPreviewScroller = (): boolean => {
       const editorScroller = splitScrollSyncElement.querySelector<HTMLElement>(
         '.file-editor .cm-scroller'
       )
       const previewPane = splitScrollSyncElement.querySelector<HTMLElement>('.file-preview-pane')
 
       if (!editorScroller || !previewPane) {
-        syncFrame = window.requestAnimationFrame(attachScrollSync)
-        return
+        return false
       }
 
-      let activePreviewScroller: HTMLElement | undefined
+      if (previewPane !== activePreviewPane) {
+        previewMutationObserver?.disconnect()
+        cleanupPreviewPaneSync?.()
+        activePreviewPane = previewPane
 
-      const bindCurrentPreviewScroller = (): void => {
-        const nextPreviewScroller = getPreviewScrollElement(previewPane)
-        if (nextPreviewScroller === activePreviewScroller) return
+        previewMutationObserver = new MutationObserver(bindCurrentPreviewScroller)
+        previewMutationObserver.observe(previewPane, { childList: true, subtree: true })
+        previewPane.addEventListener('preview-source-lines-change', bindCurrentPreviewScroller)
+        cleanupPreviewPaneSync = () => {
+          previewPane.removeEventListener('preview-source-lines-change', bindCurrentPreviewScroller)
+        }
+      }
 
+      const nextPreviewScroller = getPreviewScrollElement(previewPane)
+      if (
+        editorScroller !== activeEditorScroller ||
+        nextPreviewScroller !== activePreviewScroller
+      ) {
+        activeEditorScroller = editorScroller
         activePreviewScroller = nextPreviewScroller
         bindScrollSync(editorScroller, nextPreviewScroller)
       }
 
-      bindCurrentPreviewScroller()
+      return true
+    }
 
-      previewMutationObserver = new MutationObserver(bindCurrentPreviewScroller)
-      previewMutationObserver.observe(previewPane, { childList: true, subtree: true })
+    const attachScrollSync = (): void => {
+      if (!bindCurrentPreviewScroller()) {
+        syncTimer = window.setTimeout(attachScrollSync, 16)
+        return
+      }
+
+      syncTimer = window.setTimeout(bindCurrentPreviewScroller, 16)
+      refreshPreviewScrollerTimer = window.setInterval(bindCurrentPreviewScroller, 250)
     }
 
     attachScrollSync()
 
     return () => {
       previewMutationObserver?.disconnect()
+      cleanupPreviewPaneSync?.()
       cleanupScrollSync?.()
-      if (syncFrame) window.cancelAnimationFrame(syncFrame)
-      if (releaseSyncFrame) window.cancelAnimationFrame(releaseSyncFrame)
-      if (pendingSyncFrame) window.cancelAnimationFrame(pendingSyncFrame)
+      if (syncTimer) window.clearTimeout(syncTimer)
+      if (releaseSyncTimer) window.clearTimeout(releaseSyncTimer)
+      if (pendingSyncTimer) window.clearTimeout(pendingSyncTimer)
       if (clearActiveScrollSourceTimer) window.clearTimeout(clearActiveScrollSourceTimer)
+      if (refreshPreviewScrollerTimer) window.clearInterval(refreshPreviewScrollerTimer)
     }
   }, [isSplitMode, splitScrollSyncElement])
 

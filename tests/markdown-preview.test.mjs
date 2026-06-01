@@ -111,6 +111,68 @@ paginate: true
   )
   assert.match(rendered.html, /href="guide\.md" data-markdown-link="true"/)
   assert.match(rendered.css, /section/)
+  assert.deepEqual(rendered.slideSourceLines, [6, 14])
+})
+
+test('getMarpSlideSourceLines maps slides to source line starts', async () => {
+  const { getMarpSlideSourceLines } = await loadMarkdownPreview()
+
+  assert.deepEqual(
+    getMarpSlideSourceLines(`---
+marp: true
+theme: default
+---
+
+# First
+
+---
+
+## Second
+
+---
+
+## Third`),
+    [5, 9, 13]
+  )
+  assert.deepEqual(
+    getMarpSlideSourceLines(`# First
+
+* * *
+
+## Second
+
+_ _ _
+
+## Third
+
+> ---
+
+    ***`),
+    [1, 4, 8]
+  )
+})
+
+test('marpMarkdownToHtml maps slide source lines from Marp horizontal-rule tokens', async () => {
+  const { marpMarkdownToHtml } = await loadMarkdownPreview()
+  const rendered = await marpMarkdownToHtml(`---
+marp: true
+---
+
+# First
+
+***
+
+## Second
+
+___
+
+## Third
+
+> ---
+
+    ***`)
+
+  assert.deepEqual(rendered.slideSourceLines, [4, 8, 12])
 })
 
 test('markdownToHtml marks links so the preview can intercept clicks', async () => {

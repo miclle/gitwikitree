@@ -921,22 +921,22 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
-    /new MutationObserver\(bindCurrentPreviewScroller\)[\s\S]*observe\(previewPane, \{ childList: true, subtree: true \}\)/,
+    /const bindCurrentPreviewScroller = \(\): boolean =>[\s\S]*querySelector<HTMLElement>\('\.file-preview-pane'\)[\s\S]*previewPane !== activePreviewPane[\s\S]*new MutationObserver\(bindCurrentPreviewScroller\)[\s\S]*addEventListener\('preview-source-lines-change', bindCurrentPreviewScroller\)[\s\S]*setInterval\(bindCurrentPreviewScroller, 250\)/,
     'split scroll sync should rebind when the preview content swaps between regular and Marp scrollers'
   )
   assert.match(
     splitScrollHook,
-    /const attachScrollSync = \(\): void =>[\s\S]*syncFrame = window\.requestAnimationFrame\(attachScrollSync\)/,
-    'split scroll sync should wait for CodeMirror to mount its internal scroller'
+    /const attachScrollSync = \(\): void =>[\s\S]*syncTimer = window\.setTimeout\(attachScrollSync, 16\)/,
+    'split scroll sync should wait for CodeMirror to mount its internal scroller without depending on animation frames'
   )
   assert.match(
     splitScrollHook,
-    /const \[splitScrollSyncElement, setSplitScrollSyncElement\] = useState<HTMLDivElement \| null>\(null\)[\s\S]*useCallback\(\(element: HTMLDivElement \| null\): void =>[\s\S]*setSplitScrollSyncElement\(element\)/,
+    /const \[splitScrollSyncElement, setSplitScrollSyncElement\] = useState<HTMLDivElement \| null>\(null\)[\s\S]*useCallback\(\(element: HTMLDivElement \| null\): void =>[\s\S]*setSplitScrollSyncElement\(element\)[\s\S]*useLayoutEffect\(\(\) =>/,
     'split scroll sync should rebind when the split workspace DOM node remounts'
   )
   assert.match(
     splitScrollHook,
-    /getPreviewLineAnchorElements[\s\S]*querySelectorAll<HTMLElement>\('\[data-source-line\]'\)[\s\S]*createPreviewLineAnchorCache[\s\S]*previewAnchorCache\.getAnchors\(\)/,
+    /getPreviewLineAnchorElements[\s\S]*collectShadowRoots\(previewScroller\)[\s\S]*querySelectorAll<HTMLElement>\('\[data-source-line\]'\)[\s\S]*createPreviewLineAnchorCache[\s\S]*previewAnchorCache\.getAnchors\(\)/,
     'split scroll sync should map cached preview source nodes to editor lines instead of relying on scroll ratios'
   )
   assert.match(
@@ -946,8 +946,8 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
-    /pendingSyncFrame[\s\S]*window\.requestAnimationFrame\(\(\) =>[\s\S]*Math\.abs\(target\.scrollTop - nextScrollTop\) < minimumScrollSyncDelta[\s\S]*target\.scrollTop = nextScrollTop/,
-    'split scroll sync should coalesce passive pane writes and skip tiny scroll corrections'
+    /pendingSyncTimer[\s\S]*window\.setTimeout\(\(\) =>[\s\S]*Math\.abs\(target\.scrollTop - nextScrollTop\) < minimumScrollSyncDelta[\s\S]*target\.scrollTop = nextScrollTop[\s\S]*releaseSyncTimer = window\.setTimeout/,
+    'split scroll sync should coalesce passive pane writes, skip tiny scroll corrections, and suppress feedback scroll events'
   )
   assert.match(
     splitScrollHook,
@@ -1382,6 +1382,11 @@ test('Marp Markdown previews use isolated slide rendering when opted in', async 
     source,
     /<MarpPreviewContent rendered=\{marpPreview\} onReady=\{onContentReady\} \/>/,
     'Marp previews should mark content ready after the shadow root has been populated'
+  )
+  assert.match(
+    source,
+    /slideSourceLines[\s\S]*querySelectorAll<SVGElement>\('\.marpit > svg'\)[\s\S]*slide\.dataset\.sourceLine/,
+    'Marp slide SVGs should expose source-line anchors for split scroll synchronization'
   )
   assert.match(
     previewSearch,

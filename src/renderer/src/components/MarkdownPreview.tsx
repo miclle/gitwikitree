@@ -90,7 +90,7 @@ function MarpPreviewContent({
   rendered,
   onReady
 }: {
-  rendered: { html: string; css: string }
+  rendered: { html: string; css: string; slideSourceLines: number[] }
   onReady: () => void
 }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -132,6 +132,15 @@ function MarpPreviewContent({
       </style>
       ${rendered.html}
     `
+    for (const [index, slide] of Array.from(
+      shadowRoot.querySelectorAll<SVGElement>('.marpit > svg')
+    ).entries()) {
+      const sourceLine = rendered.slideSourceLines[index]
+      if (sourceLine !== undefined) {
+        slide.dataset.sourceLine = String(sourceLine)
+      }
+    }
+    host.dispatchEvent(new Event('preview-source-lines-change', { bubbles: true }))
     onReady()
   }, [onReady, rendered])
 
@@ -230,7 +239,7 @@ async function renderMarpHtml({
   markdownAssetDataUrls?: Record<string, string>
   markdownAssetPaths?: Record<string, string>
   markdownAssetAbsolutePaths?: Record<string, string>
-}): Promise<{ html: string; css: string }> {
+}): Promise<{ html: string; css: string; slideSourceLines: number[] }> {
   const rendered = await marpMarkdownToHtml(content, {
     resolveImageSrc: (href) => markdownAssetDataUrls?.[href],
     resolveImagePath: (href) => markdownAssetPaths?.[href],
@@ -239,7 +248,8 @@ async function renderMarpHtml({
 
   return {
     html: sanitizeMarpHtml(rendered.html),
-    css: rendered.css
+    css: rendered.css,
+    slideSourceLines: rendered.slideSourceLines
   }
 }
 
@@ -296,7 +306,7 @@ export function MarkdownPreview({
         markdownAssetDataUrls?: Record<string, string>
         markdownAssetPaths?: Record<string, string>
         markdownAssetAbsolutePaths?: Record<string, string>
-        rendered: { html: string; css: string }
+        rendered: { html: string; css: string; slideSourceLines: number[] }
       }
     | undefined
   >()

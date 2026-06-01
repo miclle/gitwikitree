@@ -10,6 +10,7 @@ export type MarkdownPreview = {
 export type MarpMarkdownRenderResult = {
   html: string
   css: string
+  slideSourceLines: number[]
 }
 
 export type MarkdownRenderOptions = {
@@ -153,8 +154,82 @@ type MarkdownSourceToken = Tokens.Generic & {
   header?: Tokens.TableCell[]
 }
 
+type MarpMarkdownToken = {
+  type: string
+  map: [number, number] | null
+}
+
+type MarpMarkdownParser = {
+  markdown: {
+    parse: (markdown: string, env: Record<string, unknown>) => MarpMarkdownToken[]
+  }
+}
+
 function countNewlines(value: string): number {
   return (value.match(/\n/g) ?? []).length
+}
+
+function getFrontMatterEndLineIndex(lines: string[]): number {
+  if (lines[0]?.trim() !== '---') return -1
+
+  return lines.findIndex((line, index) => index > 0 && line.trim() === '---')
+}
+
+function getFirstMarpSlideSourceLine(lines: string[]): number {
+  const frontMatterEndIndex = getFrontMatterEndLineIndex(lines)
+  if (frontMatterEndIndex === -1) return 1
+
+  return Math.min(lines.length, frontMatterEndIndex + 2)
+}
+
+function getMarpSlideSourceLinesFromTokens(markdown: string, parser: MarpMarkdownParser): number[] {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const slideTokens = parser.markdown
+    .parse(markdown, {})
+    .filter((token) => token.type === 'marpit_slide_open')
+
+  return slideTokens
+    .map((token, index) => {
+      if (index === 0) return getFirstMarpSlideSourceLine(lines)
+
+      const separatorLineIndex = token.map?.[0]
+      if (separatorLineIndex === undefined) return undefined
+
+      return Math.min(lines.length, separatorLineIndex + 2)
+    })
+    .filter((line): line is number => line !== undefined)
+}
+
+function isMarkdownHorizontalRule(line: string): boolean {
+  const trimmed = line.trim()
+  if (!/^ {0,3}[-*_][\s-*_]*$/.test(line)) return false
+
+  const markers = trimmed.replace(/\s/g, '')
+  return markers.length >= 3 && new Set(markers).size === 1
+}
+
+export function getMarpSlideSourceLines(markdown: string, parser?: MarpMarkdownParser): number[] {
+  if (parser) {
+    const slideSourceLines = getMarpSlideSourceLinesFromTokens(markdown, parser)
+    if (slideSourceLines.length > 0) return slideSourceLines
+  }
+
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const firstSlideLine = getFirstMarpSlideSourceLine(lines)
+  const frontMatterEndIndex = getFrontMatterEndLineIndex(lines)
+  const slideSourceLines = [firstSlideLine]
+  const firstSlideSeparatorIndex = frontMatterEndIndex === -1 ? 0 : frontMatterEndIndex + 1
+
+  for (let index = firstSlideSeparatorIndex; index < lines.length; index += 1) {
+    if (!isMarkdownHorizontalRule(lines[index])) continue
+
+    const nextSlideLine = Math.min(lines.length, index + 2)
+    if (slideSourceLines.at(-1) !== nextSlideLine) {
+      slideSourceLines.push(nextSlideLine)
+    }
+  }
+
+  return slideSourceLines
 }
 
 function getSourceLineAttribute(token: unknown): string {
@@ -433,7 +508,8 @@ export async function marpMarkdownToHtml(
 
   return {
     html: markRawHtmlMarkdownLinks(htmlWithImages),
-    css: rendered.css
+    css: rendered.css,
+    slideSourceLines: getMarpSlideSourceLines(markdown, marp)
   }
 }
 
