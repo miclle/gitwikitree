@@ -3,7 +3,9 @@
 ## IPC and Preload
 
 - The renderer must not import `electron` directly. Use preload-exposed capabilities through `window.api`.
-- When adding an `ipcMain.handle` or `webContents.send` channel, use a clear semantic channel name and update preload implementation, type declarations, and relevant tests.
+- When adding an `ipcMain.handle` or `webContents.send` channel, use a clear
+  semantic channel name and update preload implementation, type declarations,
+  shared types, and relevant tests.
 - Event subscription APIs must return an unsubscribe function, and React `useEffect` callers must clean up listeners.
 - Main-side handlers should return serializable objects, not class instances, functions, Buffers, or unstable structures.
 
@@ -21,9 +23,15 @@
 - Preserve `rootPath`, `activeRef`, and `source` when saving window state, opening tabs, recording recent files, and handling repository sources.
 - Prevent stale async requests from overwriting newer state. Use the existing loading/error patterns where appropriate.
 - Editing state should keep dirty indicators, save commands, preview refreshes, and status-bar metadata in sync with the active file or editable directory index.
+- File view modes should degrade deliberately. Preview is the universal
+  fallback; code and split require editable text-like content; split also
+  requires previewable Markdown-like content; blame requires a file target that
+  can be resolved in the selected repository/worktree.
 
 ## Styling
 
 - Global app styles mostly live in `src/renderer/src/assets/main.css`; base styles live in `base.css`.
 - Avoid large single-color themes, decorative backgrounds, and nested cards. Desktop-tool UI should stay clear, restrained, and easy to scan.
 - Long paths, branch names, and file names need truncation, wrapping, or tooltips so they do not crowd window controls or tab actions.
+- Resizable UI such as sidebars and split editor panes must remain keyboard
+  operable and expose the relevant ARIA value attributes.

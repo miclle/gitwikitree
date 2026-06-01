@@ -15,6 +15,15 @@ npm run build
 - UI/CSS changes should run at least `npm run lint`; high-risk layout changes should start `npm run dev` and check the main flow.
 - Settings or localization changes should include the matching settings, i18n, menu, and context-menu tests where relevant.
 - Editing or save-flow changes should check stale-write protection, dirty indicators, editable directory index previews, status-bar metadata, and menu-driven save behavior.
+- Branch/worktree changes should check switching the primary workspace, opening
+  linked worktrees, existing-worktree reuse, and recent/session context
+  preservation.
+- Blame changes should check the main `repository:blame` IPC path, workspace
+  options, author/avatar privacy behavior, and renderer fallback when blame is
+  unavailable.
+- Search changes should check local filesystem search, cache invalidation,
+  escaped-root rejection, result limits, and renderer debounce/concurrency
+  behavior.
 
 ## Test Patterns
 
@@ -22,6 +31,9 @@ npm run build
 - TypeScript sources are transpiled into temporary ESM modules through `tests/helpers/transpile-modules.mjs`. When adding tests, list the tested module and its dependency modules.
 - Tests involving Git repository behavior usually create a temporary directory, run `git init`, write files, commit, and then validate tree or preview results.
 - Every test must clean up temporary repositories and transpiled directories to avoid polluting later tests.
+- Some tests inspect source text for UI guarantees such as keyboard shortcuts,
+  modal behavior, and CSS layout. Keep those tests narrow and update them only
+  when the user-visible behavior intentionally changes.
 
 ## Verification Reports
 

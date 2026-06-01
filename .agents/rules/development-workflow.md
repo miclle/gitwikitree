@@ -5,6 +5,9 @@
 - Run `git status --short --branch` first to identify user changes and avoid accidental overwrites.
 - Read the relevant modules and tests before editing. The main, preload, and renderer contracts are tightly coupled, so avoid one-sided changes.
 - For documentation and collaboration rules, maintain `AGENTS.md` and `.agents/rules/` first. `CLAUDE.md` is only a compatibility entry point.
+- Keep `README.md` focused on the current app surface and onboarding. Put
+  implementation facts, limitations, and future directions in `TODO.md` or the
+  relevant `.agents/rules/` file.
 
 ## Implementation Order
 
@@ -20,6 +23,8 @@
 - Do not commit automatically unless the user asks for a commit.
 - If a file already has user changes, read the diff first and edit around the existing work carefully.
 - Prefer simplified Angular-style commit messages, such as `docs: add agent guidance` or `fix: preserve tab history`.
+- When a commit is requested, stage only the intended files and re-check
+  `git status --short` after committing or pushing.
 
 ## UI Workflow
 

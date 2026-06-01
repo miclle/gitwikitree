@@ -1,18 +1,20 @@
 # Git Wikitree
 
-Git Wikitree is a desktop Git file workspace built with Electron, electron-vite,
-React, and TypeScript. It opens local Git repositories, presents the repository
-as a navigable file tree, and gives Markdown-heavy projects a fast preview
-surface with branch, worktree, tab, and session-aware navigation.
+Git Wikitree is a desktop Git file workspace built with Electron 42,
+electron-vite, React 19, and TypeScript. It opens local Git repositories,
+presents the repository as a navigable file tree, and gives Markdown-heavy
+projects a fast preview and editing surface with branch, worktree, tab, blame,
+and session-aware navigation.
 
 ## Current Status
 
 The app is an active local-first desktop workspace rather than a Git history
-browser. Repository trees, previews, search, editing, branch switching, and
-worktree workflows operate on local working tree files with explicit Git
-actions where needed. The current codebase has 36 Node.js test suites covering
-main-process repository services, IPC contracts, renderer workspace behavior,
-preview helpers, settings, session restoration, menus, and status metadata.
+browser. Repository trees, previews, search, editing, branch switching, worktree
+workflows, and blame views operate against the selected local working tree or
+worktree, with explicit Git actions where needed. The current codebase has 38
+Node.js test suites covering main-process repository services, IPC contracts,
+renderer workspace behavior, preview helpers, settings, session restoration,
+menus, and status metadata.
 
 ## Features
 
@@ -31,6 +33,8 @@ preview helpers, settings, session restoration, menus, and status metadata.
   protection, preview/code/split/blame modes, session-sticky view mode
   selection, resizable editor panes, and dirty indicators in tabs, breadcrumbs,
   and the file tree.
+- Inspect Git blame for editable file targets, including line-level authorship,
+  commit subjects, age grouping, and privacy-aware avatar fallbacks.
 - Choose a branch action explicitly: switch the current local workspace, or open
   the selected branch as an editable worktree under `.worktrees`.
 - Keep multiple file and directory tabs, including per-tab back/forward history.
@@ -121,10 +125,14 @@ npm run format          # Format the repository with Prettier
   save operations cannot escape the selected repository root.
 - The primary workspace is always a local working tree or worktree; Git actions
   such as branch switching and worktree creation are explicit user choices.
-- Preview, save, and search flows operate on the selected local workspace path.
+- Preview, save, search, and blame flows operate on the selected local workspace
+  path.
 - Session state tracks repository context through `repoPath`, `rootPath`,
   `activeRef`, and `source`; preserve those fields when changing navigation or
   recent-item behavior.
+- Directory README/index previews are first-class editable targets. Keep their
+  edit, save, status, breadcrumb, and tree-refresh behavior aligned with normal
+  file previews.
 - Agent-oriented project rules live in `AGENTS.md` and `.agents/rules/`.
   `CLAUDE.md` is a compatibility symlink to `AGENTS.md`.
 

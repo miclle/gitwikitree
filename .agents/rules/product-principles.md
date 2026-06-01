@@ -2,14 +2,23 @@
 
 ## Product Positioning
 
-Git Wikitree is a desktop workspace for browsing, previewing, and lightly editing local Git repository content. The core experience is quickly opening a repository, understanding its directory structure, switching local branches or opening worktrees, and reading files in tabs.
+Git Wikitree is a desktop workspace for browsing, previewing, lightly editing,
+and inspecting local Git repository content. The core experience is quickly
+opening a repository, understanding its directory structure, switching local
+branches or opening worktrees, reading files in tabs, and checking authorship
+without leaving the local workspace.
 
 ## Design Principles
 
-- Prioritize frequent workflows: opening repositories, browsing the tree, previewing files, switching branches, and returning to recent files.
+- Prioritize frequent workflows: opening repositories, browsing the tree,
+  previewing files, editing text-like files, checking blame, switching
+  branches, and returning to recent files.
 - The interface should feel like a productivity tool, not a promotional page: compact, clear, and explicit about state.
 - The user's local repository is the primary content; UI should not compete with it.
 - The workspace should behave like an editor over local files; Git should appear only for version-control operations.
+- History-oriented features should complement the file workspace. A blame,
+  diff, or history surface should preserve the active path, tab, ref, source,
+  and worktree context instead of becoming a separate Git browser.
 - Long paths, deep directories, many tabs, and large repositories should remain usable.
 - Error messages should guide the next step, such as inaccessible paths, failed Git commands, occupied ports, or unsupported previews.
 

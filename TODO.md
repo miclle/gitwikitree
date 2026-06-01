@@ -99,6 +99,42 @@ Future direction:
 - Add find-and-replace inside the editor after current-tab preview search and
   global repository search remain stable.
 
+## Git Blame and History
+
+Current implementation:
+
+- File views include a read-only blame mode for editable file targets.
+- The renderer loads blame data through `window.api.getBlame(...)`, backed by
+  the main-process `repository:blame` IPC handler and `git blame
+--line-porcelain`.
+- Blame loading preserves the selected workspace context through `source` and
+  `rootPath`, so linked worktrees are blamed against their own checked-out
+  files.
+- The blame preview groups adjacent lines from the same commit, displays author,
+  date, subject, short hash, age indicators, contributor avatars, and code
+  lines.
+- GitHub noreply addresses are converted to GitHub avatar URLs when they expose
+  a numeric user id and login. Other addresses do not generate Gravatar or
+  third-party avatar lookups.
+- Blame mode degrades back to preview mode when the active target cannot be
+  edited or blamed.
+
+Known limitations:
+
+- Blame is read-only; there are no commands for opening commits, copying commit
+  hashes, or comparing a line range yet.
+- Blame data is loaded on demand and is not cached across file switches.
+- Uncommitted local changes are not represented as a first-class blame segment.
+- The app does not yet include a broader history, diff, or timeline view.
+
+Future direction:
+
+- Add lightweight commit actions from blame rows, starting with copy hash and
+  open in external Git tooling when a remote URL can be resolved safely.
+- Consider a small per-file blame cache if repeated mode switches become slow.
+- Add diff/history surfaces only when they strengthen the local workspace flow
+  and reuse the same repository/worktree context model.
+
 ## Localization and Status Metadata
 
 Current implementation:
@@ -116,6 +152,8 @@ Current implementation:
 - Repository loading annotates modified tracked files in the tree, and preview
   loading attaches filesystem modification timestamps plus latest Git change
   metadata.
+- Blame and latest-change metadata are separate features: the status bar shows a
+  compact latest-change summary, while blame mode owns line-level authorship.
 
 Known limitations:
 
