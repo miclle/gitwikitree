@@ -1260,6 +1260,25 @@ kbd {
   white-space: nowrap;
 }
 
+.tree-rename-input {
+  min-width: 0;
+  width: 100%;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  outline: none;
+  padding: 1px 5px;
+}
+
+.tree-rename-input:focus {
+  border-color: var(--accent);
+}
+
 .tree-node-dirty {
   width: 7px;
   height: 7px;

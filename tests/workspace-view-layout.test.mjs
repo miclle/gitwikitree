@@ -1806,6 +1806,28 @@ test('files tree marks the dirty edited file', async () => {
   )
 })
 
+test('files tree renames items inline instead of using a browser prompt', async () => {
+  const treeRowSource = await readTreeRow()
+  const workspaceHookSource = await readRepositoryWorkspaceHook()
+  const workspaceSource = await readWorkspaceView()
+
+  assert.doesNotMatch(
+    workspaceHookSource,
+    /window\.prompt/,
+    'rename should not depend on Electron browser prompt behavior'
+  )
+  assert.match(
+    treeRowSource,
+    /<input[\s\S]*className="tree-rename-input"[\s\S]*onKeyDown=\{handleRenameKeyDown\}/,
+    'tree rows should render an inline rename input'
+  )
+  assert.match(
+    workspaceSource,
+    /renamingPath=\{renamingPath\}[\s\S]*onRenameSubmit=\{renameTreeItem\}[\s\S]*onRenameCancel=\{cancelRenameTreeItem\}/,
+    'workspace should pass inline rename state and handlers into the files tree'
+  )
+})
+
 test('saving an edited file refreshes Git status decorations', async () => {
   const source = await readWorkspaceEditingHook()
 

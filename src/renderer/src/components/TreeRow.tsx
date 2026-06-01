@@ -1,4 +1,4 @@
-import { type CSSProperties } from 'react'
+import { type CSSProperties, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { iconForNode, shouldOpenInNewTab } from '../app-utils'
@@ -10,25 +10,57 @@ export function TreeRow({
   expandedPaths,
   selectedPath,
   dirtyPath,
+  renamingPath,
   onSelect,
   onToggle,
-  onOpenContextMenu
+  onOpenContextMenu,
+  onRenameSubmit,
+  onRenameCancel
 }: {
   node: TreeNode
   level: number
   expandedPaths: Set<string>
   selectedPath: string
   dirtyPath?: string
+  renamingPath?: string
   onSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   onToggle: (path: string) => void
   onOpenContextMenu: (node: TreeNode) => Promise<void>
+  onRenameSubmit: (path: string, nextName: string) => Promise<void>
+  onRenameCancel: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
   const isDirty = dirtyPath === node.path
+  const isRenaming = renamingPath === node.path
   const selectNode = (openInNewTab = false): void => {
     void onSelect(node, { openInNewTab })
+  }
+  const submitRename = (nextName: string): void => {
+    void onRenameSubmit(node.path, nextName)
+  }
+
+  useEffect(() => {
+    if (!isRenaming) return
+    renameInputRef.current?.focus()
+    renameInputRef.current?.select()
+  }, [isRenaming])
+
+  const handleRenameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    event.stopPropagation()
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onRenameCancel()
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      submitRename(event.currentTarget.value)
+    }
   }
 
   return (
@@ -75,7 +107,20 @@ export function TreeRow({
         )}
         <span className="tree-node-button">
           {iconForNode(node, expanded)}
-          <span className="tree-node-name">{node.name}</span>
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              aria-label={t('tree.renamePrompt', { name: node.name })}
+              className="tree-rename-input"
+              defaultValue={node.name}
+              onBlur={(event) => submitRename(event.currentTarget.value)}
+              onClick={(event) => event.stopPropagation()}
+              onContextMenu={(event) => event.stopPropagation()}
+              onKeyDown={handleRenameKeyDown}
+            />
+          ) : (
+            <span className="tree-node-name">{node.name}</span>
+          )}
           {isDirty && (
             <span
               className="tree-node-dirty"
@@ -104,9 +149,12 @@ export function TreeRow({
               node={child}
               selectedPath={selectedPath}
               dirtyPath={dirtyPath}
+              renamingPath={renamingPath}
               onSelect={onSelect}
               onToggle={onToggle}
               onOpenContextMenu={onOpenContextMenu}
+              onRenameSubmit={onRenameSubmit}
+              onRenameCancel={onRenameCancel}
             />
           ))}
         </div>

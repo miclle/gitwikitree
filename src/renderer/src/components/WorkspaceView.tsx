@@ -36,6 +36,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
   const {
     repository,
     expandedPaths,
+    renamingPath,
     loading,
     error,
     selectedPath,
@@ -77,6 +78,8 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     handleSelect,
     toggleDirectory,
     showTreeItemContextMenu,
+    renameTreeItem,
+    cancelRenameTreeItem,
     showBreadcrumbContextMenu: openBreadcrumbContextMenu,
     navigateActiveTabHistory,
     checkoutBranch,
@@ -226,9 +229,12 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
                         node={node}
                         selectedPath={selectedPath}
                         dirtyPath={hasUnsavedChanges ? selectedPath : undefined}
+                        renamingPath={renamingPath}
                         onSelect={handleSelect}
                         onToggle={toggleDirectory}
                         onOpenContextMenu={showTreeItemContextMenu}
+                        onRenameSubmit={renameTreeItem}
+                        onRenameCancel={cancelRenameTreeItem}
                       />
                     ))}
                   </div>

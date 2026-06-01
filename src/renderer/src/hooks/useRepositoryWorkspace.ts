@@ -124,6 +124,7 @@ type RepositoryState = {
   repository: RepositoryPayload | undefined
   selectedPath: string
   expandedPaths: Set<string>
+  renamingPath: string | undefined
   loading: boolean
   error: string | undefined
   breadcrumbParts: string[]
@@ -184,6 +185,8 @@ type NavigationActions = {
   handleSelect: (node: TreeNode, options?: { openInNewTab?: boolean }) => Promise<void>
   toggleDirectory: (path: string) => void
   showTreeItemContextMenu: (node: TreeNode) => Promise<void>
+  renameTreeItem: (path: string, nextName: string) => Promise<void>
+  cancelRenameTreeItem: () => void
   showBreadcrumbContextMenu: (path: string) => Promise<void>
   navigateActiveTabHistory: (delta: -1 | 1) => Promise<void>
   checkoutBranch: (branch: string) => Promise<void>
@@ -216,6 +219,7 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
   const homeFileRepositoryReloadTimeoutRef = useRef<number | undefined>(undefined)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
+  const [renamingPath, setRenamingPath] = useState<string | undefined>()
   const repositoryRef = useRef<RepositoryPayload | undefined>(repository)
   const selectedPathRef = useRef(selectedPath)
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
@@ -930,13 +934,21 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     [selectPreviewPath]
   )
 
+  const startRenamingTreeItem = useCallback((path: string): void => {
+    setRenamingPath(path)
+  }, [])
+
+  const cancelRenameTreeItem = useCallback((): void => {
+    setRenamingPath(undefined)
+  }, [])
+
   const renameTreeItem = useCallback(
-    async (path: string): Promise<void> => {
+    async (path: string, nextName: string): Promise<void> => {
       if (!repository || !path || !discardEditingIfAllowed()) return
 
       const currentName = fileNameFromPath(path)
-      const nextName = window.prompt(t('tree.renamePrompt', { name: currentName }), currentName)
       const trimmedName = nextName?.trim()
+      setRenamingPath(undefined)
       if (!trimmedName || trimmedName === currentName) return
 
       await runRepositoryLoading(async () => {
@@ -955,7 +967,7 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
         await loadPreview(nextSelectedPath, nextRepository)
       })
     },
-    [discardEditingIfAllowed, loadPreview, repository, runRepositoryLoading, t]
+    [discardEditingIfAllowed, loadPreview, repository, runRepositoryLoading]
   )
 
   const deleteTreeItem = useCallback(
@@ -1002,9 +1014,9 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
 
   useEffect(() => {
     return window.api.onRenameTreeItem((path) => {
-      void renameTreeItem(path)
+      startRenamingTreeItem(path)
     })
-  }, [renameTreeItem])
+  }, [startRenamingTreeItem])
 
   useEffect(() => {
     return window.api.onDeleteTreeItem((path) => {
@@ -1033,6 +1045,7 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
       repository,
       selectedPath,
       expandedPaths,
+      renamingPath,
       loading,
       error,
       breadcrumbParts: selectedPath ? selectedPath.split('/').filter(Boolean) : [],
@@ -1082,6 +1095,8 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
       handleSelect,
       toggleDirectory,
       showTreeItemContextMenu,
+      renameTreeItem,
+      cancelRenameTreeItem,
       showBreadcrumbContextMenu,
       navigateActiveTabHistory,
       checkoutBranch,
