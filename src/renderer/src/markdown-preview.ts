@@ -4,6 +4,7 @@ import { highlightCodeBlock } from './code-highlight'
 export type MarkdownPreview = {
   title?: string
   content: string
+  sourceLineOffset: number
 }
 
 export type MarpMarkdownRenderResult = {
@@ -15,6 +16,7 @@ export type MarkdownRenderOptions = {
   resolveImageSrc?: (href: string) => string | undefined
   resolveImagePath?: (href: string) => string | undefined
   resolveImageAbsolutePath?: (href: string) => string | undefined
+  sourceLineOffset?: number
 }
 
 const marpHtmlAllowlist = {
@@ -138,16 +140,118 @@ function markRawHtmlMarkdownLinks(html: string): string {
   )
 }
 
+type MarkdownTableRow = Tokens.TableCell[] & {
+  sourceLine?: number
+}
+
+type MarkdownSourceToken = Tokens.Generic & {
+  raw?: string
+  sourceLine?: number
+  tokens?: MarkdownSourceToken[]
+  items?: MarkdownSourceToken[]
+  rows?: MarkdownTableRow[]
+  header?: Tokens.TableCell[]
+}
+
+function countNewlines(value: string): number {
+  return (value.match(/\n/g) ?? []).length
+}
+
+function getSourceLineAttribute(token: unknown): string {
+  const sourceLine = (token as { sourceLine?: number }).sourceLine
+
+  return sourceLine ? ` data-source-line="${sourceLine}"` : ''
+}
+
+function annotateMarkdownSourceLines(
+  tokens: MarkdownSourceToken[],
+  markdown: string,
+  sourceLineOffset: number
+): void {
+  annotateTokenListSourceLines(tokens, markdown, sourceLineOffset)
+}
+
+function annotateTokenListSourceLines(
+  tokens: MarkdownSourceToken[],
+  source: string,
+  sourceLineOffset: number
+): void {
+  let searchOffset = 0
+
+  for (const token of tokens) {
+    if (!token.raw) continue
+
+    const tokenOffset = source.indexOf(token.raw, searchOffset)
+    if (tokenOffset === -1) continue
+
+    token.sourceLine = sourceLineOffset + countNewlines(source.slice(0, tokenOffset)) + 1
+    annotateChildTokenSourceLines(token, source, tokenOffset)
+    searchOffset = tokenOffset + token.raw.length
+  }
+}
+
+function annotateChildTokenSourceLines(
+  token: MarkdownSourceToken,
+  parentSource: string,
+  tokenOffset: number
+): void {
+  const tokenSource = token.raw
+    ? parentSource.slice(tokenOffset, tokenOffset + token.raw.length)
+    : ''
+  const childSourceLineOffset = Math.max(0, (token.sourceLine ?? 1) - 1)
+
+  if (token.tokens) {
+    annotateTokenListSourceLines(token.tokens, tokenSource, childSourceLineOffset)
+  }
+
+  if (token.items) {
+    annotateTokenListSourceLines(token.items, tokenSource, childSourceLineOffset)
+  }
+
+  if (token.header) {
+    for (const cell of token.header) {
+      annotateTokenListSourceLines(
+        cell.tokens as MarkdownSourceToken[],
+        tokenSource,
+        childSourceLineOffset
+      )
+    }
+  }
+
+  if (token.rows) {
+    annotateTableRowSourceLines(token)
+
+    for (const row of token.rows) {
+      for (const cell of row) {
+        annotateTokenListSourceLines(
+          cell.tokens as MarkdownSourceToken[],
+          tokenSource,
+          childSourceLineOffset
+        )
+      }
+    }
+  }
+}
+
+function annotateTableRowSourceLines(token: MarkdownSourceToken): void {
+  if (!token.rows || !token.sourceLine) return
+
+  for (const [index, row] of token.rows.entries()) {
+    row.sourceLine = token.sourceLine + index + 2
+  }
+}
+
 function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
   const renderer = new Renderer()
   const headingIds = new Map<string, number>()
 
-  renderer.heading = function ({ tokens, text, depth }: Tokens.Heading): string {
+  renderer.heading = function (token: Tokens.Heading): string {
+    const { tokens, text, depth } = token
     const baseId = markdownHeadingId(text)
     const idCount = headingIds.get(baseId) ?? 0
     headingIds.set(baseId, idCount + 1)
     const id = idCount === 0 ? baseId : `${baseId}-${idCount}`
-    return `<h${depth} id="${escapeHtml(id)}">${this.parser.parseInline(tokens)}</h${depth}>\n`
+    return `<h${depth} id="${escapeHtml(id)}"${getSourceLineAttribute(token)}>${this.parser.parseInline(tokens)}</h${depth}>\n`
   }
 
   renderer.link = function ({ href, title, tokens }: Tokens.Link): string {
@@ -171,17 +275,61 @@ function createMarkdownRenderer(options: MarkdownRenderOptions = {}): Renderer {
     return `<img src="${escapeHtml(src)}" data-preview-image-src="${escapeHtml(imagePath)}"${absolutePathAttribute} alt="${escapeHtml(alt)}"${titleAttribute}>`
   }
 
-  renderer.code = function ({ text, lang }: Tokens.Code): string {
+  renderer.code = function (token: Tokens.Code): string {
+    const { text, lang } = token
     const language = lang?.match(/^\S+/)?.[0]
+    const sourceLineAttribute = getSourceLineAttribute(token)
 
     if (language?.toLowerCase() === 'mermaid') {
-      return `<div class="mermaid-preview" data-mermaid-source="true">${escapeHtml(normalizeMermaidSource(text))}</div>\n`
+      return `<div class="mermaid-preview" data-mermaid-source="true"${sourceLineAttribute}>${escapeHtml(normalizeMermaidSource(text))}</div>\n`
     }
 
-    return `<div class="markdown-code-block"><button type="button" class="markdown-code-copy" data-copy-code="true" aria-label="Copy code" title="Copy code">Copy</button><pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlightCodeBlock(
+    return `<div class="markdown-code-block"${sourceLineAttribute}><button type="button" class="markdown-code-copy" data-copy-code="true" aria-label="Copy code" title="Copy code">Copy</button><pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlightCodeBlock(
       text,
       language
     )}</code></pre></div>\n`
+  }
+
+  renderer.blockquote = function (token: Tokens.Blockquote): string {
+    return `<blockquote${getSourceLineAttribute(token)}>\n${this.parser.parse(token.tokens)}</blockquote>\n`
+  }
+
+  renderer.hr = function (token: Tokens.Hr): string {
+    return `<hr${getSourceLineAttribute(token)}>\n`
+  }
+
+  renderer.list = function (token: Tokens.List): string {
+    let body = ''
+    for (const item of token.items) {
+      body += this.listitem(item)
+    }
+
+    const tag = token.ordered ? 'ol' : 'ul'
+    const start = token.ordered && token.start !== 1 ? ` start="${token.start}"` : ''
+    return `<${tag}${start}${getSourceLineAttribute(token)}>\n${body}</${tag}>\n`
+  }
+
+  renderer.listitem = function (token: Tokens.ListItem): string {
+    return `<li${getSourceLineAttribute(token)}>${this.parser.parse(token.tokens)}</li>\n`
+  }
+
+  renderer.paragraph = function (token: Tokens.Paragraph): string {
+    return `<p${getSourceLineAttribute(token)}>${this.parser.parseInline(token.tokens)}</p>\n`
+  }
+
+  renderer.table = function (token: Tokens.Table): string {
+    let header = ''
+    for (const cell of token.header) header += this.tablecell(cell)
+    const head = `<tr${getSourceLineAttribute(token)}>\n${header}</tr>\n`
+
+    let body = ''
+    for (const row of token.rows as unknown as MarkdownTableRow[]) {
+      let rowHtml = ''
+      for (const cell of row) rowHtml += this.tablecell(cell)
+      body += `<tr${getSourceLineAttribute(row)}>\n${rowHtml}</tr>\n`
+    }
+
+    return `<table${getSourceLineAttribute(token)}>\n<thead>\n${head}</thead>\n${body ? `<tbody>${body}</tbody>` : ''}</table>\n`
   }
 
   return renderer
@@ -262,8 +410,10 @@ export function markdownToHtml(markdown: string, options: MarkdownRenderOptions 
     gfm: true,
     renderer: createMarkdownRenderer(options)
   })
+  const tokens = parser.lexer(markdown) as MarkdownSourceToken[]
+  annotateMarkdownSourceLines(tokens, markdown, options.sourceLineOffset ?? 0)
 
-  return parser.parse(markdown) as string
+  return parser.parser(tokens) as string
 }
 
 export async function marpMarkdownToHtml(
@@ -333,28 +483,33 @@ export function getMarkdownPreview(markdown: string): MarkdownPreview {
   const normalized = markdown.replace(/\r\n/g, '\n')
 
   if (!normalized.startsWith('---\n')) {
-    return { content: markdown }
+    return { content: markdown, sourceLineOffset: 0 }
   }
 
   const endIndex = normalized.indexOf('\n---', 4)
   if (endIndex === -1) {
-    return { content: markdown }
+    return { content: markdown, sourceLineOffset: 0 }
   }
 
   const frontMatter = getMarkdownFrontMatter(markdown)
   if (!frontMatter) {
-    return { content: markdown }
+    return { content: markdown, sourceLineOffset: 0 }
   }
   const titleLine = frontMatter
     .split('\n')
     .find((line) => line.trimStart().toLowerCase().startsWith('title:'))
   const title = titleLine ? unquoteYamlValue(titleLine.split(':').slice(1).join(':')) : undefined
   const contentStart = normalized.indexOf('\n', endIndex + 1)
-  const content = contentStart === -1 ? '' : normalized.slice(contentStart + 1).trimStart()
+  const untrimmedContent = contentStart === -1 ? '' : normalized.slice(contentStart + 1)
+  const content = untrimmedContent.trimStart()
+  const sourceLineOffset =
+    countNewlines(normalized.slice(0, contentStart + 1)) +
+    countNewlines(untrimmedContent.slice(0, untrimmedContent.length - content.length))
   const displayTitle = title && firstMarkdownHeading(content) !== title ? title : undefined
 
   return {
     content,
-    title: displayTitle
+    title: displayTitle,
+    sourceLineOffset
   }
 }

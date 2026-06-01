@@ -936,8 +936,18 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
-    /source\.scrollTop \/ sourceMaxScrollTop[\s\S]*target\.scrollTop = targetMaxScrollTop \* scrollRatio/,
-    'split scroll sync should preserve relative scroll position between panes'
+    /getPreviewLineAnchorElements[\s\S]*querySelectorAll<HTMLElement>\('\[data-source-line\]'\)[\s\S]*createPreviewLineAnchorCache[\s\S]*previewAnchorCache\.getAnchors\(\)/,
+    'split scroll sync should map cached preview source nodes to editor lines instead of relying on scroll ratios'
+  )
+  assert.match(
+    splitScrollHook,
+    /previewAnchorCache\.getAnchors\(\)[\s\S]*projectAnchors[\s\S]*getMappedAnchoredScrollTop/,
+    'split scroll sync should use cached preview anchors for content-node interpolation'
+  )
+  assert.match(
+    splitScrollHook,
+    /pendingSyncFrame[\s\S]*window\.requestAnimationFrame\(\(\) =>[\s\S]*Math\.abs\(target\.scrollTop - nextScrollTop\) < minimumScrollSyncDelta[\s\S]*target\.scrollTop = nextScrollTop/,
+    'split scroll sync should coalesce passive pane writes and skip tiny scroll corrections'
   )
   assert.match(
     splitScrollHook,

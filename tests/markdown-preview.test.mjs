@@ -21,6 +21,7 @@ title: "模块功能及状态"
 
   assert.equal(preview.title, '模块功能及状态')
   assert.equal(preview.content, '正文内容')
+  assert.equal(preview.sourceLineOffset, 4)
 })
 
 test('getMarkdownPreview leaves markdown without front matter unchanged', async () => {
@@ -29,6 +30,7 @@ test('getMarkdownPreview leaves markdown without front matter unchanged', async 
 
   assert.equal(preview.title, undefined)
   assert.equal(preview.content, '# Existing title\n\n正文内容')
+  assert.equal(preview.sourceLineOffset, 0)
 })
 
 test('getMarkdownPreview does not duplicate a front matter title already used as first heading', async () => {
@@ -43,6 +45,7 @@ title: "模块功能及状态"
 
   assert.equal(preview.title, undefined)
   assert.equal(preview.content, '# 模块功能及状态\n\n正文内容')
+  assert.equal(preview.sourceLineOffset, 4)
 })
 
 test('isMarpMarkdown detects Marp front matter opt-in only', async () => {
@@ -114,7 +117,10 @@ test('markdownToHtml marks links so the preview can intercept clicks', async () 
   const { markdownToHtml } = await loadMarkdownPreview()
   const html = markdownToHtml('[Design doc](docs/design.md)')
 
-  assert.equal(html, '<p><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>\n')
+  assert.equal(
+    html,
+    '<p data-source-line="1"><a href="docs/design.md" data-markdown-link="true">Design doc</a></p>\n'
+  )
 })
 
 test('markdownToHtml resolves image sources for embedded previews', async () => {
@@ -130,7 +136,7 @@ test('markdownToHtml resolves image sources for embedded previews', async () => 
 
   assert.equal(
     html,
-    '<p><img src="data:image/png;base64,ZmFrZQ==" data-preview-image-src="content/assets/diagram.png" data-preview-image-absolute-src="/Users/test/repo/content/assets/diagram.png" alt="Diagram" title="Overview"></p>\n'
+    '<p data-source-line="1"><img src="data:image/png;base64,ZmFrZQ==" data-preview-image-src="content/assets/diagram.png" data-preview-image-absolute-src="/Users/test/repo/content/assets/diagram.png" alt="Diagram" title="Overview"></p>\n'
   )
 })
 
@@ -157,8 +163,18 @@ test('markdownToHtml adds stable heading ids for anchor links', async () => {
 
   assert.equal(
     html,
-    '<h1 id="getting-started">Getting Started</h1>\n<h2 id="getting-started-1">Getting Started</h2>\n<h2 id="api-reference">API <code>Reference</code></h2>\n'
+    '<h1 id="getting-started" data-source-line="1">Getting Started</h1>\n<h2 id="getting-started-1" data-source-line="3">Getting Started</h2>\n<h2 id="api-reference" data-source-line="5">API <code>Reference</code></h2>\n'
   )
+})
+
+test('markdownToHtml marks table rows with source lines', async () => {
+  const { markdownToHtml } = await loadMarkdownPreview()
+  const html = markdownToHtml('| A | B |\n|---|---|\n| x | y |\n| z | w |\n')
+
+  assert.match(html, /<table data-source-line="1">/)
+  assert.match(html, /<tr data-source-line="1">/)
+  assert.match(html, /<tr data-source-line="3">/)
+  assert.match(html, /<tr data-source-line="4">/)
 })
 
 test('markdownToHtml renders GitHub flavored markdown and highlighted code blocks', async () => {
@@ -177,7 +193,7 @@ test('markdownToHtml marks Mermaid code fences for diagram rendering', async () 
 
   assert.equal(
     html,
-    '<div class="mermaid-preview" data-mermaid-source="true">graph TD\n  A[Start] --&gt; B[Done]</div>\n'
+    '<div class="mermaid-preview" data-mermaid-source="true" data-source-line="1">graph TD\n  A[Start] --&gt; B[Done]</div>\n'
   )
 })
 
@@ -196,7 +212,7 @@ stateDiagram
 
   assert.equal(
     html,
-    '<div class="mermaid-preview" data-mermaid-source="true">stateDiagram\n' +
+    '<div class="mermaid-preview" data-mermaid-source="true" data-source-line="1">stateDiagram\n' +
       '  direction TB\n' +
       '  state &quot;Preparing（准备中）&quot; as Preparing\n' +
       '  state &quot;Booting（开机中）&quot; as Booting\n' +
@@ -221,7 +237,7 @@ stateDiagram
 
   assert.equal(
     html,
-    '<div class="mermaid-preview" data-mermaid-source="true">stateDiagram\n' +
+    '<div class="mermaid-preview" data-mermaid-source="true" data-source-line="1">stateDiagram\n' +
       '  state &quot;Shutdown（已关机）&quot; as Shutdown\n' +
       '  state &quot;Running（运行中）&quot; as Running\n' +
       '  Running --&gt; Shutdown: 从 Running（运行中）关机</div>\n'

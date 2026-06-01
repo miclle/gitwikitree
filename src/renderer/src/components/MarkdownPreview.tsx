@@ -32,7 +32,8 @@ function sanitizeMarkdownHtml(html: string): string {
       'data-markdown-link',
       'data-preview-image-src',
       'data-preview-image-absolute-src',
-      'data-mermaid-source'
+      'data-mermaid-source',
+      'data-source-line'
     ],
     ALLOW_DATA_ATTR: true
   })
@@ -198,11 +199,13 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
 
 function renderMarkdownHtml({
   content,
+  sourceLineOffset,
   markdownAssetDataUrls,
   markdownAssetPaths,
   markdownAssetAbsolutePaths
 }: {
   content: string
+  sourceLineOffset: number
   markdownAssetDataUrls?: Record<string, string>
   markdownAssetPaths?: Record<string, string>
   markdownAssetAbsolutePaths?: Record<string, string>
@@ -211,7 +214,8 @@ function renderMarkdownHtml({
     markdownToHtml(content, {
       resolveImageSrc: (href) => markdownAssetDataUrls?.[href],
       resolveImagePath: (href) => markdownAssetPaths?.[href],
-      resolveImageAbsolutePath: (href) => markdownAssetAbsolutePaths?.[href]
+      resolveImageAbsolutePath: (href) => markdownAssetAbsolutePaths?.[href],
+      sourceLineOffset
     })
   )
 }
@@ -535,6 +539,7 @@ export function MarkdownPreview({
           dangerouslySetInnerHTML={{
             __html: renderMarkdownHtml({
               content: markdownPreview.content,
+              sourceLineOffset: markdownPreview.sourceLineOffset,
               markdownAssetDataUrls,
               markdownAssetPaths,
               markdownAssetAbsolutePaths
