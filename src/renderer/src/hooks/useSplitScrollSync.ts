@@ -12,6 +12,10 @@ function syncScrollPosition(source: HTMLElement, target: HTMLElement): void {
   target.scrollTop = targetMaxScrollTop * scrollRatio
 }
 
+function getPreviewScrollElement(previewPane: HTMLElement): HTMLElement {
+  return previewPane.querySelector<HTMLElement>('.marp-preview') ?? previewPane
+}
+
 export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivElement> {
   const [splitScrollSyncElement, setSplitScrollSyncElement] = useState<HTMLDivElement | null>(null)
   const splitScrollSyncRef = useCallback((element: HTMLDivElement | null): void => {
@@ -25,6 +29,7 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
     let syncFrame = 0
     let releaseSyncFrame = 0
     let cleanupScrollSync: (() => void) | undefined
+    let previewMutationObserver: MutationObserver | undefined
 
     const syncPanelScroll = (source: HTMLElement, target: HTMLElement): void => {
       if (isSyncing) return
@@ -34,6 +39,21 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
       releaseSyncFrame = window.requestAnimationFrame(() => {
         isSyncing = false
       })
+    }
+
+    const bindScrollSync = (editorScroller: HTMLElement, previewScroller: HTMLElement): void => {
+      cleanupScrollSync?.()
+
+      const handleEditorScroll = (): void => syncPanelScroll(editorScroller, previewScroller)
+      const handlePreviewScroll = (): void => syncPanelScroll(previewScroller, editorScroller)
+
+      editorScroller.addEventListener('scroll', handleEditorScroll)
+      previewScroller.addEventListener('scroll', handlePreviewScroll)
+
+      cleanupScrollSync = () => {
+        editorScroller.removeEventListener('scroll', handleEditorScroll)
+        previewScroller.removeEventListener('scroll', handlePreviewScroll)
+      }
     }
 
     const attachScrollSync = (): void => {
@@ -47,21 +67,26 @@ export function useSplitScrollSync(isSplitMode: boolean): RefCallback<HTMLDivEle
         return
       }
 
-      const handleEditorScroll = (): void => syncPanelScroll(editorScroller, previewPane)
-      const handlePreviewScroll = (): void => syncPanelScroll(previewPane, editorScroller)
+      let activePreviewScroller: HTMLElement | undefined
 
-      editorScroller.addEventListener('scroll', handleEditorScroll)
-      previewPane.addEventListener('scroll', handlePreviewScroll)
+      const bindCurrentPreviewScroller = (): void => {
+        const nextPreviewScroller = getPreviewScrollElement(previewPane)
+        if (nextPreviewScroller === activePreviewScroller) return
 
-      cleanupScrollSync = () => {
-        editorScroller.removeEventListener('scroll', handleEditorScroll)
-        previewPane.removeEventListener('scroll', handlePreviewScroll)
+        activePreviewScroller = nextPreviewScroller
+        bindScrollSync(editorScroller, nextPreviewScroller)
       }
+
+      bindCurrentPreviewScroller()
+
+      previewMutationObserver = new MutationObserver(bindCurrentPreviewScroller)
+      previewMutationObserver.observe(previewPane, { childList: true, subtree: true })
     }
 
     attachScrollSync()
 
     return () => {
+      previewMutationObserver?.disconnect()
       cleanupScrollSync?.()
       if (syncFrame) window.cancelAnimationFrame(syncFrame)
       if (releaseSyncFrame) window.cancelAnimationFrame(releaseSyncFrame)

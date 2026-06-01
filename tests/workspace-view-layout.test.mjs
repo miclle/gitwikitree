@@ -916,6 +916,16 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
+    /function getPreviewScrollElement\(previewPane: HTMLElement\): HTMLElement \{[\s\S]*querySelector<HTMLElement>\('\.marp-preview'\) \?\? previewPane/,
+    'split scroll sync should use the Marp preview scroller when slides own the preview scroll area'
+  )
+  assert.match(
+    splitScrollHook,
+    /new MutationObserver\(bindCurrentPreviewScroller\)[\s\S]*observe\(previewPane, \{ childList: true, subtree: true \}\)/,
+    'split scroll sync should rebind when the preview content swaps between regular and Marp scrollers'
+  )
+  assert.match(
+    splitScrollHook,
     /const attachScrollSync = \(\): void =>[\s\S]*syncFrame = window\.requestAnimationFrame\(attachScrollSync\)/,
     'split scroll sync should wait for CodeMirror to mount its internal scroller'
   )
@@ -931,7 +941,7 @@ test('split editing keeps editor and preview scrolling together', async () => {
   )
   assert.match(
     splitScrollHook,
-    /editorScroller\.addEventListener\('scroll', handleEditorScroll[\s\S]*previewPane\.addEventListener\('scroll', handlePreviewScroll[\s\S]*removeEventListener\('scroll', handleEditorScroll[\s\S]*removeEventListener\('scroll', handlePreviewScroll/s,
+    /cleanupScrollSync\?\.\(\)[\s\S]*editorScroller\.addEventListener\('scroll', handleEditorScroll[\s\S]*previewScroller\.addEventListener\('scroll', handlePreviewScroll[\s\S]*removeEventListener\('scroll', handleEditorScroll[\s\S]*removeEventListener\('scroll', handlePreviewScroll[\s\S]*previewMutationObserver\?\.disconnect\(\)/s,
     'split scroll sync should install and clean up both scroll listeners'
   )
 })
