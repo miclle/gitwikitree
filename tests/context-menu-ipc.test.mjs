@@ -10,6 +10,7 @@ async function loadContextMenuIpc() {
       'src/main/context-menu-ipc.ts',
       'src/main/context-menu.ts',
       'src/main/menu-i18n.ts',
+      'src/main/repository-paths.ts',
       'src/main/browser-context-menu.ts',
       'src/shared/types.ts'
     ]
@@ -21,6 +22,7 @@ function createHarness(targetWindow = { id: 'target-window' }) {
   const handlers = new Map()
   const openedWindows = []
   const popups = []
+  const copiedText = []
   const item = {
     repoPath: '/repo',
     rootPath: '/repo',
@@ -36,6 +38,7 @@ function createHarness(targetWindow = { id: 'target-window' }) {
     item,
     openedWindows,
     popups,
+    copiedText,
     dependencies: {
       ipcMain: {
         handle: (channel, handler) => {
@@ -48,7 +51,7 @@ function createHarness(targetWindow = { id: 'target-window' }) {
       }),
       openTreeItemInNewWindow: (targetItem) => openedWindows.push(targetItem),
       openExternal: () => undefined,
-      writeClipboardText: () => undefined,
+      writeClipboardText: (text) => copiedText.push(text),
       getLanguage: () => 'zh-CN'
     }
   }
@@ -65,7 +68,7 @@ test('registerContextMenuIpcHandlers registers the tree item context menu channe
 
 test('context-menu:tree-item builds and opens a menu for the sender window', async () => {
   const { registerContextMenuIpcHandlers } = await loadContextMenuIpc()
-  const { handlers, item, popups, openedWindows, dependencies } = createHarness()
+  const { handlers, item, popups, openedWindows, copiedText, dependencies } = createHarness()
   const sender = { send: () => undefined }
 
   registerContextMenuIpcHandlers(dependencies)
@@ -74,12 +77,14 @@ test('context-menu:tree-item builds and opens a menu for the sender window', asy
   assert.equal(popups.length, 1)
   assert.deepEqual(
     popups[0].items.map((menuItem) => menuItem.label),
-    ['在新标签中打开', '在新窗口中打开']
+    ['在新标签中打开', '在新窗口中打开', '复制路径']
   )
   assert.deepEqual(popups[0].options, { window: { id: 'target-window' } })
 
   popups[0].items[1].click()
+  popups[0].items[2].click()
   assert.deepEqual(openedWindows, [item])
+  assert.deepEqual(copiedText, ['/repo/docs/guide.md'])
 })
 
 test('context-menu:tree-item does nothing when the sender window is gone', async () => {

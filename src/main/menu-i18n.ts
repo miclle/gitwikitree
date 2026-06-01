@@ -17,6 +17,7 @@ export type MenuTranslationKey =
   | 'menu.redo'
   | 'menu.cut'
   | 'menu.copy'
+  | 'menu.copyPath'
   | 'menu.paste'
   | 'menu.pasteAndMatchStyle'
   | 'menu.delete'
@@ -58,6 +59,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.redo': 'Redo',
     'menu.cut': 'Cut',
     'menu.copy': 'Copy',
+    'menu.copyPath': 'Copy Path',
     'menu.paste': 'Paste',
     'menu.pasteAndMatchStyle': 'Paste and Match Style',
     'menu.delete': 'Delete',
@@ -98,6 +100,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.redo': '重做',
     'menu.cut': '剪切',
     'menu.copy': '复制',
+    'menu.copyPath': '复制路径',
     'menu.paste': '粘贴',
     'menu.pasteAndMatchStyle': '粘贴并匹配样式',
     'menu.delete': '删除',

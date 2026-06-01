@@ -43,7 +43,8 @@ export function registerContextMenuIpcHandlers({
       item,
       language: getLanguage(),
       sender: event.sender as Pick<WebContents, 'send'>,
-      openInNewWindow: openTreeItemInNewWindow
+      openInNewWindow: openTreeItemInNewWindow,
+      writeClipboardText
     })
 
     buildMenuFromTemplate(menuItems).popup({ window: targetWindow })

@@ -9,6 +9,7 @@ async function loadContextMenu() {
     modules: [
       'src/main/context-menu.ts',
       'src/main/menu-i18n.ts',
+      'src/main/repository-paths.ts',
       'src/main/browser-context-menu.ts',
       'src/shared/types.ts'
     ],
@@ -21,6 +22,7 @@ test('tree item context menu exposes new tab and new window actions', async () =
   const { createTreeItemContextMenuItems } = await loadContextMenu()
   const sentMessages = []
   const openedWindows = []
+  const copiedText = []
   const item = {
     repoPath: '/repo',
     rootPath: '/repo',
@@ -36,21 +38,24 @@ test('tree item context menu exposes new tab and new window actions', async () =
     sender: {
       send: (channel, payload) => sentMessages.push({ channel, payload })
     },
-    openInNewWindow: (payload) => openedWindows.push(payload)
+    openInNewWindow: (payload) => openedWindows.push(payload),
+    writeClipboardText: (text) => copiedText.push(text)
   })
 
   assert.deepEqual(
     items.map((menuItem) => menuItem.label),
-    ['Open in New Tab', 'Open in New Window']
+    ['Open in New Tab', 'Open in New Window', 'Copy Path']
   )
 
   items[0].click()
   items[1].click()
+  items[2].click()
 
   assert.deepEqual(sentMessages, [
     { channel: 'tree-item:open-in-new-tab', payload: 'docs/guide.md' }
   ])
   assert.deepEqual(openedWindows, [item])
+  assert.deepEqual(copiedText, ['/repo/docs/guide.md'])
 })
 
 test('tree item context menu localizes actions', async () => {
@@ -71,12 +76,13 @@ test('tree item context menu localizes actions', async () => {
     sender: {
       send: () => undefined
     },
-    openInNewWindow: () => undefined
+    openInNewWindow: () => undefined,
+    writeClipboardText: () => undefined
   })
 
   assert.deepEqual(
     items.map((menuItem) => menuItem.label),
-    ['在新标签中打开', '在新窗口中打开']
+    ['在新标签中打开', '在新窗口中打开', '复制路径']
   )
 })
 

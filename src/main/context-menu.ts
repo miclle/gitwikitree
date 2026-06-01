@@ -1,4 +1,5 @@
 import type { MenuItemConstructorOptions, WebContents } from 'electron'
+import { safeJoin } from './repository-paths'
 import { translateMenu } from './menu-i18n'
 import type {
   AppLanguage,
@@ -15,12 +16,14 @@ export function createTreeItemContextMenuItems({
   item,
   language = 'en',
   sender,
-  openInNewWindow
+  openInNewWindow,
+  writeClipboardText
 }: {
   item: TreeItemContext
   language?: AppLanguage
   sender: Pick<WebContents, 'send'>
   openInNewWindow: (item: TreeItemContext) => void
+  writeClipboardText: (text: string) => void
 }): MenuItemConstructorOptions[] {
   const t = (key: Parameters<typeof translateMenu>[1]): string => translateMenu(language, key)
 
@@ -32,6 +35,10 @@ export function createTreeItemContextMenuItems({
     {
       label: t('menu.openInNewWindow'),
       click: () => openInNewWindow(item)
+    },
+    {
+      label: t('menu.copyPath'),
+      click: () => writeClipboardText(safeJoin(item.repoPath, item.path))
     }
   ]
 }
