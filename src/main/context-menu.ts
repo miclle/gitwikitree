@@ -39,6 +39,10 @@ export function createTreeItemContextMenuItems({
     {
       label: t('menu.copyPath'),
       click: () => writeClipboardText(safeJoin(item.repoPath, item.path))
+    },
+    {
+      label: t('menu.copyRelativePath'),
+      click: () => writeClipboardText(item.path)
     }
   ]
 }

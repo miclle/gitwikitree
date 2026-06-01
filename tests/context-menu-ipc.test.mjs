@@ -77,14 +77,15 @@ test('context-menu:tree-item builds and opens a menu for the sender window', asy
   assert.equal(popups.length, 1)
   assert.deepEqual(
     popups[0].items.map((menuItem) => menuItem.label),
-    ['在新标签中打开', '在新窗口中打开', '复制路径']
+    ['在新标签中打开', '在新窗口中打开', '复制路径', '复制相对路径']
   )
   assert.deepEqual(popups[0].options, { window: { id: 'target-window' } })
 
   popups[0].items[1].click()
   popups[0].items[2].click()
+  popups[0].items[3].click()
   assert.deepEqual(openedWindows, [item])
-  assert.deepEqual(copiedText, ['/repo/docs/guide.md'])
+  assert.deepEqual(copiedText, ['/repo/docs/guide.md', 'docs/guide.md'])
 })
 
 test('context-menu:tree-item does nothing when the sender window is gone', async () => {
