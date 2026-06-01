@@ -226,6 +226,32 @@ test('preview titlebar places file tabs in the titlebar row', async () => {
   )
 })
 
+test('welcome state uses window titlebar chrome without settings action', async () => {
+  const source = await readWorkspaceView()
+  const css = await readMainCss()
+
+  assert.match(
+    source,
+    /!repository \? \([\s\S]*<div className="app-titlebar welcome-titlebar">[\s\S]*<TitlebarWindowControls \/>[\s\S]*t\('app\.title'\)/,
+    'welcome state should render app titlebar chrome with traffic-light controls'
+  )
+  assert.match(
+    source,
+    /!repository \? \([\s\S]*<div className="app-titlebar welcome-titlebar">[\s\S]*\{error && <div className="error-banner">\{error\}<\/div>\}[\s\S]*<section className="welcome-state">/,
+    'welcome state should keep the error banner below the titlebar'
+  )
+  assert.doesNotMatch(
+    source,
+    /<button className="open-button secondary"[\s\S]*app\.settings/,
+    'welcome state should not expose a settings button'
+  )
+  assert.match(
+    css,
+    /\.welcome-state\s*\{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/,
+    'welcome state should fill the remaining window below the titlebar without overflowing'
+  )
+})
+
 test('renderer content security policy allows remote markdown images', async () => {
   const source = await readRendererIndex()
 

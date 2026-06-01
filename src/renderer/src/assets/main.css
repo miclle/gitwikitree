@@ -278,6 +278,23 @@ button:disabled {
   padding: 0 12px 0;
 }
 
+.welcome-titlebar .titlebar-main {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 132px;
+  align-items: center;
+}
+
+.welcome-titlebar-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--chrome-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .titlebar-left,
 .titlebar-window-controls,
 .titlebar-repository,
@@ -2848,7 +2865,15 @@ textarea.settings-control {
 }
 
 .welcome-state {
-  min-height: 100%;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-height: 0;
+  padding-bottom: 112px;
+  background: var(--panel);
+}
+
+.welcome-state > svg {
+  color: var(--control-text);
 }
 
 .welcome-state h2 {

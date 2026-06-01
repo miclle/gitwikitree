@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import type { AppLanguage } from '../../shared/types'
 
 export type TranslationKey =
+  | 'app.title'
   | 'app.openRepository'
   | 'app.settings'
   | 'app.openTabs'
@@ -125,6 +126,7 @@ export const supportedLanguages = ['en', 'zh-CN'] as const satisfies readonly Ap
 
 export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
   en: {
+    'app.title': 'Git Wikitree',
     'app.openRepository': 'Open Repository',
     'app.settings': 'Settings',
     'app.openTabs': 'Open tabs',
@@ -244,6 +246,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'preview.copyCode': 'Copy code'
   },
   'zh-CN': {
+    'app.title': 'Git Wikitree',
     'app.openRepository': '打开仓库',
     'app.settings': '设置',
     'app.openTabs': '已打开标签',

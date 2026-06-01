@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
-import { Code2, Columns2, Eye, GitCommit, Loader2, Pencil, Plus, Settings } from 'lucide-react'
+import { Code2, Columns2, Eye, GitCommit, Loader2, Pencil, Plus } from 'lucide-react'
 import { getDirectoryReadmeBreadcrumbSource } from '../breadcrumb-display'
 import { useGitBlame } from '../hooks/useGitBlame'
 import { BranchControls } from './BranchControls'
@@ -84,7 +84,7 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
     openBreadcrumbPath,
     selectPreviewPath
   } = navigationActions
-  const { settings, isSettingsOpen, openSettings, closeSettings, saveSettings } = settingsState
+  const { settings, isSettingsOpen, closeSettings, saveSettings } = settingsState
   const directoryReadmeSource = getDirectoryReadmeBreadcrumbSource(preview)
   const {
     searchInputRef,
@@ -162,28 +162,32 @@ export function WorkspaceView(workspace: RepositoryWorkspace): React.JSX.Element
 
   return (
     <main className={isResizing ? 'app-shell is-resizing' : 'app-shell'}>
-      {error && <div className="error-banner">{error}</div>}
-
       {!repository ? (
-        <section className="welcome-state">
-          <Code2 size={42} />
-          <h2>{t('app.openRepository')}</h2>
-          <button
-            className="open-button large"
-            type="button"
-            disabled={loading}
-            onClick={openRepository}
-          >
-            {loading ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
-            {t('app.openRepository')}
-          </button>
-          <button className="open-button secondary" type="button" onClick={openSettings}>
-            <Settings size={17} />
-            {t('app.settings')}
-          </button>
-        </section>
+        <>
+          <div className="app-titlebar welcome-titlebar">
+            <div className="titlebar-main">
+              <TitlebarWindowControls />
+              <div className="welcome-titlebar-title">{t('app.title')}</div>
+            </div>
+          </div>
+          {error && <div className="error-banner">{error}</div>}
+          <section className="welcome-state">
+            <Code2 size={42} />
+            <h2>{t('app.openRepository')}</h2>
+            <button
+              className="open-button large"
+              type="button"
+              disabled={loading}
+              onClick={openRepository}
+            >
+              {loading ? <Loader2 className="spin" size={17} /> : <Plus size={17} />}
+              {t('app.openRepository')}
+            </button>
+          </section>
+        </>
       ) : (
         <>
+          {error && <div className="error-banner">{error}</div>}
           <section
             className={isSidebarOpen ? 'repo-layout' : 'repo-layout sidebar-collapsed'}
             style={{
