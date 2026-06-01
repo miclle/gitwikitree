@@ -50,6 +50,7 @@ import {
 } from './window-state'
 import type {
   AppSettings,
+  FileTabShortcutDirection,
   FileTabShortcutPosition,
   RecentFileState,
   RepositoryPayload,
@@ -138,6 +139,10 @@ function closeFocusedFileTabOrWindow(): void {
 
 function selectFocusedFileTabByShortcut(position: FileTabShortcutPosition): void {
   BrowserWindow.getFocusedWindow()?.webContents.send('tab:select-by-shortcut', position)
+}
+
+function selectAdjacentFocusedFileTab(delta: FileTabShortcutDirection): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send('tab:select-adjacent', delta)
 }
 
 function openGlobalSearch(): void {
@@ -328,6 +333,7 @@ function createAppMenu(): void {
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
         selectFileTabByShortcut: selectFocusedFileTabByShortcut,
+        selectAdjacentFileTab: selectAdjacentFocusedFileTab,
         saveCurrentFile,
         openSettings,
         openCurrentTabSearch,

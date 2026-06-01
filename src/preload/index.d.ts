@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AppSettings,
+  FileTabShortcutDirection,
   FileTabShortcutPosition,
   GitBlamePayload,
   MarkdownLinkContext,
@@ -62,6 +63,7 @@ export type GitWikitreeAPI = {
   onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
   onSelectFileTabByShortcut: (callback: (position: FileTabShortcutPosition) => void) => () => void
+  onSelectAdjacentFileTab: (callback: (delta: FileTabShortcutDirection) => void) => () => void
   onOpenCurrentTabSearch: (callback: () => void) => () => void
   onOpenGlobalSearch: (callback: () => void) => () => void
   onSaveCurrentFile: (callback: () => void) => () => void

@@ -24,6 +24,8 @@ export type MenuTranslationKey =
   | 'menu.find'
   | 'menu.searchRepository'
   | 'menu.navigate'
+  | 'menu.selectPreviousTab'
+  | 'menu.selectNextTab'
   | 'menu.selectTab'
   | 'menu.selectLastTab'
   | 'menu.view'
@@ -64,6 +66,8 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.find': 'Find',
     'menu.searchRepository': 'Search Repository...',
     'menu.navigate': 'Navigate',
+    'menu.selectPreviousTab': 'Select Previous Tab',
+    'menu.selectNextTab': 'Select Next Tab',
     'menu.selectTab': 'Select Tab',
     'menu.selectLastTab': 'Select Last Tab',
     'menu.view': 'View',
@@ -103,6 +107,8 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.find': '查找',
     'menu.searchRepository': '搜索仓库...',
     'menu.navigate': '导航',
+    'menu.selectPreviousTab': '选择上一个标签',
+    'menu.selectNextTab': '选择下一个标签',
     'menu.selectTab': '选择标签',
     'menu.selectLastTab': '选择最后一个标签',
     'menu.view': '视图',

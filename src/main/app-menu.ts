@@ -4,6 +4,7 @@ import { translateMenu } from './menu-i18n'
 import { getRecentRepositories } from './session-store'
 import type {
   AppLanguage,
+  FileTabShortcutDirection,
   FileTabShortcutPosition,
   RecentFileState,
   RecentRepositoryState
@@ -23,6 +24,7 @@ type AppMenuTemplateOptions = {
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
   selectFileTabByShortcut: (position: FileTabShortcutPosition) => void
+  selectAdjacentFileTab: (delta: FileTabShortcutDirection) => void
   saveCurrentFile: () => void
   openSettings: () => void
   openCurrentTabSearch: () => void
@@ -42,6 +44,7 @@ export function createAppMenuTemplate({
   clearRecent,
   closeCurrentTabOrWindow,
   selectFileTabByShortcut,
+  selectAdjacentFileTab,
   saveCurrentFile,
   openSettings,
   openCurrentTabSearch,
@@ -170,6 +173,17 @@ export function createAppMenuTemplate({
     {
       label: t('menu.navigate'),
       submenu: [
+        {
+          label: t('menu.selectPreviousTab'),
+          accelerator: 'CommandOrControl+Shift+[',
+          click: () => selectAdjacentFileTab(-1)
+        },
+        {
+          label: t('menu.selectNextTab'),
+          accelerator: 'CommandOrControl+Shift+]',
+          click: () => selectAdjacentFileTab(1)
+        },
+        { type: 'separator' },
         ...tabShortcutItems,
         {
           label: t('menu.selectLastTab'),

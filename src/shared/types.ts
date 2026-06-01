@@ -8,6 +8,8 @@ export type AppLanguage = 'en' | 'zh-CN'
 
 export type FileTabShortcutPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 
+export type FileTabShortcutDirection = -1 | 1
+
 export type AppFontFamily = 'system' | 'sans' | 'serif' | 'mono'
 
 export type EditorIndentStyle = 'tab' | 'space'

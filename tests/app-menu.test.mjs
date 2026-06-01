@@ -29,6 +29,7 @@ function createActions() {
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
       selectFileTabByShortcut: (position) => calls.push(['selectFileTabByShortcut', position]),
+      selectAdjacentFileTab: (delta) => calls.push(['selectAdjacentFileTab', delta]),
       saveCurrentFile: () => calls.push(['saveCurrentFile']),
       openSettings: () => calls.push(['openSettings']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
@@ -144,8 +145,11 @@ test('createAppMenuTemplate exposes tab selection shortcuts', async () => {
   const navigateMenu = template.find((item) => item.label === 'Navigate')
 
   assert.deepEqual(
-    navigateMenu.submenu.map((item) => [item.label, item.accelerator]),
+    navigateMenu.submenu.map((item) => [item.label ?? item.type, item.accelerator]),
     [
+      ['Select Previous Tab', 'CommandOrControl+Shift+['],
+      ['Select Next Tab', 'CommandOrControl+Shift+]'],
+      ['separator', undefined],
       ['Select Tab 1', 'CommandOrControl+1'],
       ['Select Tab 2', 'CommandOrControl+2'],
       ['Select Tab 3', 'CommandOrControl+3'],
@@ -159,10 +163,14 @@ test('createAppMenuTemplate exposes tab selection shortcuts', async () => {
   )
 
   navigateMenu.submenu[0].click()
-  navigateMenu.submenu[7].click()
-  navigateMenu.submenu[8].click()
+  navigateMenu.submenu[1].click()
+  navigateMenu.submenu[3].click()
+  navigateMenu.submenu[10].click()
+  navigateMenu.submenu[11].click()
 
   assert.deepEqual(calls, [
+    ['selectAdjacentFileTab', -1],
+    ['selectAdjacentFileTab', 1],
     ['selectFileTabByShortcut', 1],
     ['selectFileTabByShortcut', 8],
     ['selectFileTabByShortcut', 9]

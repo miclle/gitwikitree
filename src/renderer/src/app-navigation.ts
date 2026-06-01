@@ -1,4 +1,8 @@
-import type { FileTabShortcutPosition, NavigationTarget } from '../../shared/types'
+import type {
+  FileTabShortcutDirection,
+  FileTabShortcutPosition,
+  NavigationTarget
+} from '../../shared/types'
 
 export type { NavigationTarget }
 
@@ -112,4 +116,18 @@ export function getFileTabForShortcutPosition(
   if (position === 9) return tabs.at(-1)
 
   return tabs[position - 1]
+}
+
+export function getAdjacentFileTab(
+  tabs: OpenFileTab[],
+  activeTabId: string | undefined,
+  delta: FileTabShortcutDirection
+): OpenFileTab | undefined {
+  if (tabs.length < 2) return undefined
+
+  const activeTabIndex = tabs.findIndex((tab) => tab.id === activeTabId)
+  if (activeTabIndex < 0) return undefined
+
+  const nextIndex = (activeTabIndex + delta + tabs.length) % tabs.length
+  return tabs[nextIndex]
 }

@@ -151,6 +151,24 @@ test('getFileTabForShortcutPosition maps 1-8 to tab positions and 9 to the last 
   assert.equal(getFileTabForShortcutPosition(tabs.slice(0, 3), 8), undefined)
 })
 
+test('getAdjacentFileTab moves left and right from the active tab', async () => {
+  const { getAdjacentFileTab } = await loadAppNavigation()
+  const tabs = ['tab-a', 'tab-b', 'tab-c'].map((id) => ({
+    id,
+    path: `${id}.md`,
+    name: `${id}.md`,
+    history: [{ path: `${id}.md`, name: `${id}.md` }],
+    historyIndex: 0
+  }))
+
+  assert.equal(getAdjacentFileTab(tabs, 'tab-b', -1)?.id, 'tab-a')
+  assert.equal(getAdjacentFileTab(tabs, 'tab-b', 1)?.id, 'tab-c')
+  assert.equal(getAdjacentFileTab(tabs, 'tab-a', -1)?.id, 'tab-c')
+  assert.equal(getAdjacentFileTab(tabs, 'tab-c', 1)?.id, 'tab-a')
+  assert.equal(getAdjacentFileTab(tabs, 'tab-missing', 1), undefined)
+  assert.equal(getAdjacentFileTab(tabs.slice(0, 1), 'tab-a', 1), undefined)
+})
+
 test('createWorkspaceNavigationPatch keeps tab and selected-file state together', async () => {
   const { module } = await loadWorkspaceNavigation()
   const initialTabs = [
