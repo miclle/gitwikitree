@@ -88,6 +88,14 @@ function createHarness() {
           options
         }
       }),
+      deletePath: async (repoPath, relativePath, options) => ({
+        ...loadedRepository,
+        path: repoPath,
+        deleted: {
+          relativePath,
+          options
+        }
+      }),
       searchRepository: async (repoPath, query, options) => ({
         repoPath,
         query,
@@ -117,6 +125,7 @@ test('registerRepositoryIpcHandlers registers all repository load channels', asy
       'repository:blame',
       'repository:save-file',
       'repository:rename-path',
+      'repository:delete-path',
       'repository:search'
     ]
   )
@@ -259,6 +268,31 @@ test('repository:rename-path renames within the selected workspace and activates
   assert.deepEqual(repository.renamed, {
     relativePath: 'docs/index.md',
     nextName: 'guide.md',
+    options: {
+      source: 'worktree',
+      rootPath: '/root'
+    }
+  })
+  assert.deepEqual(activated, [{ sourceWindow: { id: 'sender-window' }, repository }])
+})
+
+test('repository:delete-path deletes within the selected workspace and activates it', async () => {
+  const { registerRepositoryIpcHandlers } = await loadRepositoryIpc()
+  const { handlers, activated, dependencies } = createHarness()
+
+  registerRepositoryIpcHandlers(dependencies)
+  const repository = await handlers.get('repository:delete-path')(
+    { sender: {} },
+    '/repo',
+    'docs/index.md',
+    {
+      source: 'worktree',
+      rootPath: '/root'
+    }
+  )
+
+  assert.deepEqual(repository.deleted, {
+    relativePath: 'docs/index.md',
     options: {
       source: 'worktree',
       rootPath: '/root'

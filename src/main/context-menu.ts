@@ -47,6 +47,10 @@ export function createTreeItemContextMenuItems({
     {
       label: t('menu.rename'),
       click: () => sender.send('tree-item:rename', item.path)
+    },
+    {
+      label: t('menu.delete'),
+      click: () => sender.send('tree-item:delete', item.path)
     }
   ]
 }

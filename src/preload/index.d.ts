@@ -51,6 +51,11 @@ export type GitWikitreeAPI = {
     nextName: string,
     options?: RepositoryLoadOptions
   ) => Promise<RepositoryPayload>
+  deletePath: (
+    repoPath: string,
+    relativePath: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<RepositoryPayload>
   searchRepository: (
     repoPath: string,
     query: string,
@@ -67,6 +72,7 @@ export type GitWikitreeAPI = {
   onOpenTreeItem: (callback: (payload: TreeItemOpenPayload) => void) => () => void
   onOpenTreeItemInNewTab: (callback: (path: string) => void) => () => void
   onRenameTreeItem: (callback: (path: string) => void) => () => void
+  onDeleteTreeItem: (callback: (path: string) => void) => () => void
   onOpenMarkdownLink: (callback: (payload: MarkdownLinkOpenPayload) => void) => () => void
   onCloseCurrentTabOrWindow: (callback: () => void) => () => void
   onSelectFileTabByShortcut: (callback: (position: FileTabShortcutPosition) => void) => () => void

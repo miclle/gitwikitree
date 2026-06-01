@@ -35,3 +35,18 @@ export async function renamePath(
   await fs.rename(sourcePath, targetPath)
   return loadRepository(repository.path, options)
 }
+
+export async function deletePath(
+  repoPath: string,
+  relativePath: string,
+  options: RepositoryLoadOptions = {}
+): Promise<RepositoryPayload> {
+  await assertRepositoryPath(repoPath)
+  assertSafeGitRelativePath(relativePath)
+
+  const repository = await loadRepository(repoPath, options)
+  const targetPath = safeJoin(repository.path, relativePath)
+
+  await fs.rm(targetPath, { recursive: true, force: false })
+  return loadRepository(repository.path, options)
+}

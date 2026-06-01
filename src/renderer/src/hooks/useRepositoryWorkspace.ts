@@ -102,6 +102,10 @@ function replaceMovedTab(tab: OpenFileTab, fromPath: string, toPath: string): Op
   }
 }
 
+function isPathWithin(path: string | undefined, parentPath: string): boolean {
+  return Boolean(path && (path === parentPath || path.startsWith(`${parentPath}/`)))
+}
+
 async function loadRepositoryForProjectSession(
   fallbackRepository: RepositoryPayload,
   session: ProjectSessionState
@@ -954,6 +958,42 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     [discardEditingIfAllowed, loadPreview, repository, runRepositoryLoading, t]
   )
 
+  const deleteTreeItem = useCallback(
+    async (path: string): Promise<void> => {
+      if (!repository || !path || !discardEditingIfAllowed()) return
+      if (!window.confirm(t('tree.deleteConfirm', { name: fileNameFromPath(path) }))) return
+
+      await runRepositoryLoading(async () => {
+        const nextRepository = await window.api.deletePath(repository.path, path, {
+          source: repository.source,
+          rootPath: repository.rootPath
+        })
+        const fallbackPath = parentPaths(path).at(-1) ?? ''
+        const nextSelectedPath = isPathWithin(selectedPathRef.current, path)
+          ? fallbackPath
+          : selectedPathRef.current
+
+        setRepository(nextRepository)
+        setExpandedPaths((current) => {
+          const next = new Set(current)
+          next.delete(path)
+          return next
+        })
+        setSelectedPath(nextSelectedPath)
+        setActiveFilePath((current) => (isPathWithin(current, path) ? undefined : current))
+        setActiveFileTabId((currentTabId) => {
+          const activeTab = openFileTabs.find((tab) => tab.id === currentTabId)
+          if (!activeTab || !isPathWithin(activeTab.path, path)) return currentTabId
+
+          return openFileTabs.find((tab) => !isPathWithin(tab.path, path))?.id
+        })
+        setOpenFileTabs((current) => current.filter((tab) => !isPathWithin(tab.path, path)))
+        await loadPreview(nextSelectedPath, nextRepository)
+      })
+    },
+    [discardEditingIfAllowed, loadPreview, openFileTabs, repository, runRepositoryLoading, t]
+  )
+
   useEffect(() => {
     return window.api.onOpenTreeItemInNewTab((path) => {
       selectPreviewPath(path, true)
@@ -965,6 +1005,12 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
       void renameTreeItem(path)
     })
   }, [renameTreeItem])
+
+  useEffect(() => {
+    return window.api.onDeleteTreeItem((path) => {
+      void deleteTreeItem(path)
+    })
+  }, [deleteTreeItem])
 
   useEffect(() => {
     return window.api.onOpenMarkdownLink(openMarkdownLink)

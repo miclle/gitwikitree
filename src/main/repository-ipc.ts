@@ -46,6 +46,11 @@ type RepositoryIpcDependencies = {
     nextName: string,
     options?: RepositoryLoadOptions
   ) => Promise<RepositoryPayload>
+  deletePath: (
+    repoPath: string,
+    relativePath: string,
+    options?: RepositoryLoadOptions
+  ) => Promise<RepositoryPayload>
   searchRepository: (
     repoPath: string,
     query: string,
@@ -69,6 +74,7 @@ export function registerRepositoryIpcHandlers({
   getBlame,
   saveFile,
   renamePath,
+  deletePath,
   searchRepository,
   activateRepositoryInWindow
 }: RepositoryIpcDependencies): void {
@@ -147,6 +153,16 @@ export function registerRepositoryIpcHandlers({
       options?: RepositoryLoadOptions
     ) => {
       const repository = await renamePath(repoPath, relativePath, nextName, options)
+      const sourceWindow = getWindowFromWebContents(event.sender)
+      await activateRepositoryInWindow(sourceWindow, repository)
+      return repository
+    }
+  )
+
+  ipcMain.handle(
+    'repository:delete-path',
+    async (event, repoPath: string, relativePath: string, options?: RepositoryLoadOptions) => {
+      const repository = await deletePath(repoPath, relativePath, options)
       const sourceWindow = getWindowFromWebContents(event.sender)
       await activateRepositoryInWindow(sourceWindow, repository)
       return repository

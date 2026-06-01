@@ -90,6 +90,7 @@ export type TranslationKey =
   | 'tree.expand'
   | 'tree.modified'
   | 'tree.renamePrompt'
+  | 'tree.deleteConfirm'
   | 'status.workspace'
   | 'status.directory'
   | 'status.workingTree'
@@ -218,6 +219,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'tree.expand': 'Expand {name}',
     'tree.modified': 'Modified',
     'tree.renamePrompt': 'Rename {name} to:',
+    'tree.deleteConfirm': 'Delete {name}?',
     'status.workspace': 'Workspace status',
     'status.directory': 'Directory',
     'status.workingTree': 'Working tree',
@@ -339,6 +341,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'tree.expand': '展开 {name}',
     'tree.modified': '已修改',
     'tree.renamePrompt': '将 {name} 重命名为：',
+    'tree.deleteConfirm': '删除 {name}？',
     'status.workspace': '工作区状态',
     'status.directory': '目录',
     'status.workingTree': '工作树',

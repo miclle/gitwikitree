@@ -30,6 +30,7 @@ import {
   openWorktree,
   saveFile,
   renamePath,
+  deletePath,
   searchRepository
 } from './repository-service'
 import { registerRepositoryIpcHandlers } from './repository-ipc'
@@ -399,6 +400,7 @@ app.whenReady().then(async () => {
     getBlame,
     saveFile,
     renamePath,
+    deletePath,
     searchRepository,
     activateRepositoryInWindow
   })

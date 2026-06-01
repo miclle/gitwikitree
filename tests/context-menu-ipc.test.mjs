@@ -77,7 +77,7 @@ test('context-menu:tree-item builds and opens a menu for the sender window', asy
   assert.equal(popups.length, 1)
   assert.deepEqual(
     popups[0].items.map((menuItem) => menuItem.label),
-    ['在新标签中打开', '在新窗口中打开', '复制路径', '复制相对路径', '重命名']
+    ['在新标签中打开', '在新窗口中打开', '复制路径', '复制相对路径', '重命名', '删除']
   )
   assert.deepEqual(popups[0].options, { window: { id: 'target-window' } })
 

@@ -286,6 +286,26 @@ test('renamePath renames an item inside the selected workspace', async () => {
   }
 })
 
+test('deletePath removes an item inside the selected workspace', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    const repository = await service.deletePath(repoPath, 'docs/guide.md')
+
+    await assert.rejects(() => readFile(join(repoPath, 'docs', 'guide.md'), 'utf8'), /ENOENT/)
+    assert.equal(
+      repository.tree
+        .find((node) => node.path === 'docs')
+        ?.children?.some((node) => node.path === 'docs/guide.md'),
+      false
+    )
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('loadRepository builds the workspace tree from local files instead of git visibility', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()
