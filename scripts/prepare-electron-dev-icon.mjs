@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { join } from 'node:path'
 
 const appName = 'Git Wikitree'
@@ -9,6 +17,7 @@ const projectRoot = process.cwd()
 const iconSource = join(projectRoot, 'build', 'icon.icns')
 const electronDist = join(projectRoot, 'node_modules', 'electron', 'dist')
 const electronPackage = join(projectRoot, 'node_modules', 'electron')
+const electronInstallScript = join(electronPackage, 'install.js')
 const defaultElectronApp = join(electronDist, 'Electron.app')
 const electronApp = join(electronDist, `${appName}.app`)
 const plistPath = join(electronApp, 'Contents', 'Info.plist')
@@ -18,6 +27,8 @@ const executablePath = `${appName}.app/Contents/MacOS/Electron`
 if (process.platform !== 'darwin') {
   process.exit(0)
 }
+
+ensureElectronInstalled()
 
 if (existsSync(defaultElectronApp)) {
   rmSync(electronApp, { force: true, recursive: true })
@@ -57,5 +68,30 @@ function setPlistValue(key, value) {
     execFileSync(plistBuddy, ['-c', `Set :${key} ${value}`, plistPath], { stdio: 'ignore' })
   } catch {
     execFileSync(plistBuddy, ['-c', `Add :${key} string ${value}`, plistPath], { stdio: 'ignore' })
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function ensureElectronInstalled() {
+  const pathFile = join(electronPackage, 'path.txt')
+  const currentExecutable = existsSync(pathFile) ? readFileSync(pathFile, 'utf8') : ''
+
+  if (currentExecutable && existsSync(join(electronDist, currentExecutable))) {
+    return
+  }
+
+  if (!existsSync(electronInstallScript)) {
+    throw new Error(`Missing Electron install script: ${electronInstallScript}`)
+  }
+
+  console.log('Electron binary is missing; installing Electron for development...')
+  execFileSync(process.execPath, [electronInstallScript], { stdio: 'inherit' })
+
+  const installedExecutable = existsSync(pathFile) ? readFileSync(pathFile, 'utf8') : ''
+
+  if (!installedExecutable || !existsSync(join(electronDist, installedExecutable))) {
+    throw new Error(
+      'Electron failed to install correctly. Try deleting node_modules/electron and running npm install again.'
+    )
   }
 }
