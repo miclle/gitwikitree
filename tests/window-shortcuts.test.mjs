@@ -82,3 +82,63 @@ test('shouldOpenCurrentTabSearchFromInput catches plain CommandOrControl F only'
     false
   )
 })
+
+test('getFileTabShortcutPositionFromInput catches CommandOrControl number shortcuts', async () => {
+  const { getFileTabShortcutPositionFromInput } = await loadWindowShortcuts()
+
+  assert.equal(
+    getFileTabShortcutPositionFromInput({
+      type: 'keyDown',
+      key: '1',
+      meta: true,
+      control: false,
+      shift: false
+    }),
+    1
+  )
+  assert.equal(
+    getFileTabShortcutPositionFromInput({
+      type: 'keyDown',
+      key: '9',
+      meta: false,
+      control: true,
+      shift: false
+    }),
+    9
+  )
+})
+
+test('getFileTabShortcutPositionFromInput ignores shifted numbers and key releases', async () => {
+  const { getFileTabShortcutPositionFromInput } = await loadWindowShortcuts()
+
+  assert.equal(
+    getFileTabShortcutPositionFromInput({
+      type: 'keyDown',
+      key: '1',
+      meta: true,
+      control: false,
+      shift: true
+    }),
+    undefined
+  )
+  assert.equal(
+    getFileTabShortcutPositionFromInput({
+      type: 'keyUp',
+      key: '1',
+      meta: true,
+      control: false,
+      shift: false
+    }),
+    undefined
+  )
+  assert.equal(
+    getFileTabShortcutPositionFromInput({
+      type: 'keyDown',
+      key: '0',
+      meta: true,
+      control: false,
+      shift: false
+    }),
+    undefined
+  )
+})

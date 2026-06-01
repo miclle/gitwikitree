@@ -28,7 +28,6 @@ function createActions() {
       openRecentFile: (file, event) => calls.push(['openRecentFile', file.filePath, event]),
       clearRecent: () => calls.push(['clearRecent']),
       closeCurrentTabOrWindow: () => calls.push(['closeCurrentTabOrWindow']),
-      selectFileTabByShortcut: (position) => calls.push(['selectFileTabByShortcut', position]),
       selectAdjacentFileTab: (delta) => calls.push(['selectAdjacentFileTab', delta]),
       saveCurrentFile: () => calls.push(['saveCurrentFile']),
       openSettings: () => calls.push(['openSettings']),
@@ -132,7 +131,7 @@ test('createAppMenuTemplate exposes current-tab and repository search menu items
   )
 })
 
-test('createAppMenuTemplate exposes tab selection shortcuts', async () => {
+test('createAppMenuTemplate exposes Chrome-style tab menu actions', async () => {
   const { createAppMenuTemplate } = await loadAppMenu()
   const { actions, calls } = createActions()
   const template = createAppMenuTemplate({
@@ -142,38 +141,22 @@ test('createAppMenuTemplate exposes tab selection shortcuts', async () => {
     recentFiles: [],
     ...actions
   })
-  const navigateMenu = template.find((item) => item.label === 'Navigate')
+  const tabMenu = template.find((item) => item.label === 'Tab')
 
   assert.deepEqual(
-    navigateMenu.submenu.map((item) => [item.label ?? item.type, item.accelerator]),
+    tabMenu.submenu.map((item) => [item.label ?? item.type, item.accelerator]),
     [
       ['Select Previous Tab', 'CommandOrControl+Shift+['],
-      ['Select Next Tab', 'CommandOrControl+Shift+]'],
-      ['separator', undefined],
-      ['Select Tab 1', 'CommandOrControl+1'],
-      ['Select Tab 2', 'CommandOrControl+2'],
-      ['Select Tab 3', 'CommandOrControl+3'],
-      ['Select Tab 4', 'CommandOrControl+4'],
-      ['Select Tab 5', 'CommandOrControl+5'],
-      ['Select Tab 6', 'CommandOrControl+6'],
-      ['Select Tab 7', 'CommandOrControl+7'],
-      ['Select Tab 8', 'CommandOrControl+8'],
-      ['Select Last Tab', 'CommandOrControl+9']
+      ['Select Next Tab', 'CommandOrControl+Shift+]']
     ]
   )
 
-  navigateMenu.submenu[0].click()
-  navigateMenu.submenu[1].click()
-  navigateMenu.submenu[3].click()
-  navigateMenu.submenu[10].click()
-  navigateMenu.submenu[11].click()
+  tabMenu.submenu[0].click()
+  tabMenu.submenu[1].click()
 
   assert.deepEqual(calls, [
     ['selectAdjacentFileTab', -1],
-    ['selectAdjacentFileTab', 1],
-    ['selectFileTabByShortcut', 1],
-    ['selectFileTabByShortcut', 8],
-    ['selectFileTabByShortcut', 9]
+    ['selectAdjacentFileTab', 1]
   ])
 })
 

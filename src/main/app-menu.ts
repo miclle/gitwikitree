@@ -5,7 +5,6 @@ import { getRecentRepositories } from './session-store'
 import type {
   AppLanguage,
   FileTabShortcutDirection,
-  FileTabShortcutPosition,
   RecentFileState,
   RecentRepositoryState
 } from '../shared/types'
@@ -23,7 +22,6 @@ type AppMenuTemplateOptions = {
   openRecentFile: (file: RecentFileState, event: MenuClickEvent) => void
   clearRecent: () => void
   closeCurrentTabOrWindow: () => void
-  selectFileTabByShortcut: (position: FileTabShortcutPosition) => void
   selectAdjacentFileTab: (delta: FileTabShortcutDirection) => void
   saveCurrentFile: () => void
   openSettings: () => void
@@ -43,7 +41,6 @@ export function createAppMenuTemplate({
   openRecentFile,
   clearRecent,
   closeCurrentTabOrWindow,
-  selectFileTabByShortcut,
   selectAdjacentFileTab,
   saveCurrentFile,
   openSettings,
@@ -81,14 +78,6 @@ export function createAppMenuTemplate({
       click: () => clearRecent()
     }
   ]
-  const tabShortcutItems: MenuItemConstructorOptions[] = [1, 2, 3, 4, 5, 6, 7, 8].map(
-    (position) => ({
-      label: `${t('menu.selectTab')} ${position}`,
-      accelerator: `CommandOrControl+${position}`,
-      click: () => selectFileTabByShortcut(position as FileTabShortcutPosition)
-    })
-  )
-
   return [
     ...(platform === 'darwin'
       ? [
@@ -171,7 +160,7 @@ export function createAppMenuTemplate({
       ]
     },
     {
-      label: t('menu.navigate'),
+      label: t('menu.tab'),
       submenu: [
         {
           label: t('menu.selectPreviousTab'),
@@ -182,13 +171,6 @@ export function createAppMenuTemplate({
           label: t('menu.selectNextTab'),
           accelerator: 'CommandOrControl+Shift+]',
           click: () => selectAdjacentFileTab(1)
-        },
-        { type: 'separator' },
-        ...tabShortcutItems,
-        {
-          label: t('menu.selectLastTab'),
-          accelerator: 'CommandOrControl+9',
-          click: () => selectFileTabByShortcut(9)
         }
       ]
     },

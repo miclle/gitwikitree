@@ -39,6 +39,7 @@ import { createSettingsStore } from './settings-store'
 import { registerWindowIpcHandlers } from './window-ipc'
 import { configureDirectoryIndexNames } from './repository-tree'
 import {
+  getFileTabShortcutPositionFromInput,
   shouldOpenCurrentTabSearchFromInput,
   shouldOpenGlobalSearchFromInput
 } from './window-shortcuts'
@@ -51,7 +52,6 @@ import {
 import type {
   AppSettings,
   FileTabShortcutDirection,
-  FileTabShortcutPosition,
   RecentFileState,
   RepositoryPayload,
   SessionState
@@ -135,10 +135,6 @@ function closeFocusedFileTabOrWindow(): void {
   if (!targetWindow) return
 
   targetWindow.webContents.send('tab:close-current-or-window')
-}
-
-function selectFocusedFileTabByShortcut(position: FileTabShortcutPosition): void {
-  BrowserWindow.getFocusedWindow()?.webContents.send('tab:select-by-shortcut', position)
 }
 
 function selectAdjacentFocusedFileTab(delta: FileTabShortcutDirection): void {
@@ -230,6 +226,13 @@ function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: Tree
   })
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
+    const fileTabShortcutPosition = getFileTabShortcutPositionFromInput(input)
+    if (fileTabShortcutPosition) {
+      event.preventDefault()
+      mainWindow.webContents.send('tab:select-by-shortcut', fileTabShortcutPosition)
+      return
+    }
+
     if (shouldOpenGlobalSearchFromInput(input)) {
       event.preventDefault()
       mainWindow.webContents.send('search:open-global')
@@ -332,7 +335,6 @@ function createAppMenu(): void {
         openRecentFile: openRecentFileMenuItem,
         clearRecent: () => void clearRecentMenuItems(),
         closeCurrentTabOrWindow: closeFocusedFileTabOrWindow,
-        selectFileTabByShortcut: selectFocusedFileTabByShortcut,
         selectAdjacentFileTab: selectAdjacentFocusedFileTab,
         saveCurrentFile,
         openSettings,
