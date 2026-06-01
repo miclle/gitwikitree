@@ -72,6 +72,7 @@ export type TranslationKey =
   | 'settings.languageEnglish'
   | 'settings.languageChinese'
   | 'settings.homeFiles'
+  | 'settings.useHomeFiles'
   | 'settings.candidateOrder'
   | 'settings.preview'
   | 'settings.font'
@@ -198,6 +199,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.languageEnglish': 'English',
     'settings.languageChinese': 'Chinese',
     'settings.homeFiles': 'Home Files',
+    'settings.useHomeFiles': 'Use home files for directory previews',
     'settings.candidateOrder': 'Candidate order',
     'settings.preview': 'Preview',
     'settings.font': 'Font',
@@ -317,6 +319,7 @@ export const messages: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.languageEnglish': '英文',
     'settings.languageChinese': '中文',
     'settings.homeFiles': '主页文件',
+    'settings.useHomeFiles': '使用主页文件作为目录预览',
     'settings.candidateOrder': '候选顺序',
     'settings.preview': '预览',
     'settings.font': '字体',

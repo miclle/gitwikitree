@@ -78,7 +78,7 @@ function getSettingsFilePath(): string {
 
 function applySettings(settings: AppSettings): void {
   appSettings = settings
-  configureDirectoryIndexNames(settings.homeFileNames)
+  configureDirectoryIndexNames(settings.homeFileNames, settings.homeFilesEnabled)
 }
 
 async function readStoredSession(): Promise<SessionState> {

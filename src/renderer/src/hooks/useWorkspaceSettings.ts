@@ -63,15 +63,19 @@ export function useWorkspaceSettings({
   const saveSettings = useCallback(
     async (nextSettings: Partial<AppSettings>): Promise<void> => {
       const previousHomeFileNames = settings.homeFileNames.join('\0')
+      const previousHomeFilesEnabled = settings.homeFilesEnabled
       const savedSettings = await window.api.saveSettings(nextSettings)
 
       setSettings(savedSettings)
 
-      if (previousHomeFileNames !== savedSettings.homeFileNames.join('\0')) {
+      if (
+        previousHomeFilesEnabled !== savedSettings.homeFilesEnabled ||
+        previousHomeFileNames !== savedSettings.homeFileNames.join('\0')
+      ) {
         onHomeFileNamesChange()
       }
     },
-    [onHomeFileNamesChange, settings.homeFileNames]
+    [onHomeFileNamesChange, settings.homeFileNames, settings.homeFilesEnabled]
   )
 
   return {

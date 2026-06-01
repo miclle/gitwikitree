@@ -11,14 +11,16 @@ Current implementation:
 - The app menu exposes `Settings...` with `Command/Ctrl+,`; macOS places it in
   the app menu, and other platforms expose it from the Edit menu.
 - The renderer includes a settings dialog that immediately applies appearance,
-  app language, homepage file candidates, preview font family/size, editor font
-  family/size, and editor indentation style/size as each control changes.
+  app language, homepage file previews and candidates, preview font family/size,
+  editor font family/size, and editor indentation style/size as each control
+  changes.
 - Appearance supports light, dark, and system modes.
 - App language supports English and Simplified Chinese across renderer labels,
   Electron menus, context menus, and status-bar formatting.
-- Directory homepage candidates default to `README.md`, `README.markdown`,
-  `index.md`, and `_index.md`, and the configured order is used when building
-  repository trees and directory previews.
+- Directory homepage previews can be enabled or disabled. Candidates default to
+  `README.md`, `README.markdown`, `index.md`, and `_index.md`, and the
+  configured order is used when building repository trees and directory previews
+  while the feature is enabled.
 - Preview typography is applied through CSS variables for Markdown and text-like
   code previews.
 - Editor typography and indentation settings are applied to the CodeMirror
@@ -27,7 +29,7 @@ Current implementation:
 Known limitations:
 
 - Settings are application-wide only; individual repositories cannot override
-  homepage file order, typography, indentation, or autosave behavior yet.
+  homepage preview behavior, typography, indentation, or autosave behavior yet.
 - Autosave is not implemented. It should account for stale edit protection,
   external file changes, save failures, and Git working tree state before being
   enabled.

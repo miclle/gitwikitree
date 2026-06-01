@@ -85,13 +85,6 @@ async function readWorkspaceSettingsHook() {
   )
 }
 
-async function readHomeFileDirectoryPreviewReloadHook() {
-  return readFile(
-    new URL('../src/renderer/src/hooks/useHomeFileDirectoryPreviewReload.ts', import.meta.url),
-    'utf8'
-  )
-}
-
 async function readPreviewImageLightboxHook() {
   return readFile(
     new URL('../src/renderer/src/hooks/usePreviewImageLightbox.ts', import.meta.url),
@@ -341,8 +334,8 @@ test('preview chrome keeps tab corners behind pathbar controls', async () => {
 
 test('settings dialog applies changes immediately without a save action', async () => {
   const source = await readSettingsDialog()
+  const workspaceHook = await readRepositoryWorkspaceHook()
   const settingsHook = await readWorkspaceSettingsHook()
-  const homeFilePreviewReloadHook = await readHomeFileDirectoryPreviewReloadHook()
 
   assert.doesNotMatch(source, /onSubmit=|type="submit"|>\s*Save\s*</)
   assert.doesNotMatch(source, /settings-actions|>\s*Done\s*</)
@@ -371,6 +364,11 @@ test('settings dialog applies changes immediately without a save action', async 
     /onChange=\{\(event\) =>[\s\S]*applyHomeFileNames/,
     'home file candidate edits should apply without an extra save click'
   )
+  assert.match(
+    source,
+    /applySetting\('homeFilesEnabled', event\.currentTarget\.checked\)/,
+    'home file directory preview changes should apply from a checkbox'
+  )
   const saveSettingsBlock = settingsHook.match(
     /const saveSettings = useCallback\([\s\S]*?\n {2}\)\n\n {2}return/
   )
@@ -382,28 +380,23 @@ test('settings dialog applies changes immediately without a save action', async 
   )
   assert.match(
     settingsHook,
-    /onHomeFileNamesChange\(\)/,
-    'home file candidate edits should notify the workspace after settings persist'
+    /previousHomeFilesEnabled !== savedSettings\.homeFilesEnabled[\s\S]*onHomeFileNamesChange\(\)/,
+    'home file setting changes should notify the workspace after settings persist'
   )
   assert.match(
-    homeFilePreviewReloadHook,
-    /homeFilePreviewReloadTimeoutRef = useRef<number \| undefined>\(undefined\)/,
-    'home file candidate edits should use a debounced directory preview reload'
-  )
-  assert.doesNotMatch(
-    saveSettingsBlock[0],
-    /reloadCurrentRepository|loadRepository/,
-    'home file candidate edits should not reload the repository or affect file previews'
+    workspaceHook,
+    /homeFileRepositoryReloadTimeoutRef = useRef<number \| undefined>\(undefined\)/,
+    'home file setting changes should track a pending repository reload timeout'
   )
   assert.match(
-    homeFilePreviewReloadHook,
-    /if \(preview\?\.kind !== 'directory'\) return[\s\S]*homeFilePreviewReloadTimeoutRef\.current = window\.setTimeout\(\(\) => \{[\s\S]*void loadPreview\(directoryPath\)/,
-    'home file candidate edits should only coalesce reloads for the current directory preview'
+    workspaceHook,
+    /window\.clearTimeout\(homeFileRepositoryReloadTimeoutRef\.current\)[\s\S]*homeFileRepositoryReloadTimeoutRef\.current = undefined/,
+    'home file setting changes should cancel a pending repository reload before scheduling another one'
   )
   assert.match(
-    homeFilePreviewReloadHook,
-    /if \(preview\?\.kind === 'directory' && preview\.path === selectedPath\) return[\s\S]*clearHomeFileDirectoryPreviewReload\(\)/,
-    'pending home file preview reloads should be canceled after navigating away from the directory'
+    workspaceHook,
+    /homeFileRepositoryReloadTimeoutRef\.current = window\.setTimeout\(\(\) => \{[\s\S]*const nextRepository = await window\.api\.loadRepository\(nextRepositoryContext\.path\)[\s\S]*setRepository\(nextRepository\)[\s\S]*await loadPreview\(selectedPathRef\.current, nextRepository\)/,
+    'home file setting changes should coalesce repository tree refreshes and reload the current preview'
   )
 })
 

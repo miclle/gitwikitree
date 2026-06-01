@@ -20,6 +20,7 @@ test('normalizeAppSettings fills defaults and rejects invalid values', async () 
   const settings = normalizeAppSettings({
     appearance: 'dark',
     language: 'zh-CN',
+    homeFilesEnabled: false,
     homeFileNames: ['_index.md', '../escape.md', '', '_index.md', 'README.md'],
     previewFontFamily: 'serif',
     previewFontSize: 26,
@@ -33,6 +34,7 @@ test('normalizeAppSettings fills defaults and rejects invalid values', async () 
     ...defaultAppSettings,
     appearance: 'dark',
     language: 'zh-CN',
+    homeFilesEnabled: false,
     homeFileNames: ['_index.md', 'README.md'],
     previewFontFamily: 'serif',
     previewFontSize: 22,
@@ -51,6 +53,7 @@ test('settings store reads defaults and writes normalized settings', async () =>
   const saved = await store.write({
     appearance: 'light',
     language: 'zh-CN',
+    homeFilesEnabled: false,
     homeFileNames: ['index.md', 'README.md'],
     previewFontSize: 18,
     editorFontSize: 16,
@@ -62,6 +65,7 @@ test('settings store reads defaults and writes normalized settings', async () =>
     ...defaultAppSettings,
     appearance: 'light',
     language: 'zh-CN',
+    homeFilesEnabled: false,
     homeFileNames: ['index.md', 'README.md'],
     previewFontSize: 18,
     editorFontSize: 16,

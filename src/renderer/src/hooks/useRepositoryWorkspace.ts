@@ -6,7 +6,6 @@ import {
   type OpenFileTab
 } from '../app-navigation'
 import { usePanelResize } from './usePanelResize'
-import { useHomeFileDirectoryPreviewReload } from './useHomeFileDirectoryPreviewReload'
 import { usePendingMarkdownAnchor } from './usePendingMarkdownAnchor'
 import { useRepositoryLaunchIntents } from './useRepositoryLaunchIntents'
 import { useRepositoryPreviewLoader } from './useRepositoryPreviewLoader'
@@ -45,6 +44,7 @@ import type {
 } from '../../../shared/types'
 
 const defaultExpanded = new Set([''])
+const homeFileRepositoryReloadDelayMs = 450
 
 type RepositoryLoadContext = {
   repoPath: string
@@ -166,8 +166,11 @@ export type RepositoryWorkspace = {
 
 export function useRepositoryWorkspace(): RepositoryWorkspace {
   const nextTabId = useRef(0)
+  const homeFileRepositoryReloadTimeoutRef = useRef<number | undefined>(undefined)
   const [repository, setRepository] = useState<RepositoryPayload | undefined>()
   const [selectedPath, setSelectedPath] = useState('')
+  const repositoryRef = useRef<RepositoryPayload | undefined>(repository)
+  const selectedPathRef = useRef(selectedPath)
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded)
   const [loading, setLoading] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -188,37 +191,13 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
   const { preview, setPreview, previewLoading, error, setError, loadPreview } =
     useRepositoryPreviewLoader(repository)
 
-  const { scheduleHomeFileDirectoryPreviewReload } = useHomeFileDirectoryPreviewReload({
-    preview,
-    selectedPath,
-    loadPreview
-  })
+  useEffect(() => {
+    repositoryRef.current = repository
+  }, [repository])
 
-  const { settings, isSettingsOpen, openSettings, closeSettings, saveSettings, t } =
-    useWorkspaceSettings({
-      onHomeFileNamesChange: scheduleHomeFileDirectoryPreviewReload
-    })
-
-  const {
-    isEditing,
-    isSaving,
-    canEditPreview,
-    draftContent,
-    hasUnsavedChanges,
-    isEditingTargetPath,
-    discardEditingIfAllowed,
-    startEditing,
-    cancelEditing,
-    updateDraftContent,
-    saveCurrentFile
-  } = useWorkspaceEditing({
-    discardMessage: t('app.discardUnsaved'),
-    preview,
-    repository,
-    setError,
-    setPreview,
-    setRepository
-  })
+  useEffect(() => {
+    selectedPathRef.current = selectedPath
+  }, [selectedPath])
 
   const applyNavigationPatch = useCallback((patch: WorkspaceNavigationPatch): void => {
     setSelectedPath(patch.selectedPath)
@@ -252,6 +231,59 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     },
     [setError]
   )
+
+  const clearHomeFileRepositoryReload = useCallback((): void => {
+    if (homeFileRepositoryReloadTimeoutRef.current) {
+      window.clearTimeout(homeFileRepositoryReloadTimeoutRef.current)
+      homeFileRepositoryReloadTimeoutRef.current = undefined
+    }
+  }, [])
+
+  useEffect(() => {
+    return clearHomeFileRepositoryReload
+  }, [clearHomeFileRepositoryReload])
+
+  const reloadRepositoryForHomeFiles = useCallback((): void => {
+    clearHomeFileRepositoryReload()
+
+    homeFileRepositoryReloadTimeoutRef.current = window.setTimeout(() => {
+      homeFileRepositoryReloadTimeoutRef.current = undefined
+      const nextRepositoryContext = repositoryRef.current
+      if (!nextRepositoryContext) return
+
+      void runRepositoryLoading(async () => {
+        const nextRepository = await window.api.loadRepository(nextRepositoryContext.path)
+        setRepository(nextRepository)
+        await loadPreview(selectedPathRef.current, nextRepository)
+      })
+    }, homeFileRepositoryReloadDelayMs)
+  }, [clearHomeFileRepositoryReload, loadPreview, runRepositoryLoading])
+
+  const { settings, isSettingsOpen, openSettings, closeSettings, saveSettings, t } =
+    useWorkspaceSettings({
+      onHomeFileNamesChange: reloadRepositoryForHomeFiles
+    })
+
+  const {
+    isEditing,
+    isSaving,
+    canEditPreview,
+    draftContent,
+    hasUnsavedChanges,
+    isEditingTargetPath,
+    discardEditingIfAllowed,
+    startEditing,
+    cancelEditing,
+    updateDraftContent,
+    saveCurrentFile
+  } = useWorkspaceEditing({
+    discardMessage: t('app.discardUnsaved'),
+    preview,
+    repository,
+    setError,
+    setPreview,
+    setRepository
+  })
 
   const openRepositoryRoot = useCallback(
     async (

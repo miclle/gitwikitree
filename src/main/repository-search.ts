@@ -39,19 +39,11 @@ function isSearchablePreviewType(type: ReturnType<typeof detectPreviewType>): bo
   return type === 'text' || type === 'markdown' || type === 'html' || type === 'svg'
 }
 
-function flattenTree(
-  nodes: TreeNode[],
-  rootIndex?: { name: string; path: string }
-): SearchCandidate[] {
-  return nodes
-    .flatMap((node) => [
-      { path: node.path, name: node.name, type: node.type },
-      ...(node.index
-        ? [{ path: node.index.path, name: node.index.name, type: 'file' as const }]
-        : []),
-      ...(node.children ? flattenTree(node.children) : [])
-    ])
-    .concat(rootIndex ? [{ path: rootIndex.path, name: rootIndex.name, type: 'file' }] : [])
+function flattenTree(nodes: TreeNode[]): SearchCandidate[] {
+  return nodes.flatMap((node) => [
+    { path: node.path, name: node.name, type: node.type },
+    ...(node.children ? flattenTree(node.children) : [])
+  ])
 }
 
 function normalizeQuery(query: string): string[] {
@@ -227,7 +219,7 @@ export async function searchRepository(
   if (terms.length === 0) return []
 
   const repository = await loadRepository(repoPath, options)
-  const candidates = flattenTree(repository.tree, repository.index)
+  const candidates = flattenTree(repository.tree)
   const workspaceSearchContentCache = getWorkspaceSearchContentCache(repository)
   pruneWorkspaceSearchContentCache(workspaceSearchContentCache, candidates)
   const pathMatchedPaths = new Set<string>()

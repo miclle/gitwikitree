@@ -74,13 +74,16 @@ test('loadRepository builds a working tree from local workspace files', async ()
     assert.equal(repository.editable, true)
     assert.deepEqual(
       repository.tree.map((node) => node.path),
-      ['docs', 'section']
+      ['docs', 'section', 'README.md']
     )
     assert.deepEqual(
       repository.tree[0].children.map((node) => node.path),
-      ['docs/guide.md']
+      ['docs/guide.md', 'docs/index.md']
     )
-    assert.deepEqual(repository.tree[1].children, [])
+    assert.deepEqual(
+      repository.tree[1].children.map((node) => node.path),
+      ['section/_index.md']
+    )
   } finally {
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })

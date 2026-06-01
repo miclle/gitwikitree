@@ -17,6 +17,7 @@ export type EditorIndentStyle = 'tab' | 'space'
 export type AppSettings = {
   appearance: AppAppearance
   language: AppLanguage
+  homeFilesEnabled: boolean
   homeFileNames: string[]
   previewFontFamily: AppFontFamily
   previewFontSize: number
@@ -29,6 +30,7 @@ export type AppSettings = {
 export const defaultAppSettings: AppSettings = {
   appearance: 'system',
   language: 'en',
+  homeFilesEnabled: true,
   homeFileNames: ['README.md', 'README.markdown', 'index.md', '_index.md'],
   previewFontFamily: 'system',
   previewFontSize: 15,

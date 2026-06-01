@@ -2837,6 +2837,17 @@ kbd {
   font-weight: 600;
 }
 
+.settings-checkbox-field {
+  align-items: center;
+}
+
+.settings-checkbox {
+  justify-self: start;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 .settings-control {
   width: 100%;
   min-height: 32px;
@@ -2855,6 +2866,11 @@ kbd {
   border-color: var(--accent);
   outline: 2px solid rgba(9, 105, 218, 0.18);
   outline-offset: 0;
+}
+
+.settings-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 select.settings-control {

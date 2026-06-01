@@ -97,11 +97,21 @@ export function SettingsDialog({
 
           <section className="settings-section" aria-label={t('settings.homeFiles')}>
             <h2>{t('settings.homeFiles')}</h2>
+            <label className="settings-field settings-checkbox-field">
+              <span>{t('settings.useHomeFiles')}</span>
+              <input
+                className="settings-checkbox"
+                type="checkbox"
+                checked={draft.homeFilesEnabled}
+                onChange={(event) => applySetting('homeFilesEnabled', event.currentTarget.checked)}
+              />
+            </label>
             <label className="settings-field">
               <span>{t('settings.candidateOrder')}</span>
               <textarea
                 className="settings-control"
                 value={homeFileNamesText}
+                disabled={!draft.homeFilesEnabled}
                 spellCheck={false}
                 rows={5}
                 onChange={(event) => applyHomeFileNames(event.currentTarget.value)}

@@ -40,8 +40,8 @@ menus, and status metadata.
 - Keep multiple file and directory tabs, including per-tab back/forward history.
 - Persist project sessions, expanded paths, active tabs, recent repositories,
   recent files, and window bounds.
-- Configure appearance, app language, homepage file candidates, preview
-  typography, editor typography, and editor indentation.
+- Configure appearance, app language, homepage file previews and candidates,
+  preview typography, editor typography, and editor indentation.
 - Show workspace, branch, path, file facts, editor cursor/selection facts,
   modified timestamps, and latest Git author metadata in the status bar.
 - Provide Electron menus and context menus for repository files, Markdown links,

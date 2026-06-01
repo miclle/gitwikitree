@@ -15,9 +15,9 @@
 ## Preview, Editing, and Save
 
 - Directory homepage files (`README.md`, `README.markdown`, `index.md`, and
-  `_index.md` by default) are first-class preview targets. If a directory
-  preview uses one of these files, editing and saving should follow the same
-  path as a direct file preview.
+  `_index.md` by default) are first-class preview targets while homepage file
+  previews are enabled. If a directory preview uses one of these files, editing
+  and saving should follow the same path as a direct file preview.
 - Save calls must pass the selected workspace context and an expected modified
   timestamp. Keep stale-write rejection visible to the renderer instead of
   silently overwriting disk changes.

@@ -2,6 +2,7 @@ import type { TreeNode } from '../shared/types'
 import { defaultAppSettings } from '../shared/types'
 
 let directoryIndexNames = normalizeDirectoryIndexNames(defaultAppSettings.homeFileNames)
+let directoryIndexesEnabled = defaultAppSettings.homeFilesEnabled
 
 type DirectoryIndex = {
   name: string
@@ -36,25 +37,27 @@ export function normalizeDirectoryIndexNames(names: string[]): string[] {
     : defaultAppSettings.homeFileNames.map((name) => name.toLocaleLowerCase())
 }
 
-export function configureDirectoryIndexNames(names: string[]): void {
+export function configureDirectoryIndexNames(names: string[], enabled = true): void {
   directoryIndexNames = normalizeDirectoryIndexNames(names)
+  directoryIndexesEnabled = enabled
 }
 
 export function buildRepositoryTree(
   files: string[],
   modifiedFiles = new Set<string>(),
-  indexNames = directoryIndexNames
+  indexNames = directoryIndexNames,
+  indexEnabled = directoryIndexesEnabled
 ): RepositoryTree {
   const tree: TreeNode[] = []
   let index: DirectoryIndex | undefined
 
   files.forEach((file) => {
-    const inserted = insertPath(tree, file, modifiedFiles, indexNames)
-    if (inserted) return
+    const rootIndex = directoryIndexForPath(file, indexNames, indexEnabled)
+    if (rootIndex && !file.includes('/') && shouldPreferIndex(index, rootIndex, indexNames)) {
+      index = rootIndex
+    }
 
-    const rootIndex = directoryIndexForPath(file, indexNames)
-    if (!rootIndex || file.includes('/') || !shouldPreferIndex(index, rootIndex, indexNames)) return
-    index = rootIndex
+    insertPath(tree, file, modifiedFiles, indexNames, indexEnabled)
   })
 
   return { tree, index }
@@ -62,8 +65,11 @@ export function buildRepositoryTree(
 
 function directoryIndexForPath(
   filePath: string,
-  indexNames = directoryIndexNames
+  indexNames = directoryIndexNames,
+  indexEnabled = directoryIndexesEnabled
 ): DirectoryIndex | undefined {
+  if (!indexEnabled) return undefined
+
   const parts = filePath.split('/').filter(Boolean)
   const name = parts.at(-1)
   if (!name || !indexNames.includes(name.toLowerCase())) return undefined
@@ -87,8 +93,9 @@ function insertPath(
   tree: TreeNode[],
   filePath: string,
   modifiedFiles: Set<string>,
-  indexNames = directoryIndexNames
-): boolean {
+  indexNames = directoryIndexNames,
+  indexEnabled = directoryIndexesEnabled
+): void {
   const parts = filePath.split('/').filter(Boolean)
   let siblings = tree
   let currentPath = ''
@@ -99,12 +106,11 @@ function insertPath(
     const type = index === parts.length - 1 ? 'file' : 'directory'
 
     if (type === 'file') {
-      const directoryIndex = directoryIndexForPath(filePath, indexNames)
+      const directoryIndex = directoryIndexForPath(filePath, indexNames, indexEnabled)
       if (directoryIndex) {
         if (directoryNode && shouldPreferIndex(directoryNode.index, directoryIndex, indexNames)) {
           directoryNode.index = directoryIndex
         }
-        return
       }
     }
 
@@ -132,8 +138,6 @@ function insertPath(
       siblings = node.children ?? []
     }
   })
-
-  return !directoryIndexForPath(filePath, indexNames)
 }
 
 export function getNodeAtPath(tree: TreeNode[], path: string): TreeNode | undefined {
@@ -153,6 +157,8 @@ export function getNodeAtPath(tree: TreeNode[], path: string): TreeNode | undefi
 }
 
 export function findDirectoryIndex(children: TreeNode[] = []): TreeNode | undefined {
+  if (!directoryIndexesEnabled) return undefined
+
   return children
     .filter((entry) => entry.type === 'file')
     .sort((a, b) => {
