@@ -1822,6 +1822,11 @@ test('files tree renames items inline instead of using a browser prompt', async 
     'tree rows should render an inline rename input'
   )
   assert.match(
+    treeRowSource,
+    /didSubmitRenameRef[\s\S]*submitRename[\s\S]*if \(didSubmitRenameRef\.current\) return/,
+    'tree row rename submission should be idempotent across Enter and blur'
+  )
+  assert.match(
     workspaceSource,
     /renamingPath=\{renamingPath\}[\s\S]*onRenameSubmit=\{renameTreeItem\}[\s\S]*onRenameCancel=\{cancelRenameTreeItem\}/,
     'workspace should pass inline rename state and handlers into the files tree'

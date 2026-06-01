@@ -15,6 +15,14 @@ function assertSafeFileName(name: string): void {
   }
 }
 
+function assertSafeActionRelativePath(relativePath: string): void {
+  if (!relativePath) {
+    throw new Error('Invalid file path.')
+  }
+
+  assertSafeGitRelativePath(relativePath)
+}
+
 export async function renamePath(
   repoPath: string,
   relativePath: string,
@@ -22,7 +30,7 @@ export async function renamePath(
   options: RepositoryLoadOptions = {}
 ): Promise<RepositoryPayload> {
   await assertRepositoryPath(repoPath)
-  assertSafeGitRelativePath(relativePath)
+  assertSafeActionRelativePath(relativePath)
   assertSafeFileName(nextName)
 
   const repository = await loadRepository(repoPath, options)
@@ -42,7 +50,7 @@ export async function deletePath(
   options: RepositoryLoadOptions = {}
 ): Promise<RepositoryPayload> {
   await assertRepositoryPath(repoPath)
-  assertSafeGitRelativePath(relativePath)
+  assertSafeActionRelativePath(relativePath)
 
   const repository = await loadRepository(repoPath, options)
   const targetPath = safeJoin(repository.path, relativePath)

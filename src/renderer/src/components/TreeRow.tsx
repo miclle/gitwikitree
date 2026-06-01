@@ -31,6 +31,7 @@ export function TreeRow({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const didSubmitRenameRef = useRef(false)
   const expanded = expandedPaths.has(node.path)
   const hasChildren = node.type === 'directory' && Boolean(node.children?.length)
   const isDirty = dirtyPath === node.path
@@ -39,11 +40,14 @@ export function TreeRow({
     void onSelect(node, { openInNewTab })
   }
   const submitRename = (nextName: string): void => {
+    if (didSubmitRenameRef.current) return
+    didSubmitRenameRef.current = true
     void onRenameSubmit(node.path, nextName)
   }
 
   useEffect(() => {
     if (!isRenaming) return
+    didSubmitRenameRef.current = false
     renameInputRef.current?.focus()
     renameInputRef.current?.select()
   }, [isRenaming])
@@ -53,6 +57,7 @@ export function TreeRow({
 
     if (event.key === 'Escape') {
       event.preventDefault()
+      didSubmitRenameRef.current = true
       onRenameCancel()
       return
     }

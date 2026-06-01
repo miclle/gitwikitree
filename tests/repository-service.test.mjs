@@ -306,6 +306,19 @@ test('deletePath removes an item inside the selected workspace', async () => {
   }
 })
 
+test('deletePath rejects the repository root path', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await assert.rejects(() => service.deletePath(repoPath, ''), /invalid file path/i)
+    assert.equal(await readFile(join(repoPath, 'README.md'), 'utf8'), '# Root\n\nHello')
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('loadRepository builds the workspace tree from local files instead of git visibility', async () => {
   const { service, tempDir } = await loadRepositoryService()
   const repoPath = await createRepository()
