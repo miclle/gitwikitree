@@ -67,6 +67,7 @@ export type GitWikitreeAPI = {
   onOpenCurrentTabSearch: (callback: () => void) => () => void
   onOpenGlobalSearch: (callback: () => void) => () => void
   onSaveCurrentFile: (callback: () => void) => () => void
+  onToggleFilesTreeSidebar: (callback: () => void) => () => void
   onOpenSettings: (callback: () => void) => () => void
 }
 

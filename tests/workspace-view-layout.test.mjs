@@ -1647,6 +1647,16 @@ test('expanded sidebar keeps sidebar and history controls out of the sidebar tit
   )
 })
 
+test('files sidebar can be toggled from the app menu shortcut event', async () => {
+  const source = await readRepositoryWorkspaceHook()
+
+  assert.match(
+    source,
+    /window\.api\.onToggleFilesTreeSidebar\(\(\) => \{\s*setIsSidebarOpen\(\(current\) => !current\)/,
+    'workspace should subscribe to the Files Tree shortcut event and toggle sidebar visibility'
+  )
+})
+
 test('files sidebar resize keeps a 170px minimum width', async () => {
   const source = await readPanelResizeHook()
 

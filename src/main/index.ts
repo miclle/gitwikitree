@@ -340,6 +340,8 @@ function createAppMenu(): void {
         openSettings,
         openCurrentTabSearch,
         openGlobalSearch,
+        toggleFilesTreeSidebar: () =>
+          BrowserWindow.getFocusedWindow()?.webContents.send('sidebar:toggle-files-tree'),
         closeWindow: () => BrowserWindow.getFocusedWindow()?.close()
       })
     )

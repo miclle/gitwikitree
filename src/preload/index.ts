@@ -160,6 +160,12 @@ const api = {
 
     return () => ipcRenderer.removeListener('file:save-current', listener)
   },
+  onToggleFilesTreeSidebar: (callback: () => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('sidebar:toggle-files-tree', listener)
+
+    return () => ipcRenderer.removeListener('sidebar:toggle-files-tree', listener)
+  },
   onOpenSettings: (callback: () => void) => {
     const listener = (): void => callback()
     ipcRenderer.on('settings:open', listener)

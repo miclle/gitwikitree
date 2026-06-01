@@ -867,6 +867,12 @@ export function useRepositoryWorkspace(): RepositoryWorkspace {
     })
   }, [saveCurrentFile])
 
+  useEffect(() => {
+    return window.api.onToggleFilesTreeSidebar(() => {
+      setIsSidebarOpen((current) => !current)
+    })
+  }, [])
+
   return {
     repositoryState: {
       repository,

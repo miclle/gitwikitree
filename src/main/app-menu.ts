@@ -27,6 +27,7 @@ type AppMenuTemplateOptions = {
   openSettings: () => void
   openCurrentTabSearch: () => void
   openGlobalSearch: () => void
+  toggleFilesTreeSidebar: () => void
   closeWindow: () => void
 }
 
@@ -46,6 +47,7 @@ export function createAppMenuTemplate({
   openSettings,
   openCurrentTabSearch,
   openGlobalSearch,
+  toggleFilesTreeSidebar,
   closeWindow
 }: AppMenuTemplateOptions): MenuItemConstructorOptions[] {
   const t = (key: Parameters<typeof translateMenu>[1]): string => translateMenu(language, key)
@@ -179,6 +181,12 @@ export function createAppMenuTemplate({
       submenu: [
         { role: 'reload', label: t('menu.reload') },
         { role: 'toggleDevTools', label: t('menu.toggleDeveloperTools') },
+        { type: 'separator' },
+        {
+          label: t('menu.toggleFilesTree'),
+          accelerator: 'CommandOrControl+B',
+          click: toggleFilesTreeSidebar
+        },
         { type: 'separator' },
         { role: 'resetZoom', label: t('menu.resetZoom') }
       ]

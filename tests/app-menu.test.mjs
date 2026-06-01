@@ -33,6 +33,7 @@ function createActions() {
       openSettings: () => calls.push(['openSettings']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
       openGlobalSearch: () => calls.push(['openGlobalSearch']),
+      toggleFilesTreeSidebar: () => calls.push(['toggleFilesTreeSidebar']),
       closeWindow: () => calls.push(['closeWindow'])
     }
   }
@@ -158,6 +159,26 @@ test('createAppMenuTemplate exposes Chrome-style tab menu actions', async () => 
     ['selectAdjacentFileTab', -1],
     ['selectAdjacentFileTab', 1]
   ])
+})
+
+test('createAppMenuTemplate exposes Files Tree sidebar toggle in the view menu', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions, calls } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const viewMenu = template.find((item) => item.label === 'View')
+  const toggleItem = viewMenu.submenu.find((item) => item.label === 'Toggle Files Tree')
+
+  assert.equal(toggleItem.accelerator, 'CommandOrControl+B')
+
+  toggleItem.click()
+
+  assert.deepEqual(calls, [['toggleFilesTreeSidebar']])
 })
 
 test('createAppMenuTemplate exposes save in the file menu', async () => {
@@ -299,6 +320,6 @@ test('createAppMenuTemplate localizes app menu labels', async () => {
   )
   assert.deepEqual(
     viewMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
-    ['重新加载', '切换开发者工具', 'separator', '重置缩放']
+    ['重新加载', '切换开发者工具', 'separator', '切换文件树', 'separator', '重置缩放']
   )
 })

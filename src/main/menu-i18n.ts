@@ -29,6 +29,7 @@ export type MenuTranslationKey =
   | 'menu.view'
   | 'menu.reload'
   | 'menu.toggleDeveloperTools'
+  | 'menu.toggleFilesTree'
   | 'menu.resetZoom'
   | 'menu.openLink'
   | 'menu.copyLinkAddress'
@@ -69,6 +70,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.view': 'View',
     'menu.reload': 'Reload',
     'menu.toggleDeveloperTools': 'Toggle Developer Tools',
+    'menu.toggleFilesTree': 'Toggle Files Tree',
     'menu.resetZoom': 'Reset Zoom',
     'menu.openLink': 'Open Link',
     'menu.copyLinkAddress': 'Copy Link Address',
@@ -108,6 +110,7 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.view': '视图',
     'menu.reload': '重新加载',
     'menu.toggleDeveloperTools': '切换开发者工具',
+    'menu.toggleFilesTree': '切换文件树',
     'menu.resetZoom': '重置缩放',
     'menu.openLink': '打开链接',
     'menu.copyLinkAddress': '复制链接地址',
