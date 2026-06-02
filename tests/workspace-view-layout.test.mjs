@@ -330,6 +330,11 @@ test('preview chrome keeps tab corners behind pathbar controls', async () => {
     /\.repo-pathbar\s*\{[\s\S]*?z-index:\s*3;[\s\S]*?background:\s*var\(--panel\);/,
     'pathbar controls should paint over the active-tab corner filler'
   )
+  assert.match(
+    css,
+    /\.repo-pathbar\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--border-muted\);/,
+    'pathbar should draw a light edge above code, split, and blame content'
+  )
 })
 
 test('settings dialog applies changes immediately without a save action', async () => {

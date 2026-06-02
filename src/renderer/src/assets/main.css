@@ -1342,6 +1342,7 @@ kbd {
   gap: 10px;
   min-height: 30px;
   padding: 5px 16px;
+  border-bottom: 1px solid var(--border-muted);
   background: var(--panel);
 }
 
