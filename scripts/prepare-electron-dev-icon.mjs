@@ -20,6 +20,7 @@ const electronPackage = join(projectRoot, 'node_modules', 'electron')
 const electronInstallScript = join(electronPackage, 'install.js')
 const defaultElectronApp = join(electronDist, 'Electron.app')
 const electronApp = join(electronDist, `${appName}.app`)
+const entitlementsPath = join(projectRoot, 'build', 'entitlements.mac.plist')
 const plistPath = join(electronApp, 'Contents', 'Info.plist')
 const resourcesDir = join(electronApp, 'Contents', 'Resources')
 const executablePath = `${appName}.app/Contents/MacOS/Electron`
@@ -57,6 +58,7 @@ setPlistValue('CFBundleIdentifier', appId)
 setPlistValue('CFBundleIconFile', iconFile)
 writeFileSync(join(electronPackage, 'path.txt'), executablePath)
 execFileSync('/usr/bin/touch', [electronApp], { stdio: 'ignore' })
+signDevelopmentApp()
 
 console.log(`Prepared ${appName}.app for ${appName} development icon`)
 
@@ -94,4 +96,17 @@ function ensureElectronInstalled() {
       'Electron failed to install correctly. Try deleting node_modules/electron and running npm install again.'
     )
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+function signDevelopmentApp() {
+  if (!existsSync(entitlementsPath)) {
+    throw new Error(`Missing macOS entitlements: ${entitlementsPath}`)
+  }
+
+  execFileSync(
+    '/usr/bin/codesign',
+    ['--force', '--deep', '--sign', '-', '--entitlements', entitlementsPath, electronApp],
+    { stdio: 'ignore' }
+  )
 }
