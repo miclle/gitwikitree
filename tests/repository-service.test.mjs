@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -540,6 +540,163 @@ test('openWorktree reuses an existing worktree when the target branch is already
     assert.equal(repository.source, 'working-tree')
     assert.equal(repository.branch, 'main')
   } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('openWorktree repairs an app-managed worktree after the repository folder moves', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const oldParent = await mkdtemp(join(tmpdir(), 'gitwikitree-moved-old-'))
+  const newParent = await mkdtemp(join(tmpdir(), 'gitwikitree-moved-new-'))
+  const repoPath = join(oldParent, 'repo')
+  const movedRepoPath = join(newParent, 'repo')
+
+  try {
+    await mkdir(repoPath, { recursive: true })
+    await execFileAsync('git', ['init', '-b', 'main'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'README.md'), '# Root\n\nHello')
+    await execFileAsync('git', ['add', 'README.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'initial'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    await service.openWorktree(repoPath, 'wiki')
+    await rename(repoPath, movedRepoPath)
+
+    const repository = await service.openWorktree(movedRepoPath, 'wiki')
+    const realMovedRepoPath = await realpath(movedRepoPath)
+    const realWorktreePath = await realpath(join(movedRepoPath, '.worktrees', 'wiki'))
+
+    assert.equal(repository.path, realWorktreePath)
+    assert.equal(repository.rootPath, realMovedRepoPath)
+    assert.equal(repository.source, 'worktree')
+    assert.equal(repository.branch, 'wiki')
+  } finally {
+    await rm(oldParent, { recursive: true, force: true })
+    await rm(newParent, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('openWorktree rebuilds missing metadata for an app-managed worktree', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    const wikiRepository = await service.openWorktree(repoPath, 'wiki')
+    await rm(join(repoPath, '.git', 'worktrees', 'wiki'), { recursive: true, force: true })
+    await writeFile(join(wikiRepository.path, 'draft.md'), '# Local draft\n')
+
+    const repository = await service.openWorktree(repoPath, 'wiki')
+    const realWorktreePath = await realpath(wikiRepository.path)
+
+    assert.equal(repository.path, realWorktreePath)
+    assert.equal(repository.source, 'worktree')
+    assert.equal(repository.branch, 'wiki')
+    assert.ok(repository.tree.some((node) => node.path === 'draft.md'))
+  } finally {
+    await rm(repoPath, { recursive: true, force: true })
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('openWorktree preserves unrelated worktree metadata with the same basename', async () => {
+  const { service, tempDir } = await loadRepositoryService()
+  const repoPath = await createRepository()
+  const externalParent = await mkdtemp(join(tmpdir(), 'gitwikitree-external-worktree-'))
+  const externalWorktreePath = join(externalParent, 'wiki')
+  const appWorktreePath = join(repoPath, '.worktrees', 'wiki')
+
+  try {
+    await execFileAsync('git', ['switch', '-c', 'external'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'external.md'), '# External\n')
+    await execFileAsync('git', ['add', 'external.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add external'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    await execFileAsync('git', ['switch', '-c', 'wiki'], { cwd: repoPath })
+    await writeFile(join(repoPath, 'wiki.md'), '# Wiki\n')
+    await execFileAsync('git', ['add', 'wiki.md'], { cwd: repoPath })
+    await execFileAsync('git', ['commit', '-m', 'add wiki'], {
+      cwd: repoPath,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@example.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@example.com'
+      }
+    })
+    await execFileAsync('git', ['switch', 'main'], { cwd: repoPath })
+    await execFileAsync('git', ['worktree', 'add', externalWorktreePath, 'external'], {
+      cwd: repoPath
+    })
+    await mkdir(appWorktreePath, { recursive: true })
+    await writeFile(join(appWorktreePath, '.git'), 'gitdir: /missing/repo/.git/worktrees/wiki\n')
+    await writeFile(join(appWorktreePath, 'draft.md'), '# Local draft\n')
+
+    const repository = await service.openWorktree(repoPath, 'wiki')
+    const { stdout: externalRoot } = await execFileAsync(
+      'git',
+      ['-C', externalWorktreePath, 'rev-parse', '--show-toplevel'],
+      { cwd: repoPath }
+    )
+    const { stdout: externalBranch } = await execFileAsync(
+      'git',
+      ['-C', externalWorktreePath, 'branch', '--show-current'],
+      { cwd: repoPath }
+    )
+
+    assert.equal(repository.path, await realpath(appWorktreePath))
+    assert.equal(repository.branch, 'wiki')
+    assert.equal(externalRoot.trim(), await realpath(externalWorktreePath))
+    assert.equal(externalBranch.trim(), 'external')
+    assert.match(await readFile(join(appWorktreePath, '.git'), 'utf8'), /worktrees\/wiki-1/)
+  } finally {
+    await rm(externalParent, { recursive: true, force: true })
     await rm(repoPath, { recursive: true, force: true })
     await rm(tempDir, { recursive: true, force: true })
   }
