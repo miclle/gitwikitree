@@ -8,6 +8,10 @@ opening a repository, understanding its directory structure, switching local
 branches or opening worktrees, reading files in tabs, and checking authorship
 without leaving the local workspace.
 
+For public-facing documentation, lead with this product value and local-first
+workflow. Keep internal architecture, current limitations, and future plans out
+of the README unless they directly help users decide whether to try the app.
+
 ## Design Principles
 
 - Prioritize frequent workflows: opening repositories, browsing the tree,
@@ -16,6 +20,9 @@ without leaving the local workspace.
 - The interface should feel like a productivity tool, not a promotional page: compact, clear, and explicit about state.
 - The user's local repository is the primary content; UI should not compete with it.
 - The workspace should behave like an editor over local files; Git should appear only for version-control operations.
+- File operations should feel explicit and reversible where possible. Rename and
+  delete are already available; creation, moving, recovery, and richer conflict
+  handling should be added only with clear local-file safety semantics.
 - History-oriented features should complement the file workspace. A blame,
   diff, or history surface should preserve the active path, tab, ref, source,
   and worktree context instead of becoming a separate Git browser.

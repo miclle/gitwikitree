@@ -6,11 +6,12 @@ unless the user explicitly asks otherwise.
 
 ## Project Overview
 
-Git Wikitree is a local Git file workspace desktop app built with Electron 42,
-electron-vite, React 19, and TypeScript. The app opens local Git repositories,
-displays local workspace file trees, previews directories, Markdown, HTML, SVG,
-PDF, images, and text files, and supports explicit branch switching, worktree
-opening, file editing, preview/code/split/blame file views, file tabs, recent
+Git Wikitree is a local-first Git file workspace desktop app built with
+Electron 42, electron-vite, React 19, and TypeScript. The app opens local Git
+repositories, displays local workspace file trees, previews directories,
+Markdown, Marp Markdown, HTML, SVG, PDF, images, and text files, and supports
+explicit branch switching, worktree opening, file editing, preview/code/split/
+blame file views, file tree rename/delete actions, file tabs, recent
 repositories/files, settings, localization, status metadata, and session
 restoration.
 
@@ -45,16 +46,24 @@ automatically move to another port.
 
 - When changing capabilities that cross the main, preload, and renderer boundary, update the IPC handler, `src/preload/index.ts`, `src/preload/index.d.ts`, and the matching contract in `src/shared/types.ts`.
 - Keep boundary checks for repository paths, file paths, branch refs, and worktrees. Relative paths must not escape the selected repository root.
-- Save and edit flows must protect local files from stale writes and preserve the selected repository/worktree context.
+- Save, edit, rename, and delete flows must protect local files from stale or
+  escaped writes and preserve the selected repository/worktree context.
 - File previews, directory index previews, Markdown links, tab history, recent
   files/repositories, and session state are connected. When changing one, check
   restoration, menu-driven opens, and new-window paths.
-- Preview, save, search, and blame flows must use the selected local workspace
-  path. Do not fall back to Git object reads for primary content.
+- Preview, save, search, file actions, and blame flows must use the selected
+  local workspace path. Do not fall back to Git object reads for primary
+  content.
 - User-facing strings live in the renderer i18n dictionaries and translated Electron menu/context-menu helpers. When adding UI copy, update every supported language and related tests.
 - New UI should match the existing desktop-tool feel: clear controls, moderate density, accessible icon buttons, and no marketing-page layout.
 - Do not overwrite user changes. The workspace may contain in-progress renderer edits, so inspect `git status` before modifying files.
-- Before delivery, run verification that matches the change. Code changes usually require at least `npm run typecheck`, `npm run lint`, and `npm test`.
+- Keep `README.md` product-facing for open-source readers. Put implementation
+  facts, known limitations, and roadmap details in `TODO.md`; put durable
+  collaboration constraints in `.agents/rules/`.
+- Before delivery, run verification that matches the change. Code changes
+  usually require at least `npm run typecheck`, `npm run lint`, and `npm test`.
+  Documentation-only changes should at least run targeted Markdown formatting
+  checks and `git diff --check`.
 
 ## Rules and Skills
 

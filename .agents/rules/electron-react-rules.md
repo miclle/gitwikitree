@@ -23,6 +23,9 @@
 - Preserve `rootPath`, `activeRef`, and `source` when saving window state, opening tabs, recording recent files, and handling repository sources.
 - Prevent stale async requests from overwriting newer state. Use the existing loading/error patterns where appropriate.
 - Editing state should keep dirty indicators, save commands, preview refreshes, and status-bar metadata in sync with the active file or editable directory index.
+- File tree actions such as rename and delete must flow through preload IPC and
+  main-process path validation. Renderer prompts, inline edit state, active-tab
+  cleanup, preview refresh, and tree refresh should stay synchronized.
 - File view modes should degrade deliberately. Preview is the universal
   fallback; code and split require editable text-like content; split also
   requires previewable Markdown-like content; blame requires a file target that

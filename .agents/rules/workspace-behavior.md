@@ -18,6 +18,10 @@
   `_index.md` by default) are first-class preview targets while homepage file
   previews are enabled. If a directory preview uses one of these files, editing
   and saving should follow the same path as a direct file preview.
+- Markdown previews include specialized behavior for GitHub-flavored Markdown,
+  Mermaid diagrams, Marp slides, local repository assets, heading anchors, copy
+  buttons, and repository links. Keep those paths aligned when changing preview
+  parsing or rendering.
 - Save calls must pass the selected workspace context and an expected modified
   timestamp. Keep stale-write rejection visible to the renderer instead of
   silently overwriting disk changes.
@@ -27,6 +31,18 @@
 - The status bar should show compact, authoritative facts. Avoid duplicating the
   same concept across preview metadata, filesystem timestamps, Git metadata, and
   editor state.
+
+## File Actions
+
+- Rename and delete operate on existing files or directories inside the selected
+  workspace. They are not substitutes for a future move command, new-file
+  command, or safe-trash flow.
+- Renderer actions must collect user intent, but the main process must
+  revalidate repository paths, relative paths, and final file names.
+- After a rename or delete, refresh the repository tree and reconcile active
+  tabs, selected paths, editable targets, dirty state, and recent-file behavior.
+- The repository root must never be renameable or deleteable through these
+  actions.
 
 ## Search and Blame
 

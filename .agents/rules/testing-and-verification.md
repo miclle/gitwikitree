@@ -24,10 +24,18 @@ npm run build
 - Search changes should check local filesystem search, cache invalidation,
   escaped-root rejection, result limits, and renderer debounce/concurrency
   behavior.
+- File action changes should check main-process path guards, preload contracts,
+  context-menu triggers, inline rename behavior, delete confirmation, active tab
+  cleanup, and worktree context preservation.
+- Markdown preview changes should check GitHub-flavored Markdown behavior and
+  the specialized paths for Mermaid, Marp, local assets, heading anchors, copy
+  buttons, and repository links when relevant.
 
 ## Test Patterns
 
 - Tests use the Node.js built-in test runner and live in `tests/*.test.mjs`.
+  The current suite count is 39; update product/docs references when suites are
+  added or removed.
 - TypeScript sources are transpiled into temporary ESM modules through `tests/helpers/transpile-modules.mjs`. When adding tests, list the tested module and its dependency modules.
 - Tests involving Git repository behavior usually create a temporary directory, run `git init`, write files, commit, and then validate tree or preview results.
 - Every test must clean up temporary repositories and transpiled directories to avoid polluting later tests.
