@@ -101,19 +101,20 @@ tests/           Node.js test runner suites and TypeScript transpile helpers
 ## Scripts
 
 ```bash
-npm run dev             # Start electron-vite development mode
-npm run start           # Preview the built Electron app
-npm run build           # Typecheck and build the app
-npm run build:unpack    # Build and package an unpacked app directory
-npm run build:mac       # Build and package for macOS
-npm run build:win       # Build and package for Windows
-npm run build:linux     # Build and package for Linux
-npm run typecheck       # Run node and web TypeScript checks
-npm run typecheck:node  # Typecheck main/preload code
-npm run typecheck:web   # Typecheck renderer code
-npm run lint            # Run ESLint
-npm run test            # Run Node.js test suites
-npm run format          # Format the repository with Prettier
+npm run dev               # Start electron-vite development mode
+npm run start             # Preview the built Electron app
+npm run build             # Typecheck and build the app
+npm run build:unpack      # Build and package an unpacked app directory
+npm run build:mac         # Build and package an unsigned macOS app
+npm run build:mac:release # Build, sign, notarize, and package for macOS
+npm run build:win         # Build and package for Windows
+npm run build:linux       # Build and package for Linux
+npm run typecheck         # Run node and web TypeScript checks
+npm run typecheck:node    # Typecheck main/preload code
+npm run typecheck:web     # Typecheck renderer code
+npm run lint              # Run ESLint
+npm run test              # Run Node.js test suites
+npm run format            # Format the repository with Prettier
 ```
 
 ## Development Notes
