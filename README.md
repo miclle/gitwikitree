@@ -116,6 +116,7 @@ npm run verify:mac:intel:release # Verify the notarized Intel macOS app and DMG 
 npm run verify:mac:arm64:release # Verify the notarized Apple silicon app and DMG contents
 npm run build:win         # Build and package for Windows x64
 npm run build:linux       # Build and package for Linux
+npm run build:linux:release # Build Linux AppImage and deb release assets for x64
 npm run typecheck         # Run node and web TypeScript checks
 npm run typecheck:node    # Typecheck main/preload code
 npm run typecheck:web     # Typecheck renderer code
