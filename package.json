@@ -23,6 +23,7 @@
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
     "build:mac:release": "npm run build && electron-builder --mac -c.mac.notarize=true",
+    "verify:mac:release": "node scripts/verify-macos-release.mjs",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
