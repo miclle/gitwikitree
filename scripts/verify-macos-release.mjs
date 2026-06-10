@@ -1,19 +1,22 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 const appName = 'Git Wikitree.app'
 const projectRoot = process.cwd()
 const args = process.argv.slice(2)
+const supportedArchs = new Set(['arm64', 'x64'])
 
 if (process.platform !== 'darwin') {
   throw new Error('macOS release verification must run on macOS')
 }
 
 const options = parseArgs(args)
-const appPath = options.app ? resolve(projectRoot, options.app) : findLatestApp()
-const dmgPath = options.dmg ? resolve(projectRoot, options.dmg) : findLatestDmg()
+const arch = resolveArch(options)
+const dmgPath = options.dmg ? resolve(projectRoot, options.dmg) : findLatestDmg(arch)
+const artifactArch = arch ?? inferArchFromPath(dmgPath)
+const appPath = options.app ? resolve(projectRoot, options.app) : findLatestApp(artifactArch)
 
 verifyApp(appPath, 'built app')
 verifyDmg(dmgPath)
@@ -30,6 +33,8 @@ function parseArgs(values) {
       parsed.app = readOptionValue(values, (index += 1), value)
     } else if (value === '--dmg') {
       parsed.dmg = readOptionValue(values, (index += 1), value)
+    } else if (value === '--arch') {
+      parsed.arch = readOptionValue(values, (index += 1), value)
     } else if (value === '--help') {
       printHelp()
       process.exit(0)
@@ -51,7 +56,32 @@ function readOptionValue(values, index, optionName) {
   return optionValue
 }
 
-function findLatestDmg() {
+function resolveArch(options) {
+  if (options.arch) {
+    if (!supportedArchs.has(options.arch)) {
+      throw new Error(`Unsupported arch: ${options.arch}. Expected one of: arm64, x64.`)
+    }
+
+    return options.arch
+  }
+
+  return inferArchFromPath(options.dmg) ?? inferArchFromAppPath(options.app)
+}
+
+function inferArchFromPath(targetPath) {
+  if (!targetPath) {
+    return undefined
+  }
+
+  const name = targetPath.split(/[\\/]/).join('-')
+  const matchedArch = [...supportedArchs].find((candidate) =>
+    new RegExp(`(^|[-_.])${candidate}($|[-_.])`).test(name)
+  )
+
+  return matchedArch
+}
+
+function findLatestDmg(arch) {
   const distDir = join(projectRoot, 'dist')
 
   if (!existsSync(distDir)) {
@@ -60,17 +90,19 @@ function findLatestDmg() {
 
   const dmgs = readdirSync(distDir)
     .filter((entry) => entry.endsWith('.dmg'))
+    .filter((entry) => !arch || inferArchFromPath(entry) === arch)
     .map((entry) => join(distDir, entry))
     .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
 
   if (dmgs.length === 0) {
-    throw new Error('No DMG found in dist/. Pass --dmg <path> to verify a specific file.')
+    const suffix = arch ? ` for ${arch}` : ''
+    throw new Error(`No DMG found in dist${suffix}. Pass --dmg <path> to verify a specific file.`)
   }
 
   return dmgs[0]
 }
 
-function findLatestApp() {
+function findLatestApp(arch) {
   const distDir = join(projectRoot, 'dist')
 
   if (!existsSync(distDir)) {
@@ -79,17 +111,35 @@ function findLatestApp() {
 
   const apps = readdirSync(distDir)
     .filter((entry) => entry.startsWith('mac'))
+    .filter((entry) => !arch || inferArchFromAppDirectory(entry) === arch)
     .map((entry) => join(distDir, entry, appName))
     .filter((entry) => existsSync(entry))
     .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
 
   if (apps.length === 0) {
+    const suffix = arch ? ` for ${arch}` : ''
     throw new Error(
-      'No built .app found under dist/mac*/. Pass --app <path> to verify a specific app.'
+      `No built .app found under dist/mac*${suffix}. Pass --app <path> to verify a specific app.`
     )
   }
 
   return apps[0]
+}
+
+function inferArchFromAppDirectory(directoryName) {
+  if (directoryName === 'mac') {
+    return 'x64'
+  }
+
+  return inferArchFromPath(directoryName)
+}
+
+function inferArchFromAppPath(targetPath) {
+  if (!targetPath) {
+    return undefined
+  }
+
+  return inferArchFromAppDirectory(basename(dirname(targetPath))) ?? inferArchFromPath(targetPath)
 }
 
 function verifyApp(targetPath, label) {
@@ -150,10 +200,12 @@ function quoteArg(value) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run verify:mac:release -- [--app <path>] [--dmg <path>]
+  console.log(`Usage: npm run verify:mac:release -- [--arch arm64|x64] [--app <path>] [--dmg <path>]
 
 Verifies:
 - the built .app signature, Gatekeeper assessment, and stapled notarization ticket
 - the .app contained inside the DMG after mounting it
+
+When --arch is omitted, the script infers it from --dmg or --app when possible.
 `)
 }

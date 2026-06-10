@@ -19,12 +19,18 @@
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps && npm run prepare:electron-dev",
-    "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "build:unpack": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win --x64",
+    "build:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "build:mac:intel": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64",
+    "build:mac:arm64": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
     "build:mac:release": "npm run build && electron-builder --mac -c.mac.notarize=true",
+    "build:mac:intel:release": "npm run build && electron-builder --mac --x64 -c.mac.notarize=true",
+    "build:mac:arm64:release": "npm run build && electron-builder --mac --arm64 -c.mac.notarize=true",
     "verify:mac:release": "node scripts/verify-macos-release.mjs",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "verify:mac:intel:release": "node scripts/verify-macos-release.mjs --arch x64",
+    "verify:mac:arm64:release": "node scripts/verify-macos-release.mjs --arch arm64",
+    "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

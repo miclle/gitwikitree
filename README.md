@@ -105,9 +105,16 @@ npm run dev               # Start electron-vite development mode
 npm run start             # Preview the built Electron app
 npm run build             # Typecheck and build the app
 npm run build:unpack      # Build and package an unpacked app directory
-npm run build:mac         # Build and package an unsigned macOS app
-npm run build:mac:release # Build, sign, notarize, and package for macOS
-npm run build:win         # Build and package for Windows
+npm run build:mac         # Build and package an unsigned macOS app for the current arch
+npm run build:mac:intel   # Build and package an unsigned macOS app for Intel Macs
+npm run build:mac:arm64   # Build and package an unsigned macOS app for Apple silicon
+npm run build:mac:release # Build, sign, notarize, and package for the current macOS arch
+npm run build:mac:intel:release # Build, sign, notarize, and package for Intel Macs
+npm run build:mac:arm64:release # Build, sign, notarize, and package for Apple silicon
+npm run verify:mac:release # Verify the notarized macOS app and DMG contents
+npm run verify:mac:intel:release # Verify the notarized Intel macOS app and DMG contents
+npm run verify:mac:arm64:release # Verify the notarized Apple silicon app and DMG contents
+npm run build:win         # Build and package for Windows x64
 npm run build:linux       # Build and package for Linux
 npm run typecheck         # Run node and web TypeScript checks
 npm run typecheck:node    # Typecheck main/preload code
