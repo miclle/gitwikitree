@@ -39,6 +39,12 @@ function sanitizeMarkdownHtml(html: string): string {
   })
 }
 
+function sanitizeMermaidSvg(svg: string): string {
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true }
+  })
+}
+
 function sanitizeMarpHtml(html: string): string {
   return html
 }
@@ -184,7 +190,9 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
           const { svg, bindFunctions } = await mermaid.render(diagramId, source)
           if (!diagram.isConnected) return
 
-          diagram.innerHTML = svg
+          const sanitizedSvg = sanitizeMermaidSvg(svg)
+
+          diagram.innerHTML = sanitizedSvg
           diagram.setAttribute('data-mermaid-rendered', 'true')
           diagram.removeAttribute('data-mermaid-error')
           diagram.removeAttribute('title')

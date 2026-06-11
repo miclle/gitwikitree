@@ -1314,6 +1314,21 @@ test('Mermaid previews render diagrams directly without stale processed markers'
     /await mermaid\.render\(diagramId, source\)/,
     'Mermaid previews should render each diagram directly to SVG'
   )
+  assert.match(
+    source,
+    /function sanitizeMermaidSvg\(svg: string\): string \{[\s\S]*DOMPurify\.sanitize\(svg,[\s\S]*USE_PROFILES:\s*\{\s*svg:\s*true,\s*svgFilters:\s*true\s*\}/,
+    'Mermaid SVG should be sanitized after rendering and before insertion into the preview DOM'
+  )
+  assert.match(
+    source,
+    /const sanitizedSvg = sanitizeMermaidSvg\(svg\)/,
+    'Mermaid previews should sanitize the rendered SVG before insertion'
+  )
+  assert.match(
+    source,
+    /diagram\.innerHTML = sanitizedSvg/,
+    'Mermaid previews should insert the sanitized SVG, not the raw renderer output'
+  )
   assert.doesNotMatch(
     source,
     /mermaid\.run\(/,
