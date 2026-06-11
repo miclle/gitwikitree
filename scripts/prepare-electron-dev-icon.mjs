@@ -29,6 +29,11 @@ if (process.platform !== 'darwin') {
   process.exit(0)
 }
 
+if (process.env.CI === 'true') {
+  console.log('Skipping development Electron app preparation in CI')
+  process.exit(0)
+}
+
 ensureElectronInstalled()
 
 if (existsSync(defaultElectronApp)) {
