@@ -3,7 +3,13 @@ import { existsSync, statSync } from 'fs'
 import { promises as fs } from 'fs'
 import { isAbsolute, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
+import {
+  checkForUpdates as checkForUpdatesWithDependencies,
+  configureAutoUpdates,
+  getAutoUpdateChannel
+} from './auto-update'
 import { createAppMenuTemplate, type MenuClickEvent } from './app-menu'
 import { showBrowserWindowContextMenu } from './browser-window-context-menu'
 import { type TreeItemContext } from './context-menu'
@@ -157,6 +163,13 @@ function saveCurrentFile(): void {
 
 function openSettings(): void {
   BrowserWindow.getFocusedWindow()?.webContents.send('settings:open')
+}
+
+function checkForUpdates(): void {
+  checkForUpdatesWithDependencies({
+    app,
+    autoUpdater
+  })
 }
 
 function createWindow(repoPath?: string, file?: RecentFileState, treeItem?: TreeItemContext): void {
@@ -340,6 +353,7 @@ function createAppMenu(): void {
         selectAdjacentFileTab: selectAdjacentFocusedFileTab,
         saveCurrentFile,
         openSettings,
+        checkForUpdates,
         openCurrentTabSearch,
         openGlobalSearch,
         toggleFilesTreeSidebar: () =>
@@ -435,6 +449,14 @@ app.whenReady().then(async () => {
       isDirectory: (path) => existsSync(path) && statSync(path).isDirectory()
     })
   )
+  configureAutoUpdates({
+    app,
+    autoUpdater,
+    dialog,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
+    channel: getAutoUpdateChannel(),
+    language: appSettings.language
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

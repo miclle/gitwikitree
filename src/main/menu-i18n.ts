@@ -34,6 +34,8 @@ export type MenuTranslationKey =
   | 'menu.toggleDeveloperTools'
   | 'menu.toggleFilesTree'
   | 'menu.resetZoom'
+  | 'menu.help'
+  | 'menu.checkForUpdates'
   | 'menu.openLink'
   | 'menu.copyLinkAddress'
   | 'menu.openInNewTab'
@@ -78,6 +80,8 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.toggleDeveloperTools': 'Toggle Developer Tools',
     'menu.toggleFilesTree': 'Toggle Files Tree',
     'menu.resetZoom': 'Reset Zoom',
+    'menu.help': 'Help',
+    'menu.checkForUpdates': 'Check for Updates...',
     'menu.openLink': 'Open Link',
     'menu.copyLinkAddress': 'Copy Link Address',
     'menu.openInNewTab': 'Open in New Tab',
@@ -121,6 +125,8 @@ const menuMessages: Record<AppLanguage, Record<MenuTranslationKey, string>> = {
     'menu.toggleDeveloperTools': '切换开发者工具',
     'menu.toggleFilesTree': '切换文件树',
     'menu.resetZoom': '重置缩放',
+    'menu.help': '帮助',
+    'menu.checkForUpdates': '检查更新...',
     'menu.openLink': '打开链接',
     'menu.copyLinkAddress': '复制链接地址',
     'menu.openInNewTab': '在新标签中打开',

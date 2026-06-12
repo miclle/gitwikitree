@@ -36,6 +36,8 @@ Markdown sites or knowledge bases close to the actual files.
 - Keep multiple tabs with per-tab back and forward history.
 - Restore project sessions, expanded paths, active tabs, recent repositories,
   recent files, sidebar state, and window bounds.
+- Receive signed packaged-app updates from GitHub Releases when a newer release
+  is available.
 - Configure light, dark, or system appearance; English or Simplified Chinese;
   directory home-file candidates; preview typography; and editor typography and
   indentation.
@@ -85,7 +87,7 @@ npm run start
 - CodeMirror for editing
 - Node.js built-in test runner for tests
 - ESLint and Prettier for code quality and formatting
-- electron-builder for packaging
+- electron-builder and electron-updater for packaging and GitHub Release updates
 
 ## Project Layout
 

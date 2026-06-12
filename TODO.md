@@ -83,7 +83,7 @@ limitations, or roadmap priorities change.
 
 ### Verification Baseline
 
-- The current repository has 39 Node.js test suites covering repository
+- The current repository has 40 Node.js test suites covering repository
   services, IPC contracts, preview helpers, editing state, file actions, search,
   settings, menus, localization, session restoration, and renderer workspace
   behavior.
@@ -117,9 +117,10 @@ limitations, or roadmap priorities change.
 - Font selection is limited to built-in families rather than arbitrary installed
   fonts.
 - Localization is maintained manually in static dictionaries.
-- Packaging exists through electron-builder, but public release automation,
-  notarization, signing, update channels, and contributor-facing release docs
-  still need to be shaped before a serious public launch.
+- Packaging uses electron-builder with signed/notarized macOS release scripts,
+  GitHub Release update metadata, and electron-updater checks in packaged apps.
+  Contributor-facing release docs and long-term update-channel policy still need
+  to be shaped before a serious public launch.
 
 ## Near-Term Roadmap
 

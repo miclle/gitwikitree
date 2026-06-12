@@ -32,10 +32,12 @@ jobs:
             runner: macos-latest
             build_script: build:mac:arm64:release
             verify_script: verify:mac:arm64:release
+            update_channel: latest-arm64
           - arch: x64
             runner: macos-15-intel
             build_script: build:mac:intel:release
             verify_script: verify:mac:intel:release
+            update_channel: latest-x64
 
     env:
       TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
@@ -105,7 +107,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          assets=(dist/*${{ matrix.arch }}*.dmg dist/*${{ matrix.arch }}*.zip)
+          update_metadata=(dist/${{ matrix.update_channel }}-mac.yml)
+          if [ ! -f "${update_metadata[0]}" ]; then
+            echo "Missing macOS ${{ matrix.arch }} update metadata: ${update_metadata[0]}" >&2
+            exit 1
+          fi
+
+          assets=(
+            dist/*${{ matrix.arch }}*.dmg
+            dist/*${{ matrix.arch }}*.dmg.blockmap
+            dist/*${{ matrix.arch }}*.zip
+            dist/*${{ matrix.arch }}*.zip.blockmap
+            "${update_metadata[@]}"
+          )
 
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No macOS ${{ matrix.arch }} release assets found in dist/." >&2
@@ -146,7 +160,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          assets=(dist/*.exe)
+          update_metadata=(dist/latest.yml)
+          if [ ! -f "${update_metadata[0]}" ]; then
+            echo "Missing Windows update metadata: ${update_metadata[0]}" >&2
+            exit 1
+          fi
+
+          assets=(dist/*.exe dist/*.exe.blockmap "${update_metadata[@]}")
 
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No Windows release assets found in dist/." >&2
@@ -186,7 +206,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          assets=(dist/*.AppImage dist/*.deb)
+          update_metadata=(dist/latest-linux.yml)
+          if [ ! -f "${update_metadata[0]}" ]; then
+            echo "Missing Linux update metadata: ${update_metadata[0]}" >&2
+            exit 1
+          fi
+
+          assets=(dist/*.AppImage dist/*.AppImage.blockmap dist/*.deb "${update_metadata[@]}")
 
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No Linux release assets found in dist/." >&2

@@ -31,6 +31,7 @@ function createActions() {
       selectAdjacentFileTab: (delta) => calls.push(['selectAdjacentFileTab', delta]),
       saveCurrentFile: () => calls.push(['saveCurrentFile']),
       openSettings: () => calls.push(['openSettings']),
+      checkForUpdates: () => calls.push(['checkForUpdates']),
       openCurrentTabSearch: () => calls.push(['openCurrentTabSearch']),
       openGlobalSearch: () => calls.push(['openGlobalSearch']),
       toggleFilesTreeSidebar: () => calls.push(['toggleFilesTreeSidebar']),
@@ -233,6 +234,24 @@ test('createAppMenuTemplate exposes settings from the edit menu off macOS', asyn
   assert.deepEqual(calls, [['openSettings']])
 })
 
+test('createAppMenuTemplate exposes manual update checks from the help menu', async () => {
+  const { createAppMenuTemplate } = await loadAppMenu()
+  const { actions, calls } = createActions()
+  const template = createAppMenuTemplate({
+    appName: 'Git Wikitree',
+    platform: 'linux',
+    recentRepositories: [],
+    recentFiles: [],
+    ...actions
+  })
+  const helpMenu = template.find((item) => item.label === 'Help')
+  const checkForUpdatesItem = helpMenu.submenu.find((item) => item.label === 'Check for Updates...')
+
+  checkForUpdatesItem.click()
+
+  assert.deepEqual(calls, [['checkForUpdates']])
+})
+
 test('createAppMenuTemplate disables empty recent menus and adds darwin app menu', async () => {
   const { createAppMenuTemplate } = await loadAppMenu()
   const { actions } = createActions()
@@ -276,10 +295,12 @@ test('createAppMenuTemplate localizes app menu labels', async () => {
   const fileMenu = template.find((item) => item.label === '文件')
   const editMenu = template.find((item) => item.label === '编辑')
   const viewMenu = template.find((item) => item.label === '视图')
+  const helpMenu = template.find((item) => item.label === '帮助')
 
   assert.ok(fileMenu)
   assert.ok(editMenu)
   assert.ok(viewMenu)
+  assert.ok(helpMenu)
   assert.deepEqual(
     fileMenu.submenu.map((item) => item.label ?? item.type),
     ['打开仓库...', '最近文件', 'separator', '保存', '关闭标签', '关闭窗口']
@@ -321,5 +342,9 @@ test('createAppMenuTemplate localizes app menu labels', async () => {
   assert.deepEqual(
     viewMenu.submenu.map((item) => item.label ?? item.role ?? item.type),
     ['重新加载', '切换开发者工具', 'separator', '切换文件树', 'separator', '重置缩放']
+  )
+  assert.deepEqual(
+    helpMenu.submenu.map((item) => item.label ?? item.type),
+    ['检查更新...']
   )
 })

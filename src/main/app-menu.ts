@@ -25,6 +25,7 @@ type AppMenuTemplateOptions = {
   selectAdjacentFileTab: (delta: FileTabShortcutDirection) => void
   saveCurrentFile: () => void
   openSettings: () => void
+  checkForUpdates: () => void
   openCurrentTabSearch: () => void
   openGlobalSearch: () => void
   toggleFilesTreeSidebar: () => void
@@ -45,6 +46,7 @@ export function createAppMenuTemplate({
   selectAdjacentFileTab,
   saveCurrentFile,
   openSettings,
+  checkForUpdates,
   openCurrentTabSearch,
   openGlobalSearch,
   toggleFilesTreeSidebar,
@@ -189,6 +191,15 @@ export function createAppMenuTemplate({
         },
         { type: 'separator' },
         { role: 'resetZoom', label: t('menu.resetZoom') }
+      ]
+    },
+    {
+      label: t('menu.help'),
+      submenu: [
+        {
+          label: t('menu.checkForUpdates'),
+          click: checkForUpdates
+        }
       ]
     }
   ]
